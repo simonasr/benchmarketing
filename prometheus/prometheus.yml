@@ -10,7 +10,7 @@ alerting:
     timeout: 10s
     api_version: v2
 scrape_configs:
-- job_name: prometheus
+- job_name: redben1
   honor_timestamps: true
   scrape_interval: 15s
   scrape_timeout: 10s
@@ -18,4 +18,4 @@ scrape_configs:
   scheme: http
   static_configs:
   - targets:
-    - localhost:9090
+    - bench1:8081
