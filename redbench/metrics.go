@@ -26,7 +26,7 @@ func NewMetrics(reg prometheus.Registerer) *metrics {
 			Name:      "request_duration_seconds",
 			Help:      "Duration of the request.",
 			Buckets:   buckets,
-		}, []string{"op", "db"}),
+		}, []string{"command", "db"}),
 	}
 	reg.MustRegister(m.duration, m.stage)
 

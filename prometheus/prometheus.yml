@@ -1,19 +1,19 @@
 global:
-  scrape_interval: 15s
-  scrape_timeout: 10s
-  evaluation_interval: 15s
-alerting:
-  alertmanagers:
-  - static_configs:
-    - targets: []
-    scheme: http
-    timeout: 10s
-    api_version: v2
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  evaluation_interval: 10s
+# alerting:
+#   alertmanagers:
+#   - static_configs:
+#     - targets: []
+#     scheme: http
+#     timeout: 10s
+#     api_version: v2
 scrape_configs:
 - job_name: redben1
   honor_timestamps: true
-  scrape_interval: 15s
-  scrape_timeout: 10s
+  scrape_interval: 10s
+  scrape_timeout: 5s
   metrics_path: /metrics
   scheme: http
   static_configs:
