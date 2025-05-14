@@ -1,5 +1,5 @@
 services:
-  bench1:
+  bench_redis:
     build:
       context: ./redbench
       dockerfile: Dockerfile
@@ -12,6 +12,22 @@ services:
     depends_on:
       - prometheus
       - redis
+      - valkey
+  
+  bench_valkey:
+    build:
+      context: ./redbench
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8081"
+    environment:
+      - REDIS_HOST=valkey
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    depends_on:
+      - prometheus
+      - redis
+      - valkey
 
   redis:
     image: redis:7
@@ -19,6 +35,15 @@ services:
     ports:
       - 6379:6379
     restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8.1.1
+    container_name: valkey
+    ports:
+      - 6380:6379
+    restart: unless-stopped
+
+  
   prometheus:
     image: prom/prometheus
     container_name: prometheus

@@ -4,7 +4,7 @@ debug: false
 redis:
   expirationS: 20
 test:
-  minClients: 1
-  maxClients: 100
-  stageIntervalS: 5
+  minClients: 10
+  maxClients: 1000
+  stageIntervalS: 3
   requestDelayMs: 100

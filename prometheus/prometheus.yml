@@ -10,7 +10,7 @@ global:
 #     timeout: 10s
 #     api_version: v2
 scrape_configs:
-- job_name: redben1
+- job_name: redis
   honor_timestamps: true
   scrape_interval: 10s
   scrape_timeout: 5s
@@ -18,4 +18,13 @@ scrape_configs:
   scheme: http
   static_configs:
   - targets:
-    - bench1:8081
+    - bench_redis:8081
+- job_name: valkey
+  honor_timestamps: true
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  metrics_path: /metrics
+  scheme: http
+  static_configs:
+  - targets:
+    - bench_valkey:8081
