@@ -1,4 +1,23 @@
 services:
+  bench1:
+    build:
+      context: ./redbench
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOST=redis
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    depends_on:
+      - prometheus
+      - redis
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - 6379:6379
+    restart: unless-stopped
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -19,9 +38,14 @@ services:
       - 3000:3000
     restart: unless-stopped
     environment:
+      - GF_DASHBOARDS_JSON_ENABLED=true
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_PATHS_DASHBOARDS=/var/lib/grafana/dashboards
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
 volumes:
   prom_data:
