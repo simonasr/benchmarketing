@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 2,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -68,7 +68,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -105,8 +105,11 @@
       "maxPerRow": 2,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -131,13 +134,13 @@
           "expr": "histogram_quantile($p, sum by(command, le,job) (\n  rate(redbench_request_duration_seconds_bucket{command=~\"$command\"}[$__rate_interval]))\n)",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "latency $command p90 ",
+      "title": "latency $command p$p",
       "type": "timeseries"
     },
     {
@@ -174,7 +177,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -237,25 +240,10 @@
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
-          "legendFormat": "__auto",
+          "interval": "",
+          "legendFormat": "{{job}} -> {{command}}",
           "range": true,
           "refId": "B",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "sum by (job) (redbench_stage)",
-          "fullMetaSearch": false,
-          "hide": false,
-          "includeNullMetadata": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A",
           "useBackend": false
         }
       ],
@@ -353,5 +341,5 @@
   "timezone": "browser",
   "title": "RedBench",
   "uid": "cb7796ce-254d-4f6f-99c8-8f4cfea15465",
-  "version": 4
+  "version": 2
 }
