@@ -10,8 +10,9 @@ import (
 )
 
 type metrics struct {
-	stage    prometheus.Gauge
-	duration *prometheus.HistogramVec
+	stage         prometheus.Gauge
+	duration      *prometheus.HistogramVec
+	requestFailed *prometheus.CounterVec
 }
 
 func NewMetrics(reg prometheus.Registerer) *metrics {
@@ -27,8 +28,13 @@ func NewMetrics(reg prometheus.Registerer) *metrics {
 			Help:      "Duration of the request.",
 			Buckets:   buckets,
 		}, []string{"command", "db"}),
+		requestFailed: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "redbench",
+			Name:      "request_failed_total",
+			Help:      "Total number of failed requests.",
+		}, []string{"command", "db"}),
 	}
-	reg.MustRegister(m.duration, m.stage)
+	reg.MustRegister(m.duration, m.stage, m.requestFailed)
 
 	return m
 }

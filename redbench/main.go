@@ -13,12 +13,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var host string
+var (
+	host string
+	port string
+)
 
 func init() {
 	host = os.Getenv("REDIS_HOST")
 	if host == "" {
 		log.Fatalln("You MUST set REDIS_HOST env variable!")
+	}
+	port = os.Getenv("REDIS_PORT")
+	if port == "" {
+		port = "6379"
 	}
 }
 
@@ -39,12 +46,14 @@ func runTest(cfg Config, m *metrics) {
 	currentClients := cfg.Test.MinClients
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:6379", host),
-		Password:     "",
-		DB:           0,
-		DialTimeout:  time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
-		ReadTimeout:  time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
-		WriteTimeout: time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
+		Addr:            fmt.Sprintf("%s:%s", host, port),
+		Password:        "",
+		DB:              0,
+		Protocol:        2,
+		DisableIdentity: true,
+		DialTimeout:     time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
+		ReadTimeout:     time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
+		WriteTimeout:    time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
 	})
 
 	for {

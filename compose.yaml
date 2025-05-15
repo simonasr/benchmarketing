@@ -13,7 +13,7 @@ services:
       - prometheus
       - redis
       - valkey
-    restart: never
+    restart: no
   
   bench_valkey:
     build:
@@ -29,7 +29,7 @@ services:
       - prometheus
       - redis
       - valkey
-    restart: never
+    restart: no
 
   redis:
     image: redis:7
