@@ -122,7 +122,7 @@
       },
       "pluginVersion": "12.0.0",
       "repeat": "command",
-      "repeatDirection": "h",
+      "repeatDirection": "v",
       "targets": [
         {
           "datasource": {
@@ -208,7 +208,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 17
       },
       "id": 2,
       "options": {
@@ -334,12 +334,13 @@
     ]
   },
   "time": {
-    "from": "now-15m",
-    "to": "now"
+    "from": "2025-05-14T20:50:37.495Z",
+    "to": "2025-05-14T22:23:08.200Z"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "RedBench",
   "uid": "cb7796ce-254d-4f6f-99c8-8f4cfea15465",
-  "version": 2
+  "version": 2,
+  "weekStart": "monday"
 }
