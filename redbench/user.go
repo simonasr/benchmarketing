@@ -46,6 +46,7 @@ func (u *User) SaveToRedis(ctx context.Context, rdb *redis.Client, m *metrics, e
 	err = rdb.Set(ctx, u.Uuid, b, expr).Err()
 	if err != nil {
 		util.Warn(err, "rdb.Set failed")
+		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis"}).Inc()
 	}
 
 	m.duration.With(prometheus.Labels{"command": "set", "db": "redis"}).Observe(time.Since(now).Seconds())
@@ -68,6 +69,7 @@ func (u *User) GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, 
 	val, err := rdb.Get(ctx, u.Uuid).Result()
 	if err != nil {
 		util.Warn(err, "rdb.Get failed")
+		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis"}).Inc()
 	}
 
 	if debug {
