@@ -39,9 +39,12 @@ func runTest(cfg Config, m *metrics) {
 	currentClients := cfg.Test.MinClients
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:6379", host),
-		Password: "",
-		DB:       0,
+		Addr:         fmt.Sprintf("%s:6379", host),
+		Password:     "",
+		DB:           0,
+		DialTimeout:  time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
+		ReadTimeout:  time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
+		WriteTimeout: time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
 	})
 
 	for {
