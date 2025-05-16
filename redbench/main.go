@@ -78,10 +78,18 @@ func runTest(cfg Config, m *metrics) {
 
 				u := NewUser()
 
-				err := u.SaveToRedis(ctx, rdb, m, cfg.Redis.Expiration, cfg.Debug)
+				opTimeout := time.Duration(cfg.Redis.OperationTimeoutMs) * time.Millisecond
+				opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+				defer cancel()
+
+				err := u.SaveToRedis(opCtx, rdb, m, cfg.Redis.Expiration, cfg.Debug)
 				util.Warn(err, "u.SaveToRedis failed")
 
-				err = u.GetFromRedis(ctx, rdb, m, cfg.Debug)
+				// Use a new context for the next operation to avoid reusing a canceled context
+				opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+				defer cancel2()
+
+				err = u.GetFromRedis(opCtx2, rdb, m, cfg.Debug)
 				util.Warn(err, "u.GetFromRedis failed")
 
 				<-clients
