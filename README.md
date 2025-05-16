@@ -16,13 +16,13 @@ cd benchmarketing
 
 ```bash
 # Start all services in detached mode
-docker compose up -d
+docker compose -f compose-example.yaml up -d
 
 # To view logs
-docker compose logs -f
+docker compose -f compose-example.yaml logs -f
 
 # To stop all services
-docker compose down
+docker compose -f compose-example.yaml down
 ```
 
 ### Accessing Monitoring Tools
@@ -44,13 +44,13 @@ docker compose down
 
 ```bash
 # Check service status
-docker compose ps
+docker compose -f compose-example.yaml ps
 
 # Restart specific service
-docker compose restart [service-name]
+docker compose -f compose-example.yaml restart [service-name]
 
 # View service logs
-docker compose logs [service-name]
+docker compose -f compose-example.yaml logs [service-name]
 ```
 
 ## Acknowledgments
