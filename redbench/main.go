@@ -58,6 +58,14 @@ func runTest(cfg Config, m *metrics) {
 	fmt.Println()
 	rdb := redis.NewClient(opts)
 
+	// Periodically update Redis pool stats metrics
+	go func() {
+		for {
+			m.UpdateRedisPoolStats(rdb.PoolStats())
+			time.Sleep(2 * time.Second)
+		}
+	}()
+
 	for {
 		clients := make(chan struct{}, currentClients)
 		m.stage.Set(float64(currentClients))
