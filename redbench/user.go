@@ -45,7 +45,6 @@ func (u *User) SaveToRedis(ctx context.Context, rdb *redis.Client, m *metrics, e
 
 	err = rdb.Set(ctx, u.Uuid, b, expr).Err()
 	if err != nil {
-		util.Warn(err, "rdb.Set failed")
 		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis"}).Inc()
 	}
 
@@ -55,7 +54,7 @@ func (u *User) SaveToRedis(ctx context.Context, rdb *redis.Client, m *metrics, e
 		fmt.Printf("item saved in redis, key: %s, value: %s\n", u.Uuid, string(b))
 	}
 
-	return nil
+	return err
 }
 
 func (u *User) GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, debug bool) (err error) {
@@ -68,7 +67,6 @@ func (u *User) GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, 
 
 	val, err := rdb.Get(ctx, u.Uuid).Result()
 	if err != nil {
-		util.Warn(err, "rdb.Get failed")
 		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis"}).Inc()
 	}
 
@@ -76,5 +74,5 @@ func (u *User) GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, 
 		fmt.Printf("item fetched from redis: %+v\n", val)
 	}
 
-	return nil
+	return err
 }
