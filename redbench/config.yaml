@@ -3,9 +3,8 @@ metricsPort: 8081
 debug: false
 redis:
   expirationS: 20
-  timeoutSeconds: 0.01
-test:
-  minClients: 5000
+  test:
+  minClients: 40000
   maxClients: 50000
   stageIntervalS: 1
-  requestDelayMs: 100
+  requestDelayMs: 1

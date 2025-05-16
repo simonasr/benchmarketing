@@ -37,6 +37,15 @@ func main() {
 	m := NewMetrics(reg)
 	StartPrometheusServer(cfg, reg)
 
+	log.Printf(
+		"Using Redis at %s:%s (DB: %d, Protocol: %d, DisableIdentity: %v)",
+		host,
+		port,
+		0,
+		2,
+		true,
+	)
+
 	runTest(*cfg, m)
 }
 
@@ -51,9 +60,6 @@ func runTest(cfg Config, m *metrics) {
 		DB:              0,
 		Protocol:        2,
 		DisableIdentity: true,
-		DialTimeout:     time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
-		ReadTimeout:     time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
-		WriteTimeout:    time.Duration(cfg.Redis.TimeoutSeconds) * time.Second,
 	})
 
 	for {

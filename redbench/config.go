@@ -15,8 +15,7 @@ type Config struct {
 }
 
 type RedisConfig struct {
-	Expiration     int32 `yaml:"expirationS"`
-	TimeoutSeconds int   `yaml:"timeoutSeconds"`
+	Expiration int32 `yaml:"expirationS"`
 }
 
 type Test struct {
