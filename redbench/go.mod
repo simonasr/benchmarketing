@@ -6,6 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/antonputra/go-utils v0.1.5
+	github.com/davecgh/go-spew v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.7.3

@@ -10,6 +10,7 @@ import (
 	"github.com/antonputra/go-utils/util"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -37,15 +38,6 @@ func main() {
 	m := NewMetrics(reg)
 	StartPrometheusServer(cfg, reg)
 
-	log.Printf(
-		"Using Redis at %s:%s (DB: %d, Protocol: %d, DisableIdentity: %v)",
-		host,
-		port,
-		0,
-		2,
-		true,
-	)
-
 	runTest(*cfg, m)
 }
 
@@ -54,13 +46,17 @@ func runTest(cfg Config, m *metrics) {
 	var ctx = context.Background()
 	currentClients := cfg.Test.MinClients
 
-	rdb := redis.NewClient(&redis.Options{
+	opts := &redis.Options{
 		Addr:            fmt.Sprintf("%s:%s", host, port),
 		Password:        "",
 		DB:              0,
 		Protocol:        2,
 		DisableIdentity: true,
-	})
+	}
+	fmt.Println("\nRedis Options:")
+	spew.Dump(opts)
+	fmt.Println()
+	rdb := redis.NewClient(opts)
 
 	for {
 		clients := make(chan struct{}, currentClients)
