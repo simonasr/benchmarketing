@@ -7,12 +7,20 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 )
 
 type metrics struct {
 	stage         prometheus.Gauge
 	duration      *prometheus.HistogramVec
 	requestFailed *prometheus.CounterVec
+
+	redisPoolTotalConns prometheus.Gauge
+	redisPoolIdleConns  prometheus.Gauge
+	redisPoolStaleConns prometheus.Gauge
+	redisPoolHits       prometheus.Gauge
+	redisPoolMisses     prometheus.Gauge
+	redisPoolTimeouts   prometheus.Gauge
 }
 
 func NewMetrics(reg prometheus.Registerer) *metrics {
@@ -33,10 +41,54 @@ func NewMetrics(reg prometheus.Registerer) *metrics {
 			Name:      "request_failed_total",
 			Help:      "Total number of failed requests.",
 		}, []string{"command", "db"}),
+
+		redisPoolTotalConns: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_total_conns",
+			Help:      "Total number of connections in the Redis connection pool.",
+		}),
+		redisPoolIdleConns: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_idle_conns",
+			Help:      "Number of idle connections in the Redis connection pool.",
+		}),
+		redisPoolStaleConns: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_stale_conns",
+			Help:      "Number of stale connections removed from the Redis connection pool.",
+		}),
+		redisPoolHits: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_hits",
+			Help:      "Number of times a connection was found in the pool.",
+		}),
+		redisPoolMisses: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_misses",
+			Help:      "Number of times a connection was not found in the pool.",
+		}),
+		redisPoolTimeouts: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "redbench",
+			Name:      "redis_pool_timeouts",
+			Help:      "Number of times a wait for a connection timed out.",
+		}),
 	}
-	reg.MustRegister(m.duration, m.stage, m.requestFailed)
+	reg.MustRegister(
+		m.duration, m.stage, m.requestFailed,
+		m.redisPoolTotalConns, m.redisPoolIdleConns, m.redisPoolStaleConns,
+		m.redisPoolHits, m.redisPoolMisses, m.redisPoolTimeouts,
+	)
 
 	return m
+}
+
+func (m *metrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
+	m.redisPoolTotalConns.Set(float64(stats.TotalConns))
+	m.redisPoolIdleConns.Set(float64(stats.IdleConns))
+	m.redisPoolStaleConns.Set(float64(stats.StaleConns))
+	m.redisPoolHits.Set(float64(stats.Hits))
+	m.redisPoolMisses.Set(float64(stats.Misses))
+	m.redisPoolTimeouts.Set(float64(stats.Timeouts))
 }
 
 func StartPrometheusServer(c *Config, reg *prometheus.Registry) {
