@@ -3,6 +3,7 @@ metricsPort: 8081
 debug: false
 redis:
   expirationS: 20
+  operationTimeoutMs: 100
 test:
   minClients: 1
   maxClients: 50000
