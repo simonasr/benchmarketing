@@ -45,10 +45,10 @@ func (u *User) SaveToRedis(ctx context.Context, rdb *redis.Client, m *metrics, e
 
 	err = rdb.Set(ctx, u.Uuid, b, expr).Err()
 	if err != nil {
-		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis"}).Inc()
+		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": host + ":" + port}).Inc()
 	}
 
-	m.duration.With(prometheus.Labels{"command": "set", "db": "redis"}).Observe(time.Since(now).Seconds())
+	m.duration.With(prometheus.Labels{"command": "set", "db": "redis", "target": host + ":" + port}).Observe(time.Since(now).Seconds())
 
 	if debug {
 		fmt.Printf("item saved in redis, key: %s, value: %s\n", u.Uuid, string(b))
@@ -61,13 +61,13 @@ func (u *User) GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, 
 	now := time.Now()
 	defer func() {
 		if err == nil {
-			m.duration.With(prometheus.Labels{"command": "get", "db": "redis"}).Observe(time.Since(now).Seconds())
+			m.duration.With(prometheus.Labels{"command": "get", "db": "redis", "target": host + ":" + port}).Observe(time.Since(now).Seconds())
 		}
 	}()
 
 	val, err := rdb.Get(ctx, u.Uuid).Result()
 	if err != nil {
-		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis"}).Inc()
+		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis", "target": host + ":" + port}).Inc()
 	}
 
 	if debug {
