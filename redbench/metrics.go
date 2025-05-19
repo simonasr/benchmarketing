@@ -23,54 +23,61 @@ type metrics struct {
 	redisPoolTimeouts   prometheus.Gauge
 }
 
-func NewMetrics(reg prometheus.Registerer) *metrics {
+func NewMetrics(reg prometheus.Registerer, target string) *metrics {
 	m := &metrics{
 		stage: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "stage",
-			Help:      "Stage of the test.",
+			Namespace:   "redbench",
+			Name:        "stage",
+			Help:        "Stage of the test.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: "redbench",
 			Name:      "request_duration_seconds",
 			Help:      "Duration of the request.",
 			Buckets:   buckets,
-		}, []string{"command", "db"}),
+		}, []string{"command", "db", "target"}),
 		requestFailed: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "redbench",
 			Name:      "request_failed_total",
 			Help:      "Total number of failed requests.",
-		}, []string{"command", "db"}),
+		}, []string{"command", "db", "target"}),
 
 		redisPoolTotalConns: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_total_conns",
-			Help:      "Total number of connections in the Redis connection pool.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_total_conns",
+			Help:        "Total number of connections in the Redis connection pool.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		redisPoolIdleConns: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_idle_conns",
-			Help:      "Number of idle connections in the Redis connection pool.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_idle_conns",
+			Help:        "Number of idle connections in the Redis connection pool.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		redisPoolStaleConns: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_stale_conns",
-			Help:      "Number of stale connections removed from the Redis connection pool.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_stale_conns",
+			Help:        "Number of stale connections removed from the Redis connection pool.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		redisPoolHits: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_hits",
-			Help:      "Number of times a connection was found in the pool.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_hits",
+			Help:        "Number of times a connection was found in the pool.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		redisPoolMisses: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_misses",
-			Help:      "Number of times a connection was not found in the pool.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_misses",
+			Help:        "Number of times a connection was not found in the pool.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 		redisPoolTimeouts: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "redbench",
-			Name:      "redis_pool_timeouts",
-			Help:      "Number of times a wait for a connection timed out.",
+			Namespace:   "redbench",
+			Name:        "redis_pool_timeouts",
+			Help:        "Number of times a wait for a connection timed out.",
+			ConstLabels: prometheus.Labels{"target": target},
 		}),
 	}
 	reg.MustRegister(

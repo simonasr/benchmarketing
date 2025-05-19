@@ -35,7 +35,7 @@ func main() {
 	cfg.loadConfig("config.yaml")
 
 	reg := prometheus.NewRegistry()
-	m := NewMetrics(reg)
+	m := NewMetrics(reg, host+":"+port)
 	StartPrometheusServer(cfg, reg)
 
 	runTest(*cfg, m)
