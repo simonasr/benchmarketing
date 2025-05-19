@@ -131,10 +131,10 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($p, sum by(command, le,job) (\n  rate(redbench_request_duration_seconds_bucket{command=~\"$command\"}[$__rate_interval]))\n)",
+          "expr": "histogram_quantile($p, sum by(command, le,target) (\n  rate(redbench_request_duration_seconds_bucket{command=~\"$command\"}[$__rate_interval]))\n)",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{target}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -236,12 +236,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (command,job) (rate(redbench_request_duration_seconds_count[$__rate_interval]))",
+          "expr": "sum by (command,target) (rate(redbench_request_duration_seconds_count[$__rate_interval]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
           "interval": "",
-          "legendFormat": "{{job}} -> {{command}}",
+          "legendFormat": "{{target}} -> {{command}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -343,12 +343,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (command,job) (rate(redbench_request_failed_total{command=~\"$command\"}[$__rate_interval]))",
+          "expr": "sum by (command,target) (rate(redbench_request_failed_total{command=~\"$command\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
           "interval": "",
-          "legendFormat": "{{job}} -> {{command}}",
+          "legendFormat": "{{target}} -> {{command}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -455,7 +455,7 @@
           "hide": false,
           "includeNullMetadata": false,
           "interval": "",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{job}} - {{target}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -539,13 +539,13 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 38
+            "y": 47
           },
           "id": 8,
           "options": {
             "legend": {
               "calcs": [],
-              "displayMode": "list",
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -560,7 +560,7 @@
             {
               "editorMode": "code",
               "expr": "redbench_redis_pool_total_conns{job=~\"$job\"}",
-              "legendFormat": "{{job}}",
+              "legendFormat": "{{target}}",
               "range": true,
               "refId": "A"
             }
@@ -634,13 +634,13 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 47
+            "y": 56
           },
           "id": 9,
           "options": {
             "legend": {
               "calcs": [],
-              "displayMode": "list",
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -655,7 +655,7 @@
             {
               "editorMode": "code",
               "expr": "rate(redbench_redis_pool_hits{job=~\"$job\"}[$__rate_interval])",
-              "legendFormat": "{{job}}",
+              "legendFormat": "{{target}}",
               "range": true,
               "refId": "A"
             }
@@ -729,13 +729,13 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 55
+            "y": 64
           },
           "id": 10,
           "options": {
             "legend": {
               "calcs": [],
-              "displayMode": "list",
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -750,7 +750,7 @@
             {
               "editorMode": "code",
               "expr": "rate(redbench_redis_pool_misses{job=~\"$job\"}[$__rate_interval])",
-              "legendFormat": "{{job}}",
+              "legendFormat": "{{target}}",
               "range": true,
               "refId": "A"
             }
@@ -824,13 +824,13 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 63
+            "y": 72
           },
           "id": 11,
           "options": {
             "legend": {
               "calcs": [],
-              "displayMode": "list",
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -845,7 +845,7 @@
             {
               "editorMode": "code",
               "expr": "redbench_redis_pool_stale_conns{job=~\"$job\"} > 0",
-              "legendFormat": "stale conns {{job}}",
+              "legendFormat": "stale conns {{target}}",
               "range": true,
               "refId": "A"
             },
@@ -857,7 +857,7 @@
               "editorMode": "code",
               "expr": "rate(redbench_redis_pool_timeouts{job=~\"$job\"}[$__rate_interval])",
               "hide": false,
-              "legendFormat": "timeouts {{job}}",
+              "legendFormat": "timeouts {{target}}",
               "range": true,
               "refId": "B"
             }
@@ -903,7 +903,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 118
+            "y": 81
           },
           "id": 4,
           "options": {
@@ -944,7 +944,7 @@
             }
           },
           "pluginVersion": "12.0.0",
-          "repeat": "job",
+          "repeat": "target",
           "repeatDirection": "v",
           "targets": [
             {
@@ -956,7 +956,7 @@
               "refId": "A"
             }
           ],
-          "title": "$job",
+          "title": "$target",
           "type": "heatmap"
         }
       ],
@@ -1020,6 +1020,29 @@
         "query": {
           "qryType": 1,
           "query": "label_values(redbench_request_duration_seconds_count,job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(redbench_request_duration_seconds_count,target)",
+        "includeAll": true,
+        "multi": true,
+        "name": "target",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(redbench_request_duration_seconds_count,target)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
