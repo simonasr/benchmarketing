@@ -40,7 +40,7 @@ func (u *User) SaveToRedis(ctx context.Context, rdb *redis.Client, m *metrics, e
 		return util.Annotate(err, "json.Marshal failed")
 	}
 
-	expr := time.Duration(time.Duration(exp) * time.Second)
+	expr := time.Duration(exp) * time.Second
 	now := time.Now()
 
 	err = rdb.Set(ctx, u.Uuid, b, expr).Err()
