@@ -1,0 +1,79 @@
+services:
+  bench_redis:
+    build:
+      context: ./redbench
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOST=redis
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    depends_on:
+      - prometheus
+      - redis
+      - valkey
+    restart: no
+  
+  bench_valkey:
+    build:
+      context: ./redbench
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8081"
+    environment:
+      - REDIS_HOST=valkey
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    depends_on:
+      - prometheus
+      - redis
+      - valkey
+    restart: no
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8.1.1
+    container_name: valkey
+    ports:
+      - 6380:6379
+    restart: unless-stopped
+
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prom_data:/prometheus
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    dns:
+      - 10.32.0.13
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_DASHBOARDS_JSON_ENABLED=true
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_PATHS_DASHBOARDS=/var/lib/grafana/dashboards
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+volumes:
+  prom_data:
