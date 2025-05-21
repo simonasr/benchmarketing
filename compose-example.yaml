@@ -1,20 +1,36 @@
 services:
-  bench_redis:
+  bench_redis8:
     build:
       context: ./redbench
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis8
     volumes:
       - ./redbench/config.yaml:/config.yaml
     depends_on:
       - prometheus
-      - redis
+      - redis8
       - valkey
     restart: no
-  
+
+  bench_redis7:
+    build:
+      context: ./redbench
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8081"
+    environment:
+      - REDIS_HOST=redis7
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    depends_on:
+      - prometheus
+      - redis7
+      - valkey
+    restart: no
+
   bench_valkey:
     build:
       context: ./redbench
@@ -27,15 +43,23 @@ services:
       - ./redbench/config.yaml:/config.yaml
     depends_on:
       - prometheus
-      - redis
+      - redis8
+      - redis7
       - valkey
     restart: no
 
-  redis:
+  redis8:
     image: redis:8.0.1
-    container_name: redis
+    container_name: redis8
     ports:
       - 6379:6379
+    restart: unless-stopped
+
+  redis7:
+    image: redis:7.2
+    container_name: redis7
+    ports:
+      - 6378:6379
     restart: unless-stopped
 
   valkey:
@@ -45,7 +69,6 @@ services:
       - 6380:6379
     restart: unless-stopped
 
-  
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -60,8 +83,6 @@ services:
   grafana:
     image: grafana/grafana
     container_name: grafana
-    dns:
-      - 10.32.0.13
     ports:
       - 3000:3000
     restart: unless-stopped
