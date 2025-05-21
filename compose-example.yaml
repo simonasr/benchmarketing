@@ -1,52 +1,38 @@
 services:
-  bench_redis8:
+  # Common benchmark service template
+  bench_base: &bench_base
     build:
       context: ./redbench
       dockerfile: Dockerfile
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    restart: no
+    depends_on:
+      - prometheus
+      - redis8
+      - redis7
+      - valkey
+
+  bench_redis8:
+    <<: *bench_base
     ports:
       - "8081:8081"
     environment:
       - REDIS_HOST=redis8
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    depends_on:
-      - prometheus
-      - redis8
-      - valkey
-    restart: no
 
   bench_redis7:
-    build:
-      context: ./redbench
-      dockerfile: Dockerfile
+    <<: *bench_base
     ports:
       - "8083:8081"
     environment:
       - REDIS_HOST=redis7
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    depends_on:
-      - prometheus
-      - redis7
-      - valkey
-    restart: no
 
   bench_valkey:
-    build:
-      context: ./redbench
-      dockerfile: Dockerfile
+    <<: *bench_base
     ports:
       - "8082:8081"
     environment:
       - REDIS_HOST=valkey
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    depends_on:
-      - prometheus
-      - redis8
-      - redis7
-      - valkey
-    restart: no
 
   redis8:
     image: redis:8.0.1
