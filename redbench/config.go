@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/antonputra/go-utils/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -24,12 +23,18 @@ type Test struct {
 	MaxClients     int `yaml:"maxClients"`
 	StageIntervalS int `yaml:"stageIntervalS"`
 	RequestDelayMs int `yaml:"requestDelayMs"`
+	KeySize        int `yaml:"keySize"`
+	ValueSize      int `yaml:"valueSize"`
 }
 
 func (c *Config) loadConfig(path string) {
 	f, err := os.ReadFile(path)
-	util.Fail(err, "os.ReadFile failed")
+	if err != nil {
+		panic("os.ReadFile failed: " + err.Error())
+	}
 
 	err = yaml.Unmarshal(f, c)
-	util.Fail(err, "yaml.Unmarshal failed")
+	if err != nil {
+		panic("yaml.Unmarshal failed: " + err.Error())
+	}
 }
