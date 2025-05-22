@@ -14,3 +14,15 @@ scrape_configs:
     - bench_redis8:8081
     - bench_redis7:8081
     - bench_valkey:8081
+
+- job_name: redis_exporters
+  honor_timestamps: true
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  metrics_path: /metrics
+  scheme: http
+  static_configs:
+    - targets:
+      - redis8-exporter:9121
+      - redis7-exporter:9121
+      - valkey-exporter:9121
