@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/antonputra/go-utils/util"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/davecgh/go-spew/spew"
@@ -74,23 +73,25 @@ func runTest(cfg Config, m *metrics) {
 		for {
 			clients <- struct{}{}
 			go func() {
-				util.Sleep(cfg.Test.RequestDelayMs)
-
-				u := NewUser()
+				time.Sleep(time.Duration(cfg.Test.RequestDelayMs) * time.Millisecond)
 
 				opTimeout := time.Duration(cfg.Redis.OperationTimeoutMs) * time.Millisecond
 				opCtx, cancel := context.WithTimeout(ctx, opTimeout)
 				defer cancel()
 
-				err := u.SaveToRedis(opCtx, rdb, m, cfg.Redis.Expiration, cfg.Debug)
-				util.Warn(err, "u.SaveToRedis failed")
+				key, err := SaveRandomToRedis(opCtx, rdb, m, cfg.Redis.Expiration, cfg.Debug, cfg.Test.KeySize, cfg.Test.ValueSize)
+				if err != nil {
+					fmt.Printf("SaveRandomToRedis failed: %v\n", err)
+				}
 
 				// Use a new context for the next operation to avoid reusing a canceled context
 				opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
 				defer cancel2()
 
-				err = u.GetFromRedis(opCtx2, rdb, m, cfg.Debug)
-				util.Warn(err, "u.GetFromRedis failed")
+				err = GetFromRedis(opCtx2, rdb, m, cfg.Debug, key)
+				if err != nil {
+					fmt.Printf("GetFromRedis failed: %v\n", err)
+				}
 
 				<-clients
 			}()

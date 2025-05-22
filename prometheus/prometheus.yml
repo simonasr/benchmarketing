@@ -2,15 +2,8 @@ global:
   scrape_interval: 10s
   scrape_timeout: 5s
   evaluation_interval: 10s
-# alerting:
-#   alertmanagers:
-#   - static_configs:
-#     - targets: []
-#     scheme: http
-#     timeout: 10s
-#     api_version: v2
 scrape_configs:
-- job_name: redis
+- job_name: redbench
   honor_timestamps: true
   scrape_interval: 10s
   scrape_timeout: 5s
@@ -18,13 +11,18 @@ scrape_configs:
   scheme: http
   static_configs:
   - targets:
-    - bench_redis:8081
-- job_name: valkey
-  honor_timestamps: true
-  scrape_interval: 10s
-  scrape_timeout: 5s
-  metrics_path: /metrics
-  scheme: http
-  static_configs:
-  - targets:
+    - bench_redis8:8081
+    - bench_redis7:8081
     - bench_valkey:8081
+
+- job_name: redis_exporters
+  honor_timestamps: true
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  metrics_path: /metrics
+  scheme: http
+  static_configs:
+    - targets:
+      - redis8-exporter:9121
+      - redis7-exporter:9121
+      - valkey-exporter:9121
