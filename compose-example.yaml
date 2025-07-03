@@ -1,41 +1,51 @@
 services:
-  bench_redis:
+  # Common benchmark service template
+  bench_base: &bench_base
     build:
       context: ./redbench
       dockerfile: Dockerfile
+    volumes:
+      - ./redbench/config.yaml:/config.yaml
+    restart: no
+    depends_on:
+      - prometheus
+      - redis8
+      - redis7
+      - valkey
+
+  bench_redis8:
+    <<: *bench_base
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOST=redis
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    depends_on:
-      - prometheus
-      - redis
-      - valkey
-    restart: no
-  
+      - REDIS_HOST=redis8
+
+  bench_redis7:
+    <<: *bench_base
+    ports:
+      - "8083:8081"
+    environment:
+      - REDIS_HOST=redis7
+
   bench_valkey:
-    build:
-      context: ./redbench
-      dockerfile: Dockerfile
+    <<: *bench_base
     ports:
       - "8082:8081"
     environment:
       - REDIS_HOST=valkey
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    depends_on:
-      - prometheus
-      - redis
-      - valkey
-    restart: no
 
-  redis:
-    image: redis:7
-    container_name: redis
+  redis8:
+    image: redis:8.0.1
+    container_name: redis8
     ports:
       - 6379:6379
+    restart: unless-stopped
+
+  redis7:
+    image: redis:7.2
+    container_name: redis7
+    ports:
+      - 6378:6379
     restart: unless-stopped
 
   valkey:
@@ -45,7 +55,39 @@ services:
       - 6380:6379
     restart: unless-stopped
 
-  
+  redis8-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    container_name: redis8-exporter
+    environment:
+      - REDIS_ADDR=redis8:6379
+    ports:
+      - 9121:9121
+    command: ["--redis.addr=redis8:6379", "--web.listen-address=:9121"]
+    depends_on:
+      - redis8
+
+  redis7-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    container_name: redis7-exporter
+    environment:
+      - REDIS_ADDR=redis7:6379
+    ports:
+      - 9122:9121
+    command: ["--redis.addr=redis7:6379", "--web.listen-address=:9121"]
+    depends_on:
+      - redis7
+
+  valkey-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    container_name: valkey-exporter
+    environment:
+      - REDIS_ADDR=valkey:6379
+    ports:
+      - 9123:9121
+    command: ["--redis.addr=valkey:6379", "--web.listen-address=:9121"]
+    depends_on:
+      - valkey
+
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -60,8 +102,6 @@ services:
   grafana:
     image: grafana/grafana
     container_name: grafana
-    dns:
-      - 10.32.0.13
     ports:
       - 3000:3000
     restart: unless-stopped
