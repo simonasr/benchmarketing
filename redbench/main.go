@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,31 +14,46 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	host string
-	port string
-)
-
-func init() {
-	host = os.Getenv("REDIS_HOST")
-	if host == "" {
-		log.Fatalln("You MUST set REDIS_HOST env variable!")
-	}
-	port = os.Getenv("REDIS_PORT")
-	if port == "" {
-		port = "6379"
-	}
-}
-
 func main() {
 	cfg := new(Config)
 	cfg.loadConfig("config.yaml")
 
 	reg := prometheus.NewRegistry()
-	m := NewMetrics(reg, host+":"+port)
+	m := NewMetrics(reg, getRedisAddrsFromEnv()[0])
 	StartPrometheusServer(cfg, reg)
 
 	runTest(*cfg, m)
+}
+
+func getRedisAddrsFromEnv() []string {
+	if cluster := os.Getenv("REDIS_CLUSTER_HOSTS"); cluster != "" {
+		// Split comma-separated hosts
+		var addrs []string
+		for _, addr := range splitAndTrim(cluster, ",") {
+			if addr != "" {
+				addrs = append(addrs, addr)
+			}
+		}
+		if len(addrs) > 0 {
+			return addrs
+		}
+	}
+	host := os.Getenv("REDIS_HOST")
+	if host == "" {
+		log.Fatalln("You MUST set REDIS_HOST or REDIS_CLUSTER_HOSTS env variable!")
+	}
+	return []string{host}
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := []string{}
+	for _, p := range strings.Split(s, sep) {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
 }
 
 func runTest(cfg Config, m *metrics) {
@@ -45,25 +61,27 @@ func runTest(cfg Config, m *metrics) {
 	var ctx = context.Background()
 	currentClients := cfg.Test.MinClients
 
-	opts := &redis.Options{
-		Addr:            fmt.Sprintf("%s:%s", host, port),
-		Password:        "",
-		DB:              0,
-		Protocol:        2,
-		DisableIdentity: true,
+	addrs := getRedisAddrsFromEnv()
+	uopts := &redis.UniversalOptions{
+		Addrs:    addrs,
+		Password: "",
+		DB:       0,
+		// Protocol and DisableIdentity are not in UniversalOptions, so skip them
 	}
-	fmt.Println("\nRedis Options:")
-	spew.Dump(opts)
+	fmt.Println("\nRedis Universal Options:")
+	spew.Dump(uopts)
 	fmt.Println()
-	rdb := redis.NewClient(opts)
+	rdb := redis.NewUniversalClient(uopts)
 
-	// Periodically update Redis pool stats metrics
-	go func() {
-		for {
-			m.UpdateRedisPoolStats(rdb.PoolStats())
-			time.Sleep(2 * time.Second)
-		}
-	}()
+	// Try to get pool stats if supported
+	if statsProvider, ok := rdb.(interface{ PoolStats() *redis.PoolStats }); ok {
+		go func() {
+			for {
+				m.UpdateRedisPoolStats(statsProvider.PoolStats())
+				time.Sleep(2 * time.Second)
+			}
+		}()
+	}
 
 	for {
 		clients := make(chan struct{}, currentClients)
