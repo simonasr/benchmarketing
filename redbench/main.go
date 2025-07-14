@@ -46,6 +46,13 @@ func main() {
 	runTest(*cfg, m)
 }
 
+// RedisOptsLog is a serializable subset of redis.Options for logging
+type RedisOptsLog struct {
+	Addr     string `json:"addr"`
+	DB       int    `json:"db"`
+	Protocol int    `json:"protocol"`
+}
+
 func runTest(cfg Config, m *metrics) {
 
 	var ctx = context.Background()
@@ -58,7 +65,11 @@ func runTest(cfg Config, m *metrics) {
 		Protocol:        2,
 		DisableIdentity: true,
 	}
-	slog.Info("Redis options", "event", "redis_options", "data", opts)
+	slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
+		Addr:     opts.Addr,
+		DB:       opts.DB,
+		Protocol: opts.Protocol,
+	})
 	rdb := redis.NewClient(opts)
 
 	// Periodically update Redis pool stats metrics
