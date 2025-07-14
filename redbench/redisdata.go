@@ -14,6 +14,7 @@ var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // randomString generates a random alphanumeric string of the given length.
 func randomString(length int) string {
+	fmt.Printf("randomString called with length=%d\n", length)
 	if length <= 0 {
 		panic("randomString: length must be > 0, got " + fmt.Sprint(length))
 	}
