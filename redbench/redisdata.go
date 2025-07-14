@@ -12,12 +12,7 @@ import (
 
 // randomString generates a random alphanumeric string of the given length.
 func randomString(length int) string {
-	fmt.Printf("randomString called with length=%d\n", length)
-	if length <= 0 {
-		panic("randomString: length must be > 0, got " + fmt.Sprint(length))
-	}
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	fmt.Printf("letters=%q, len(letters)=%d\n", letters, len(letters))
 	result := make([]byte, length)
 	for i := range result {
 		result[i] = letters[rand.Intn(len(letters))]
