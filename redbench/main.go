@@ -37,6 +37,8 @@ func main() {
 	cfg := new(Config)
 	cfg.loadConfig("config.yaml")
 
+	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
+
 	reg := prometheus.NewRegistry()
 	m := NewMetrics(reg, host+":"+port)
 	StartPrometheusServer(cfg, reg)
@@ -56,7 +58,7 @@ func runTest(cfg Config, m *metrics) {
 		Protocol:        2,
 		DisableIdentity: true,
 	}
-	slog.Info("Redis Options", "options", fmt.Sprintf("%+v", opts))
+	slog.Info("Redis options", "event", "redis_options", "data", opts)
 	rdb := redis.NewClient(opts)
 
 	// Periodically update Redis pool stats metrics
