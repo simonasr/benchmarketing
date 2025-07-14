@@ -4,6 +4,9 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v2"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -37,4 +40,35 @@ func (c *Config) loadConfig(path string) {
 	if err != nil {
 		panic("yaml.Unmarshal failed: " + err.Error())
 	}
+
+	// Override Test fields from ENV variables
+	testVal := reflect.ValueOf(&c.Test).Elem()
+	testType := testVal.Type()
+	for i := 0; i < testVal.NumField(); i++ {
+		field := testType.Field(i)
+		fieldName := field.Name
+		// ENV var: TEST_<UPPERCASE_FIELDNAME>
+		envName := "TEST_" + toEnvName(fieldName)
+		if val, ok := os.LookupEnv(envName); ok {
+			switch testVal.Field(i).Kind() {
+			case reflect.Int, reflect.Int32, reflect.Int64:
+				if intVal, err := strconv.Atoi(val); err == nil {
+					testVal.Field(i).SetInt(int64(intVal))
+				}
+			// Add more types as needed
+			}
+		}
+	}
+}
+
+// toEnvName converts CamelCase to upper snake case (e.g., MinClients -> MINCLIENTS)
+func toEnvName(s string) string {
+	res := ""
+	for i, c := range s {
+		if i > 0 && c >= 'A' && c <= 'Z' {
+			res += "_"
+		}
+		res += string(c)
+	}
+	return strings.ToUpper(res)
 }
