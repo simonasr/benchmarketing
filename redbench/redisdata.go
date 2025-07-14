@@ -10,8 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 // randomString generates a random alphanumeric string of the given length.
 func randomString(length int) string {
 	fmt.Printf("randomString called with length=%d\n", length)
@@ -22,7 +20,7 @@ func randomString(length int) string {
 	fmt.Printf("letters=%q, len(letters)=%d\n", letters, len(letters))
 	result := make([]byte, length)
 	for i := range result {
-		result[i] = letters[seededRand.Intn(len(letters))]
+		result[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(result)
 }
