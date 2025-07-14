@@ -19,6 +19,7 @@ func randomString(length int) string {
 		panic("randomString: length must be > 0, got " + fmt.Sprint(length))
 	}
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	fmt.Printf("letters=%q, len(letters)=%d\n", letters, len(letters))
 	result := make([]byte, length)
 	for i := range result {
 		result[i] = letters[seededRand.Intn(len(letters))]
