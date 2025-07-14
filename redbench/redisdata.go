@@ -14,6 +14,9 @@ var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // randomString generates a random alphanumeric string of the given length.
 func randomString(length int) string {
+	if length <= 0 {
+		panic("randomString: length must be > 0, got " + fmt.Sprint(length))
+	}
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
 	for i := range result {
