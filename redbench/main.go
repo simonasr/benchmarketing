@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
-	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -18,14 +19,9 @@ var (
 )
 
 func init() {
-	// Set up slog to use JSON output
-	h := slog.NewJSONHandler(os.Stdout, nil)
-	slog.SetDefault(slog.New(h))
-
 	host = os.Getenv("REDIS_HOST")
 	if host == "" {
-		slog.Error("You MUST set REDIS_HOST env variable!")
-		os.Exit(1)
+		log.Fatalln("You MUST set REDIS_HOST env variable!")
 	}
 	port = os.Getenv("REDIS_PORT")
 	if port == "" {
@@ -37,20 +33,11 @@ func main() {
 	cfg := new(Config)
 	cfg.loadConfig("config.yaml")
 
-	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
-
 	reg := prometheus.NewRegistry()
 	m := NewMetrics(reg, host+":"+port)
 	StartPrometheusServer(cfg, reg)
 
 	runTest(*cfg, m)
-}
-
-// RedisOptsLog is a serializable subset of redis.Options for logging
-type RedisOptsLog struct {
-	Addr     string `json:"addr"`
-	DB       int    `json:"db"`
-	Protocol int    `json:"protocol"`
 }
 
 func runTest(cfg Config, m *metrics) {
@@ -65,11 +52,9 @@ func runTest(cfg Config, m *metrics) {
 		Protocol:        2,
 		DisableIdentity: true,
 	}
-	slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
-		Addr:     opts.Addr,
-		DB:       opts.DB,
-		Protocol: opts.Protocol,
-	})
+	fmt.Println("\nRedis Options:")
+	spew.Dump(opts)
+	fmt.Println()
 	rdb := redis.NewClient(opts)
 
 	// Periodically update Redis pool stats metrics
@@ -96,7 +81,7 @@ func runTest(cfg Config, m *metrics) {
 
 				key, err := SaveRandomToRedis(opCtx, rdb, m, cfg.Redis.Expiration, cfg.Debug, cfg.Test.KeySize, cfg.Test.ValueSize)
 				if err != nil {
-					slog.Error("SaveRandomToRedis failed", "err", err)
+					fmt.Printf("SaveRandomToRedis failed: %v\n", err)
 				}
 
 				// Use a new context for the next operation to avoid reusing a canceled context
@@ -105,7 +90,7 @@ func runTest(cfg Config, m *metrics) {
 
 				err = GetFromRedis(opCtx2, rdb, m, cfg.Debug, key)
 				if err != nil {
-					slog.Error("GetFromRedis failed", "err", err)
+					fmt.Printf("GetFromRedis failed: %v\n", err)
 				}
 
 				<-clients
