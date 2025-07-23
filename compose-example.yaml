@@ -1,18 +1,17 @@
-services:
-  # Common benchmark service template
-  bench_base: &bench_base
-    build:
-      context: ./redbench
-      dockerfile: Dockerfile
-    volumes:
-      - ./redbench/config.yaml:/config.yaml
-    restart: no
-    depends_on:
-      - prometheus
-      - redis8
-      - redis7
-      - valkey
+x-bench_base: &bench_base
+  build:
+    context: ./redbench
+    dockerfile: Dockerfile
+  volumes:
+    - ./redbench/config.yaml:/config.yaml
+  restart: no
+  depends_on:
+    - prometheus
+    - redis8
+    - redis7
+    - valkey
 
+services:
   bench_redis8:
     <<: *bench_base
     ports:
