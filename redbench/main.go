@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	host string
-	port string
+	host                string
+	port                string
+	clusterAddress      string
+	redisTargetLabel    string
 )
 
 func init() {
@@ -22,14 +24,22 @@ func init() {
 	h := slog.NewJSONHandler(os.Stdout, nil)
 	slog.SetDefault(slog.New(h))
 
+	clusterAddress = os.Getenv("REDIS_CLUSTER_ADDRESS")
 	host = os.Getenv("REDIS_HOST")
-	if host == "" {
-		slog.Error("You MUST set REDIS_HOST env variable!")
-		os.Exit(1)
-	}
 	port = os.Getenv("REDIS_PORT")
 	if port == "" {
 		port = "6379"
+	}
+
+	if clusterAddress == "" && host == "" {
+		slog.Error("You MUST set REDIS_HOST or REDIS_CLUSTER_ADDRESS env variable!")
+		os.Exit(1)
+	}
+
+	if clusterAddress != "" {
+		redisTargetLabel = clusterAddress
+	} else {
+		redisTargetLabel = host + ":" + port
 	}
 }
 
@@ -40,13 +50,14 @@ func main() {
 	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
 
 	reg := prometheus.NewRegistry()
-	m := NewMetrics(reg, host+":"+port)
+	m := NewMetrics(reg, redisTargetLabel)
 	StartPrometheusServer(cfg, reg)
 
 	runTest(*cfg, m)
 }
 
 // RedisOptsLog is a serializable subset of redis.Options for logging
+// For cluster, Addr is the cluster address string
 type RedisOptsLog struct {
 	Addr     string `json:"addr"`
 	DB       int    `json:"db"`
@@ -54,23 +65,31 @@ type RedisOptsLog struct {
 }
 
 func runTest(cfg Config, m *metrics) {
-
 	var ctx = context.Background()
 	currentClients := cfg.Test.MinClients
 
-	opts := &redis.Options{
-		Addr:            fmt.Sprintf("%s:%s", host, port),
-		Password:        "",
-		DB:              0,
-		Protocol:        2,
-		DisableIdentity: true,
+	var rdb redis.UniversalClient
+	if clusterAddress != "" {
+		rdb = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:           []string{clusterAddress},
+			DisableIdentity: true,
+		})
+		slog.Info("Redis cluster options", "event", "redis_options", "data", map[string]any{"addr": clusterAddress})
+	} else {
+		opts := &redis.Options{
+			Addr:            fmt.Sprintf("%s:%s", host, port),
+			Password:        "",
+			DB:              0,
+			Protocol:        2,
+			DisableIdentity: true,
+		}
+		slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
+			Addr:     opts.Addr,
+			DB:       opts.DB,
+			Protocol: opts.Protocol,
+		})
+		rdb = redis.NewClient(opts)
 	}
-	slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
-		Addr:     opts.Addr,
-		DB:       opts.DB,
-		Protocol: opts.Protocol,
-	})
-	rdb := redis.NewClient(opts)
 
 	// Periodically update Redis pool stats metrics
 	go func() {
