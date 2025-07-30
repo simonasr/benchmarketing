@@ -14,6 +14,10 @@ linters:
     - goimports
     - whitespace
     - misspell
+    - unparam
+    - unconvert
+    - prealloc
+    - copyloopvar
 
 issues:
   exclude-rules:
