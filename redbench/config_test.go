@@ -108,4 +108,4 @@ func TestToEnvName(t *testing.T) {
 		result := toEnvName(test.input)
 		assert.Equal(t, test.expected, result)
 	}
-} 
+}

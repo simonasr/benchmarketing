@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
-	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 
@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	host                string
-	port                string
-	clusterAddress      string
-	redisTargetLabel    string
+	host             string
+	port             string
+	clusterAddress   string
+	redisTargetLabel string
 )
 
 func init() {
