@@ -64,6 +64,30 @@ This project uses GitHub Actions for continuous integration. The following check
 
 ## Development
 
+### Code Formatting and Linting
+
+This project uses EditorConfig for consistent code formatting and pre-commit hooks to ensure code quality:
+
+1. **EditorConfig**: Ensures consistent formatting across different editors. Make sure your editor supports EditorConfig or install the appropriate plugin.
+
+2. **Pre-commit Hooks**: Install the pre-commit hooks to automatically check formatting before committing:
+
+   ```bash
+   ./scripts/install-hooks.sh
+   ```
+
+   These hooks will:
+   - Run `go fmt` on all Go files
+   - Run `golangci-lint` to check for code quality issues
+   - Ensure files end with a newline
+   - Check for trailing whitespace
+
+3. **Manual Linting**: You can also run the linter manually:
+
+   ```bash
+   cd redbench && golangci-lint run
+   ```
+
 ### Adding Tests
 
 When adding new functionality, please also add corresponding tests:
