@@ -21,7 +21,7 @@ func TestRandomString(t *testing.T) {
 	}
 }
 
-// TestSaveRandomToRedis tests the functionality of SaveRandomToRedis without mocking
+// TestSaveRandomToRedisLogic tests the functionality of SaveRandomToRedis without mocking
 func TestSaveRandomToRedisLogic(t *testing.T) {
 	// Set up metrics
 	reg := prometheus.NewRegistry()
