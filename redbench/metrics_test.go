@@ -14,11 +14,11 @@ import (
 func TestNewMetrics(t *testing.T) {
 	// Create a new registry
 	reg := prometheus.NewRegistry()
-	
+
 	// Create metrics with the registry
 	target := "test:6379"
 	m := NewMetrics(reg, target)
-	
+
 	// Verify metrics were created
 	assert.NotNil(t, m.stage)
 	assert.NotNil(t, m.duration)
@@ -34,11 +34,11 @@ func TestNewMetrics(t *testing.T) {
 func TestUpdateRedisPoolStats(t *testing.T) {
 	// Create a new registry
 	reg := prometheus.NewRegistry()
-	
+
 	// Create metrics with the registry
 	target := "test:6379"
 	m := NewMetrics(reg, target)
-	
+
 	// Create pool stats
 	stats := &redis.PoolStats{
 		TotalConns: 10,
@@ -48,10 +48,10 @@ func TestUpdateRedisPoolStats(t *testing.T) {
 		Misses:     20,
 		Timeouts:   2,
 	}
-	
+
 	// Update metrics with pool stats
 	m.UpdateRedisPoolStats(stats)
-	
+
 	// Verify metrics were updated
 	// Note: We can't directly check the values of the metrics in this test
 	// because the metrics are registered with the registry and their values
@@ -62,21 +62,21 @@ func TestUpdateRedisPoolStats(t *testing.T) {
 func TestPrometheusHandler(t *testing.T) {
 	// Create a registry
 	reg := prometheus.NewRegistry()
-	
+
 	// Create a test HTTP request to /metrics
 	req := httptest.NewRequest("GET", "/metrics", nil)
-	
+
 	// Create a test HTTP recorder
 	rec := httptest.NewRecorder()
-	
+
 	// Create a handler that would be used by StartPrometheusServer
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).ServeHTTP(w, r)
 	})
-	
+
 	// Serve the request
 	handler.ServeHTTP(rec, req)
-	
+
 	// Check the response
 	assert.Equal(t, http.StatusOK, rec.Code)
-} 
+}
