@@ -55,7 +55,7 @@ func (c *Config) loadConfig(path string) {
 				if intVal, err := strconv.Atoi(val); err == nil {
 					testVal.Field(i).SetInt(int64(intVal))
 				}
-			// Add more types as needed
+				// Add more types as needed
 			}
 		}
 	}
