@@ -1,5 +1,14 @@
 #!/bin/sh
 
+# Store the initial directory
+INITIAL_DIR=$(pwd)
+
+# Set up a trap to ensure we return to the initial directory on exit
+cleanup() {
+  cd "$INITIAL_DIR" || exit 1
+}
+trap cleanup EXIT
+
 # Change to the repository root directory
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
@@ -9,14 +18,15 @@ if [ ! -d "redbench" ]; then
   exit 1
 fi
 
+# Change to the redbench directory for all operations
+cd redbench || exit 1
+
 # Run go fmt on all Go files in redbench
 echo "Running go fmt..."
-cd redbench
 go fmt ./...
 GO_FMT_EXIT_CODE=$?
 if [ $GO_FMT_EXIT_CODE -ne 0 ]; then
   echo "go fmt failed! Fix the errors before committing."
-  cd ..
   exit 1
 fi
 
@@ -26,7 +36,6 @@ go vet ./...
 GO_VET_EXIT_CODE=$?
 if [ $GO_VET_EXIT_CODE -ne 0 ]; then
   echo "go vet failed! Fix the errors before committing."
-  cd ..
   exit 1
 fi
 
@@ -37,7 +46,6 @@ if command -v staticcheck >/dev/null 2>&1; then
   STATICCHECK_EXIT_CODE=$?
   if [ $STATICCHECK_EXIT_CODE -ne 0 ]; then
     echo "staticcheck failed! Fix the errors before committing."
-    cd ..
     exit 1
   fi
 else
@@ -50,16 +58,15 @@ go test -short ./...
 TEST_EXIT_CODE=$?
 if [ $TEST_EXIT_CODE -ne 0 ]; then
   echo "Tests failed! Fix the failing tests before committing."
-  cd ..
   exit 1
 fi
 
+# Return to repository root for the remaining checks
 cd ..
 
 # Run golangci-lint if available
 if command -v golangci-lint >/dev/null 2>&1; then
   echo "Running golangci-lint..."
-  # We're already back in the root directory
   (cd redbench && golangci-lint run)
   LINT_EXIT_CODE=$?
   if [ $LINT_EXIT_CODE -ne 0 ]; then
