@@ -21,7 +21,7 @@ func randomString(length int) string {
 }
 
 // SaveRandomToRedis generates a random key and value, saves to Redis, and returns the key.
-func SaveRandomToRedis(ctx context.Context, rdb *redis.Client, m *metrics, exp int32, debug bool, keySize, valueSize int) (key string, err error) {
+func SaveRandomToRedis(ctx context.Context, rdb redis.UniversalClient, m *metrics, exp int32, debug bool, keySize, valueSize int) (key string, err error) {
 	key = randomString(keySize)
 	value := randomString(valueSize)
 
@@ -30,10 +30,10 @@ func SaveRandomToRedis(ctx context.Context, rdb *redis.Client, m *metrics, exp i
 
 	err = rdb.Set(ctx, key, value, expr).Err()
 	if err != nil {
-		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": host + ":" + port}).Inc()
+		m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": redisTargetLabel}).Inc()
 	}
 
-	m.duration.With(prometheus.Labels{"command": "set", "db": "redis", "target": host + ":" + port}).Observe(time.Since(now).Seconds())
+	m.duration.With(prometheus.Labels{"command": "set", "db": "redis", "target": redisTargetLabel}).Observe(time.Since(now).Seconds())
 
 	if debug {
 		fmt.Printf("item saved in redis, key: %s, value: %s\n", key, value)
@@ -43,17 +43,17 @@ func SaveRandomToRedis(ctx context.Context, rdb *redis.Client, m *metrics, exp i
 }
 
 // GetFromRedis fetches the value for the given key from Redis.
-func GetFromRedis(ctx context.Context, rdb *redis.Client, m *metrics, debug bool, key string) (err error) {
+func GetFromRedis(ctx context.Context, rdb redis.UniversalClient, m *metrics, debug bool, key string) (err error) {
 	now := time.Now()
 	defer func() {
 		if err == nil {
-			m.duration.With(prometheus.Labels{"command": "get", "db": "redis", "target": host + ":" + port}).Observe(time.Since(now).Seconds())
+			m.duration.With(prometheus.Labels{"command": "get", "db": "redis", "target": redisTargetLabel}).Observe(time.Since(now).Seconds())
 		}
 	}()
 
 	val, err := rdb.Get(ctx, key).Result()
 	if err != nil {
-		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis", "target": host + ":" + port}).Inc()
+		m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis", "target": redisTargetLabel}).Inc()
 	}
 
 	if debug {
