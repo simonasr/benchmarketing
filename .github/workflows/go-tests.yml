@@ -1,0 +1,82 @@
+name: Go Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true
+
+    - name: Install dependencies
+      run: |
+        cd redbench
+        go mod download
+
+    - name: Run tests
+      run: |
+        cd redbench
+        go test -v ./...
+
+  integration-test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true
+
+    - name: Install dependencies
+      run: |
+        cd redbench
+        go mod download
+
+    - name: Run integration tests
+      run: |
+        cd redbench
+        go test -v -tags=integration ./...
+      env:
+        REDIS_HOST: localhost
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true
+
+    - name: Install golangci-lint
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    - name: Run golangci-lint
+      run: |
+        cd redbench
+        golangci-lint run 
