@@ -25,7 +25,7 @@ func setupMiniredis(t *testing.T) (*miniredis.Miniredis, string, string) {
 func TestNewRedisClient(t *testing.T) {
 	t.Run("successful connection to standalone Redis", func(t *testing.T) {
 		_, host, port := setupMiniredis(t)
-		// Miniredis v2 doesn't have a Ping method, it's ready when Run() returns
+		// Miniredis v2 is ready to use immediately after Run() is called
 
 		client, err := NewRedisClient(host, port, "")
 		require.NoError(t, err)
