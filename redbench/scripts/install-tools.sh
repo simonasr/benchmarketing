@@ -33,7 +33,11 @@ go install github.com/go-critic/go-critic/cmd/gocritic@latest
 
 echo ""
 echo "All tools installed successfully!"
-echo "Make sure $HOME/go/bin is in your PATH."
+
+# Also add the Go version-specific bin directory to PATH
+echo "Also check if you need to add Go version-specific bin directories:"
+echo "  export PATH=\\$PATH:\\$HOME/go/1.24.3/bin  # Adjust version as needed"
+echo "Make sure \\$HOME/go/bin is in your PATH."
 echo ""
 echo "You can add it by adding this to your shell profile:"
-echo "  export PATH=\$PATH:\$HOME/go/bin"
+echo "  export PATH=\\$PATH:\\$HOME/go/bin"
