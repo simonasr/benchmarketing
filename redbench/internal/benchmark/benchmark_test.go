@@ -107,8 +107,29 @@ func TestRun(t *testing.T) {
 		StaleConns: 0,
 	}
 	mockClient.On("PoolStats").Return(poolStats)
-	mockClient.On("Set", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockClient.On("Get", mock.Anything, mock.Anything).Return("test-value", nil)
+
+	// Validate Set operation with specific matchers
+	mockClient.On("Set",
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.MatchedBy(func(key string) bool {
+			// Key should be a string of length KeySize
+			return len(key) == cfg.Test.KeySize
+		}),
+		mock.MatchedBy(func(value string) bool {
+			// Value should be a string of length ValueSize
+			return len(value) == cfg.Test.ValueSize
+		}),
+		cfg.Redis.Expiration, // Exact expiration time from config
+	).Return(nil)
+
+	// Validate Get operation with specific matchers
+	mockClient.On("Get",
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.MatchedBy(func(key string) bool {
+			// Key should be a string of length KeySize
+			return len(key) == cfg.Test.KeySize
+		}),
+	).Return("test-value", nil)
 
 	runner := NewRunner(cfg, mockMetrics, mockClient, redisConn)
 
