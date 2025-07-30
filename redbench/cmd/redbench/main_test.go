@@ -41,7 +41,7 @@ redis:
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	defer os.Chdir(originalWd)
-	
+
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestEnvironmentVariables(t *testing.T) {
 	os.Setenv("REDIS_PORT", "1234")
 	os.Setenv("REDIS_TARGET_LABEL", "test-label")
 	os.Setenv("REDIS_CLUSTER_ADDRESS", "cluster:6379")
-	
+
 	defer func() {
 		os.Unsetenv("REDIS_HOST")
 		os.Unsetenv("REDIS_PORT")

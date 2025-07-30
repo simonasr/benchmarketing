@@ -14,6 +14,11 @@ linters:
     - goimports
     - whitespace
     - misspell
+    - deadcode
+    - unparam
+    - unconvert
+    - prealloc
+    - exportloopref
 
 issues:
   exclude-rules:
