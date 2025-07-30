@@ -1,0 +1,54 @@
+#!/bin/sh
+
+# Change to the repository root directory
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Check if we're in the right directory
+if [ ! -d "redbench" ]; then
+  echo "Error: Not in the expected repository structure"
+  exit 1
+fi
+
+# Run go fmt on all Go files in redbench
+echo "Running go fmt..."
+cd redbench
+go fmt ./...
+GO_FMT_EXIT_CODE=$?
+cd ..
+if [ $GO_FMT_EXIT_CODE -ne 0 ]; then
+  echo "go fmt failed! Fix the errors before committing."
+  exit 1
+fi
+
+# Run golangci-lint if available
+if command -v golangci-lint >/dev/null 2>&1; then
+  echo "Running golangci-lint..."
+  # We're already back in the root directory
+  (cd redbench && golangci-lint run)
+  LINT_EXIT_CODE=$?
+  if [ $LINT_EXIT_CODE -ne 0 ]; then
+    echo "golangci-lint failed! Fix the errors before committing."
+    exit 1
+  fi
+else
+  echo "Warning: golangci-lint not found. Skipping linting checks."
+fi
+
+# Check for trailing whitespace and missing newlines
+echo "Checking for formatting issues..."
+for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(go|md|yaml|yml)$'); do
+  # Check if file ends with a newline
+  if [ -f "$file" ] && [ -s "$file" ] && [ "$(tail -c 1 "$file" | wc -l)" -eq 0 ]; then
+    echo "Error: $file does not end with a newline"
+    exit 1
+  fi
+  
+  # Check for trailing whitespace
+  if grep -q "[[:blank:]]$" "$file"; then
+    echo "Error: $file contains trailing whitespace"
+    exit 1
+  fi
+done
+
+echo "Pre-commit checks passed!"
+exit 0

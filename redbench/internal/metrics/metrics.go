@@ -1,8 +1,8 @@
-package main
+package metrics
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,7 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type metrics struct {
+// Metrics handles all Prometheus metrics for the application.
+type Metrics struct {
 	stage         prometheus.Gauge
 	duration      *prometheus.HistogramVec
 	requestFailed *prometheus.CounterVec
@@ -21,10 +22,14 @@ type metrics struct {
 	redisPoolHits       prometheus.Gauge
 	redisPoolMisses     prometheus.Gauge
 	redisPoolTimeouts   prometheus.Gauge
+
+	target string
 }
 
-func NewMetrics(reg prometheus.Registerer, target string) *metrics {
-	m := &metrics{
+// New creates a new Metrics instance with the provided registry and target label.
+func New(reg prometheus.Registerer, target string) *Metrics {
+	m := &Metrics{
+		target: target,
 		stage: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace:   "redbench",
 			Name:        "stage",
@@ -89,7 +94,8 @@ func NewMetrics(reg prometheus.Registerer, target string) *metrics {
 	return m
 }
 
-func (m *metrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
+// UpdateRedisPoolStats updates metrics with the current Redis pool statistics.
+func (m *Metrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
 	m.redisPoolTotalConns.Set(float64(stats.TotalConns))
 	m.redisPoolIdleConns.Set(float64(stats.IdleConns))
 	m.redisPoolStaleConns.Set(float64(stats.StaleConns))
@@ -98,18 +104,47 @@ func (m *metrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
 	m.redisPoolTimeouts.Set(float64(stats.Timeouts))
 }
 
-func StartPrometheusServer(c *Config, reg *prometheus.Registry) {
+// SetStage updates the current benchmark stage (number of clients).
+func (m *Metrics) SetStage(clients float64) {
+	m.stage.Set(clients)
+}
+
+// ObserveSetDuration records the duration of a SET operation.
+func (m *Metrics) ObserveSetDuration(duration float64) {
+	m.duration.With(prometheus.Labels{"command": "set", "db": "redis", "target": m.target}).Observe(duration)
+}
+
+// ObserveGetDuration records the duration of a GET operation.
+func (m *Metrics) ObserveGetDuration(duration float64) {
+	m.duration.With(prometheus.Labels{"command": "get", "db": "redis", "target": m.target}).Observe(duration)
+}
+
+// IncrementSetFailures increments the counter for failed SET operations.
+func (m *Metrics) IncrementSetFailures() {
+	m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": m.target}).Inc()
+}
+
+// IncrementGetFailures increments the counter for failed GET operations.
+func (m *Metrics) IncrementGetFailures() {
+	m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis", "target": m.target}).Inc()
+}
+
+// StartPrometheusServer starts an HTTP server to expose Prometheus metrics.
+func StartPrometheusServer(port int, reg *prometheus.Registry) {
 	pMux := http.NewServeMux()
 	promHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	pMux.Handle("/metrics", promHandler)
 
-	metricsPort := fmt.Sprintf(":%d", c.MetricsPort)
+	metricsPort := fmt.Sprintf(":%d", port)
 	go func() {
-		log.Printf("Starting the Prometheus server on port %d", c.MetricsPort)
-		log.Fatal(http.ListenAndServe(metricsPort, pMux))
+		slog.Info("Starting the Prometheus server", "port", port)
+		if err := http.ListenAndServe(metricsPort, pMux); err != nil {
+			slog.Error("Failed to start Prometheus server", "error", err)
+		}
 	}()
 }
 
+// Buckets for histogram metrics
 var buckets = []float64{
 	0.00001, 0.000015, 0.00002, 0.000025, 0.00003, 0.000035, 0.00004, 0.000045,
 	0.00005, 0.000055, 0.00006, 0.000065, 0.00007, 0.000075, 0.00008, 0.000085,
