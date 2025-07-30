@@ -17,4 +17,4 @@ func TestEnvVars(t *testing.T) {
 func TestRedisTargetLabel(t *testing.T) {
 	// Verify that the redisTargetLabel is set
 	assert.NotEmpty(t, redisTargetLabel, "redisTargetLabel should be set")
-} 
+}
