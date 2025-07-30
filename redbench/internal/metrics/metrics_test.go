@@ -11,7 +11,7 @@ import (
 func TestNew(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	target := "test-target"
-	
+
 	m := New(reg, target)
 	assert.NotNil(t, m, "Metrics instance should not be nil")
 	assert.Equal(t, target, m.target, "Target should match the provided value")
@@ -20,7 +20,7 @@ func TestNew(t *testing.T) {
 func TestUpdateRedisPoolStats(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
-	
+
 	// Create test pool stats
 	stats := &redis.PoolStats{
 		TotalConns: 10,
@@ -30,7 +30,7 @@ func TestUpdateRedisPoolStats(t *testing.T) {
 		Misses:     20,
 		Timeouts:   2,
 	}
-	
+
 	// This should not panic
 	m.UpdateRedisPoolStats(stats)
 }
@@ -38,7 +38,7 @@ func TestUpdateRedisPoolStats(t *testing.T) {
 func TestSetStage(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
-	
+
 	// This should not panic
 	m.SetStage(5)
 }
@@ -46,7 +46,7 @@ func TestSetStage(t *testing.T) {
 func TestObserveDurations(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
-	
+
 	// These should not panic
 	m.ObserveSetDuration(0.001)
 	m.ObserveGetDuration(0.002)
@@ -55,7 +55,7 @@ func TestObserveDurations(t *testing.T) {
 func TestIncrementFailures(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
-	
+
 	// These should not panic
 	m.IncrementSetFailures()
 	m.IncrementGetFailures()
