@@ -46,7 +46,7 @@ func TestSaveRandomToRedisLogic(t *testing.T) {
 	m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": redisTargetLabel}).Inc()
 }
 
-// TestGetFromRedis tests the functionality of GetFromRedis without mocking
+// TestGetFromRedisLogic tests the functionality of GetFromRedis without mocking
 func TestGetFromRedisLogic(t *testing.T) {
 	// Set up metrics
 	reg := prometheus.NewRegistry()
