@@ -2,6 +2,18 @@
 
 Redis benchmarking tool that measures performance and provides Prometheus metrics.
 
+## Project Structure
+
+The project follows Clean Architecture principles:
+
+- `cmd/redbench`: Main application entry point
+- `internal/benchmark`: Core benchmark logic
+- `internal/config`: Configuration handling
+- `internal/metrics`: Prometheus metrics
+- `internal/redis`: Redis client and operations
+- `pkg/utils`: Shared utilities
+- `test/integration`: Integration tests
+
 ## Configuration
 
 Configuration is done via a YAML file (`config.yaml`) and environment variables:
@@ -32,7 +44,7 @@ docker run -d --name redis-test -p 6379:6379 redis:7
 Then run the integration tests with:
 
 ```bash
-REDIS_HOST=localhost go test -v -tags=integration ./...
+REDIS_HOST=localhost go test -v -tags=integration ./test/integration
 ```
 
 Don't forget to clean up after:
@@ -57,7 +69,7 @@ This project uses GitHub Actions for continuous integration. The following check
 When adding new functionality, please also add corresponding tests:
 
 1. Unit tests should be added in `*_test.go` files
-2. Integration tests should be added in `integration_test.go` with the `//go:build integration` tag
+2. Integration tests should be added in `test/integration` with the `//go:build integration` tag
 
 ### Test Coverage
 
@@ -72,4 +84,4 @@ For a detailed coverage report:
 ```bash
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
-``` 
+```
