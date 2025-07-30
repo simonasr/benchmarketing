@@ -78,7 +78,7 @@ This project uses EditorConfig for consistent code formatting and pre-commit hoo
 
    These hooks will:
    - Run `go fmt` on all Go files
-   - Run `golangci-lint` to check for code quality issues
+   - Run `golangci-lint` to check for code quality issues (formatting, imports, whitespace, etc.)
    - Ensure files end with a newline
    - Check for trailing whitespace
 
