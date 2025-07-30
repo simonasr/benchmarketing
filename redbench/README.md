@@ -17,7 +17,8 @@ Configuration is done via a YAML file (`config.yaml`) and environment variables:
 Run the unit tests with:
 
 ```bash
-go test -v ./...
+# Set a test Redis host (required for tests)
+REDIS_HOST=test-host go test -v ./...
 ```
 
 ### Integration Tests
@@ -31,7 +32,7 @@ docker run -d --name redis-test -p 6379:6379 redis:7
 Then run the integration tests with:
 
 ```bash
-go test -v -tags=integration ./...
+REDIS_HOST=localhost go test -v -tags=integration ./...
 ```
 
 Don't forget to clean up after:
