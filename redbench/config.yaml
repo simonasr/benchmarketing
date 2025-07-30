@@ -9,5 +9,5 @@ test:
   maxClients: 2000
   stageIntervalS: 1
   requestDelayMs: 1000
-  keySize: 36
-  valueSize: 55
+  keySize: 10
+  valueSize: 10
