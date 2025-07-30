@@ -14,11 +14,47 @@ echo "Running go fmt..."
 cd redbench
 go fmt ./...
 GO_FMT_EXIT_CODE=$?
-cd ..
 if [ $GO_FMT_EXIT_CODE -ne 0 ]; then
   echo "go fmt failed! Fix the errors before committing."
+  cd ..
   exit 1
 fi
+
+# Run go vet to check for common mistakes
+echo "Running go vet..."
+go vet ./...
+GO_VET_EXIT_CODE=$?
+if [ $GO_VET_EXIT_CODE -ne 0 ]; then
+  echo "go vet failed! Fix the errors before committing."
+  cd ..
+  exit 1
+fi
+
+# Run staticcheck to find issues including dead code
+if command -v staticcheck >/dev/null 2>&1; then
+  echo "Running staticcheck..."
+  staticcheck ./...
+  STATICCHECK_EXIT_CODE=$?
+  if [ $STATICCHECK_EXIT_CODE -ne 0 ]; then
+    echo "staticcheck failed! Fix the errors before committing."
+    cd ..
+    exit 1
+  fi
+else
+  echo "Warning: staticcheck not found. Install with: go install honnef.co/go/tools/cmd/staticcheck@latest"
+fi
+
+# Run tests to ensure everything works
+echo "Running tests..."
+go test -short ./...
+TEST_EXIT_CODE=$?
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+  echo "Tests failed! Fix the failing tests before committing."
+  cd ..
+  exit 1
+fi
+
+cd ..
 
 # Run golangci-lint if available
 if command -v golangci-lint >/dev/null 2>&1; then
