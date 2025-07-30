@@ -10,7 +10,3 @@ vendor/
 # Exclude git history and configuration.
 
 .gitignore
-
-# config
-
-config.yaml

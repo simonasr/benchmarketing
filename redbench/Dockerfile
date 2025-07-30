@@ -9,10 +9,11 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o client -a -ldflags="-s -w" -installsuffix cgo
+RUN CGO_ENABLED=0 GOOS=linux go build -o redbench -a -ldflags="-s -w" -installsuffix cgo ./cmd/redbench
 
 FROM scratch
 
-COPY --from=build /app/client /client
+COPY --from=build /app/redbench /redbench
+COPY --from=build /app/config.yaml /config.yaml
 
-ENTRYPOINT ["/client"]
+ENTRYPOINT ["/redbench"]
