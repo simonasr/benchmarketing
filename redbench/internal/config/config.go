@@ -16,6 +16,13 @@ type Config struct {
 	Debug       bool        `yaml:"debug"`
 	Redis       RedisConfig `yaml:"redis"`
 	Test        Test        `yaml:"test"`
+	Service     Service     `yaml:"service"`
+}
+
+// Service contains service mode configuration.
+type Service struct {
+	APIPort     int  `yaml:"apiPort"`
+	ServiceMode bool `yaml:"serviceMode"`
 }
 
 // RedisConfig contains Redis-specific configuration.

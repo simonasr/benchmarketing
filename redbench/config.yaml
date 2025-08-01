@@ -11,3 +11,6 @@ test:
   requestDelayMs: 1000
   keySize: 10
   valueSize: 10
+service:
+  apiPort: 8080
+  serviceMode: false
