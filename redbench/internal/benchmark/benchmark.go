@@ -38,45 +38,82 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Periodically update Redis pool stats metrics
 	go func() {
+		// Call immediately once at start
+		r.metrics.UpdateRedisPoolStats(r.client.PoolStats())
+
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
 		for {
-			r.metrics.UpdateRedisPoolStats(r.client.PoolStats())
-			time.Sleep(2 * time.Second)
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.metrics.UpdateRedisPoolStats(r.client.PoolStats())
+			}
 		}
 	}()
 
 	for {
+		// Check for cancellation before starting new stage
+		select {
+		case <-ctx.Done():
+			slog.Info("Benchmark cancelled", "reason", ctx.Err())
+			return ctx.Err()
+		default:
+		}
+
 		clients := make(chan struct{}, currentClients)
 		r.metrics.SetStage(float64(currentClients))
 
-		now := time.Now()
+		stageInterval := time.Duration(r.config.Test.StageIntervalS) * time.Second
+
+		// Use a ticker for more precise timing and cancellation
+		stageTicker := time.NewTicker(time.Duration(r.config.Test.RequestDelayMs) * time.Millisecond)
+		stageDeadline := time.After(stageInterval)
+
+	stageLoop:
 		for {
-			clients <- struct{}{}
-			go func() {
-				time.Sleep(time.Duration(r.config.Test.RequestDelayMs) * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				stageTicker.Stop()
+				slog.Info("Benchmark cancelled during stage", "stage", currentClients)
+				return ctx.Err()
+			case <-stageDeadline:
+				stageTicker.Stop()
+				break stageLoop
+			case <-stageTicker.C:
+				clients <- struct{}{}
+				go func() {
+					defer func() { <-clients }()
 
-				opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
-				opCtx, cancel := context.WithTimeout(ctx, opTimeout)
-				defer cancel()
+					opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					defer cancel()
 
-				key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
-				if err != nil {
-					slog.Error("SaveRandomData failed", "err", err)
-				}
+					key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
+					if err != nil {
+						// Check if error is due to context cancellation
+						if opCtx.Err() != nil {
+							return // Exit silently on cancellation
+						}
+						slog.Error("SaveRandomData failed", "err", err)
+						return
+					}
 
-				// Use a new context for the next operation to avoid reusing a canceled context
-				opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
-				defer cancel2()
+					// Use a new context for the next operation to avoid reusing a canceled context
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					defer cancel2()
 
-				err = r.redisOps.GetData(opCtx2, key)
-				if err != nil {
-					slog.Error("GetData failed", "err", err)
-				}
-
-				<-clients
-			}()
-
-			if time.Since(now).Seconds() >= float64(r.config.Test.StageIntervalS) {
-				break
+					err = r.redisOps.GetData(opCtx2, key)
+					if err != nil {
+						// Check if error is due to context cancellation
+						if opCtx2.Err() != nil {
+							return // Exit silently on cancellation
+						}
+						slog.Error("GetData failed", "err", err)
+					}
+				}()
 			}
 		}
 
@@ -86,5 +123,6 @@ func (r *Runner) Run(ctx context.Context) error {
 		currentClients += 1
 	}
 
+	slog.Info("Benchmark completed successfully")
 	return nil
 }
