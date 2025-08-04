@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
@@ -61,7 +62,10 @@ func (r *Runner) Run(ctx context.Context) error {
 			return ctx.Err()
 		default:
 		}
-		clients := make(chan struct{}, currentClients)
+		// Use WaitGroup for proper goroutine lifecycle management
+		var wg sync.WaitGroup
+		// Semaphore channel to limit concurrent operations
+		semaphore := make(chan struct{}, currentClients)
 		r.metrics.SetStage(float64(currentClients))
 
 		stageInterval := time.Duration(r.config.Test.StageIntervalS) * time.Second
@@ -85,61 +89,67 @@ func (r *Runner) Run(ctx context.Context) error {
 				stageTicker.Stop()
 				break stageLoop
 			case <-stageTicker.C:
-				clients <- struct{}{}
-				go func() {
-					defer func() {
+				// Acquire semaphore slot before starting goroutine
+				select {
+				case semaphore <- struct{}{}:
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						defer func() { <-semaphore }() // Release semaphore
+
+						// Check if stage completed before starting operations
 						select {
-						case <-clients:
+						case <-stageDone:
+							return // Stage completed, exit early
 						default:
 						}
+
+						opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
+						opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+						defer cancel()
+
+						key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
+						if err != nil {
+							// Check if error is due to context cancellation
+							if opCtx.Err() != nil {
+								return // Exit silently on cancellation
+							}
+							slog.Error("SaveRandomData failed", "err", err)
+							return
+						}
+
+						// Check again before second operation
+						select {
+						case <-stageDone:
+							return // Stage completed, exit early
+						default:
+						}
+
+						// Use a new context for the next operation to avoid reusing a canceled context
+						opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+						defer cancel2()
+
+						err = r.redisOps.GetData(opCtx2, key)
+						if err != nil {
+							// Check if error is due to context cancellation
+							if opCtx2.Err() != nil {
+								return // Exit silently on cancellation
+							}
+							slog.Error("GetData failed", "err", err)
+						}
 					}()
-
-					// Check if stage completed before starting operations
-					select {
-					case <-stageDone:
-						return // Stage completed, exit early
-					default:
-					}
-
-					opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
-					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
-					defer cancel()
-
-					key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
-					if err != nil {
-						// Check if error is due to context cancellation
-						if opCtx.Err() != nil {
-							return // Exit silently on cancellation
-						}
-						slog.Error("SaveRandomData failed", "err", err)
-						return
-					}
-
-					// Check again before second operation
-					select {
-					case <-stageDone:
-						return // Stage completed, exit early
-					default:
-					}
-
-					// Use a new context for the next operation to avoid reusing a canceled context
-					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
-					defer cancel2()
-
-					err = r.redisOps.GetData(opCtx2, key)
-					if err != nil {
-						// Check if error is due to context cancellation
-						if opCtx2.Err() != nil {
-							return // Exit silently on cancellation
-						}
-						slog.Error("GetData failed", "err", err)
-					}
-				}()
+				default:
+					// Semaphore full, skip this tick
+					continue stageLoop
+				}
 			}
 		}
 
 		// Close the stage done channel to signal goroutines that stage is complete
 		close(stageDone)
+
+		// Wait for all goroutines to complete before proceeding
+		wg.Wait()
 
 		if currentClients == r.config.Test.MaxClients {
 			break
