@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -71,7 +72,22 @@ func (s *BenchmarkService) Start(req *BenchmarkRequest) error {
 	s.cancel = cancel
 	s.running = true
 
-	go s.runBenchmark(ctx)
+	// Start benchmark in background with panic recovery
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("Benchmark goroutine panicked", "panic", r)
+				s.mu.Lock()
+				s.running = false
+				now := time.Now()
+				s.status.EndTime = &now
+				s.status.Status = "failed"
+				s.status.Error = fmt.Sprintf("benchmark panicked: %v", r)
+				s.mu.Unlock()
+			}
+		}()
+		s.runBenchmark(ctx)
+	}()
 
 	return nil
 }

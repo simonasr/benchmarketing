@@ -71,6 +71,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		stageTicker := time.NewTicker(requestDelay)
 		stageDeadline := time.After(stageInterval)
 
+		// Create a done channel to signal goroutines when stage completes
+		stageDone := make(chan struct{})
+		defer close(stageDone)
+
 	stageLoop:
 		for {
 			select {
@@ -86,6 +90,13 @@ func (r *Runner) Run(ctx context.Context) error {
 				go func() {
 					defer func() { <-clients }()
 
+					// Check if stage completed before starting operations
+					select {
+					case <-stageDone:
+						return // Stage completed, exit early
+					default:
+					}
+
 					opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
 					defer cancel()
@@ -98,6 +109,13 @@ func (r *Runner) Run(ctx context.Context) error {
 						}
 						slog.Error("SaveRandomData failed", "err", err)
 						return
+					}
+
+					// Check again before second operation
+					select {
+					case <-stageDone:
+						return // Stage completed, exit early
+					default:
 					}
 
 					// Use a new context for the next operation to avoid reusing a canceled context
