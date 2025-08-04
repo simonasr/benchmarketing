@@ -343,7 +343,7 @@ func (w *WorkerClient) testConfigToMap(config *TestConfig) map[string]interface{
 // parseStatusFromInterface converts interface{} status to BenchmarkStatus using JSON marshaling for type safety
 func (w *WorkerClient) parseStatusFromInterface(statusInterface interface{}) *BenchmarkStatus {
 	if statusInterface == nil {
-		slog.Warn("Received nil status interface - this may indicate an issue with status reporting")
+		slog.Warn("Received nil status interface - benchmark status unavailable, will retry on next poll")
 		return &BenchmarkStatus{Status: "status_unavailable", Error: "nil status interface"}
 	}
 

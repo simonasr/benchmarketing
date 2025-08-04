@@ -247,7 +247,7 @@ func (a *BenchmarkServiceAdapter) Start(req interface{}) error {
 		return a.handleMapRequest(reqMap)
 	}
 
-	return fmt.Errorf("invalid request format")
+	return fmt.Errorf("invalid request format: expected StartRequest struct or map[string]interface{}")
 }
 
 // handleStartRequest handles the new struct-based request
@@ -279,7 +279,7 @@ func (a *BenchmarkServiceAdapter) handleStartRequest(req *StartRequest) error {
 func (a *BenchmarkServiceAdapter) handleMapRequest(reqMap map[string]interface{}) error {
 	redisTargetsInterface, ok := reqMap["redis_targets"].([]map[string]interface{})
 	if !ok {
-		return fmt.Errorf("invalid redis_targets format")
+		return fmt.Errorf("invalid redis_targets format: expected []map[string]interface{}")
 	}
 
 	redisTargets := make([]api.RedisTarget, 0, len(redisTargetsInterface))

@@ -91,7 +91,7 @@ func (r *Runner) Run(ctx context.Context) error {
 							// Successfully received from channel
 						default:
 							// Channel might be closed or blocked - log warning
-							slog.Warn("Failed to receive from clients channel in defer")
+							slog.Warn("Failed to receive from clients channel in defer - goroutine may be leaking resources")
 						}
 					}()
 
