@@ -1,0 +1,55 @@
+---
+description: Distributed service coordination patterns and architecture principles
+globs: internal/coordination/*,internal/api/*,cmd/redbench/*
+---
+
+# Distributed Service Architecture Rules
+
+## HTTP-Based Coordination Principles
+- Use RESTful HTTP APIs for all service-to-service communication
+- Avoid complex message queues (ZeroMQ, RabbitMQ) in favor of simple HTTP
+- Implement designated leader pattern (no complex leader election)
+- Use polling-based coordination with configurable intervals
+
+## Leader-Worker Coordination
+```go
+// ✅ Correct - Simple coordinator structure
+type Coordinator struct {
+    workers          map[string]*Worker
+    assignments      map[string]*Assignment  
+    currentBenchmark *DistributedBenchmarkStatus
+    heartbeatTimeout time.Duration
+    mu               sync.RWMutex
+}
+
+// ✅ Correct - Worker polling pattern
+func (w *WorkerClient) coordinationLoop() {
+    ticker := time.NewTicker(w.pollInterval)
+    for {
+        select {
+        case <-w.ctx.Done():
+            return
+        case <-ticker.C:
+            w.performCoordinationCycle()
+        }
+    }
+}
+```
+
+## Synchronization Strategy
+- Use timestamp-based coordination for precise synchronization
+- Avoid artificial delays in favor of coordinated start times
+- Provide coordination windows (5 seconds default) for distributed start
+- Handle network partitions and late-joining workers gracefully
+
+## Data Model Requirements
+- Use type-safe structures for all inter-service communication
+- Avoid `map[string]interface{}` in core business logic
+- Implement proper JSON marshaling for all coordination types
+- Include creation timestamps and unique IDs for traceability
+
+## Worker Management
+- Auto-generate unique worker IDs (hostname + UUID)
+- Implement heartbeat monitoring with configurable timeouts
+- Automatic cleanup of stale workers
+- Support dynamic worker registration and deregistration

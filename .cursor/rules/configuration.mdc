@@ -1,0 +1,55 @@
+---
+description: Configuration management patterns and anti-patterns
+globs: internal/config/*,config.yaml,*.env
+---
+
+# Configuration Management Rules
+
+## Hierarchical Configuration Principle
+Configuration precedence (highest to lowest):
+1. CLI flags
+2. Environment variables  
+3. Configuration files
+4. Hardcoded defaults
+
+## No Magic Numbers Policy
+```go
+// ✅ Correct - Named constants
+const (
+    DefaultHeartbeatTimeout = 30 * time.Second
+    DefaultCleanupInterval  = 10 * time.Second  
+    CoordinationWindow      = 5 * time.Second
+    DefaultPollInterval     = 1000 * time.Millisecond
+)
+
+// ❌ Wrong - Magic numbers
+time.Sleep(30 * time.Second)  // What is 30 seconds for?
+if len(workers) > 5 {         // Why 5?
+```
+
+## Environment Variable Strategy
+- All runtime configuration must be overridable via environment variables
+- Use consistent naming: `SERVICE_API_PORT`, `REDIS_HOST`, `WORKER_ID`
+- Support both string and boolean environment variable types
+- Validate all configuration at startup, fail fast on invalid values
+
+## Dynamic Configuration Support
+```go
+// ✅ Correct - Auto-generated values when empty
+func LoadConfig() *Config {
+    cfg := loadFromFile()
+    applyEnvironmentOverrides(cfg)
+    
+    if cfg.Coordination.WorkerID == "" {
+        cfg.Coordination.WorkerID = generateWorkerID()
+    }
+    
+    return validateConfig(cfg)
+}
+```
+
+## Configuration Security
+- Never include secrets in configuration files
+- Use environment variables or mounted secrets for sensitive data
+- Validate configuration ranges and formats
+- Log configuration used (excluding secrets) at startup
