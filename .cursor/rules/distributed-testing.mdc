@@ -1,0 +1,55 @@
+---
+description: Testing strategy for distributed systems and coordination
+globs: *_test.go,test/*
+---
+
+# Distributed Systems Testing Rules
+
+## Coverage Requirements
+- **Unit Tests**: 85%+ coverage for coordination packages
+- **Integration Tests**: All HTTP endpoints with mock servers
+- **Concurrent Tests**: Thread safety validation with multiple workers
+- **Error Scenarios**: Network failures, timeouts, invalid data
+
+## Table-Driven Test Patterns
+```go
+// ✅ Correct - Comprehensive scenario testing
+tests := []struct {
+    name         string
+    setupWorkers int
+    redisTargets int
+    expectError  bool
+    errorMsg     string
+}{
+    {
+        name:         "successful coordination",
+        setupWorkers: 2,
+        redisTargets: 2,
+        expectError:  false,
+    },
+    {
+        name:         "insufficient workers",
+        setupWorkers: 1, 
+        redisTargets: 2,
+        expectError:  true,
+        errorMsg:     "not enough workers",
+    },
+}
+```
+
+## Mock and Integration Strategy
+- Use `httptest.NewServer()` for HTTP endpoint testing
+- Create mock interfaces for external dependencies
+- Test concurrent access with realistic load (10+ workers, 100+ operations)
+- Validate JSON marshaling/unmarshaling for all coordination types
+
+## Container-Based Testing
+```bash
+# ✅ Correct - All tests in containers
+docker build --target test .
+docker compose -f docker-compose.test.yml up --abort-on-container-exit
+docker compose -f docker-compose.integration.yml up
+
+# ❌ Wrong - Host-based testing
+go test ./...
+```

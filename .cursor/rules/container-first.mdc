@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+description: Container-first development workflow for all build, test, and run operations
+---
+
+# Container-First Development Rules
+
+## Core Principle: No Direct Host Operations
+- **NEVER** build, test, or run services directly on the workstation
+- **ALL** development tasks must happen inside Docker containers
+- Use `docker build`, `docker run`, or `docker compose` for every operation
+
+## Required Development Workflow
+```bash
+# ✅ Correct - Container-based operations
+docker compose up -d dev-environment
+docker compose exec app go test ./...
+docker compose exec app go build ./cmd/redbench
+docker build --target test .
+
+# ❌ Wrong - Direct host operations  
+go build ./cmd/redbench
+go test ./...
+```
+
+## Multi-Stage Docker Requirements
+- **Build Stage**: Contains all build tools and dependencies
+- **Test Stage**: Isolated test execution with cleanup
+- **Runtime Stage**: Minimal production image (distroless/alpine)
+
+## Environment Parity Mandate
+- Development containers must match production exactly
+- Same base images, dependencies, and configuration
+- Use Docker Compose for local multi-service development
+- Mount code volumes for development hot-reload only
+
+## Security Enforcement
+- Use minimal base images (distroless preferred)
+- Run containers as non-root user in production
+- Never include secrets in container images
+- Use specific version tags, never `latest` in production
