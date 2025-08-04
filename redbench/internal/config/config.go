@@ -12,10 +12,11 @@ import (
 
 // Config represents the application configuration.
 type Config struct {
-	MetricsPort int         `yaml:"metricsPort"`
-	Debug       bool        `yaml:"debug"`
-	Redis       RedisConfig `yaml:"redis"`
-	Test        Test        `yaml:"test"`
+	MetricsPort int           `yaml:"metricsPort"`
+	Debug       bool          `yaml:"debug"`
+	Redis       RedisConfig   `yaml:"redis"`
+	Test        Test          `yaml:"test"`
+	Service     ServiceConfig `yaml:"service"`
 }
 
 // RedisConfig contains Redis-specific configuration.
@@ -32,6 +33,12 @@ type Test struct {
 	RequestDelayMs int `yaml:"requestDelayMs"`
 	KeySize        int `yaml:"keySize"`
 	ValueSize      int `yaml:"valueSize"`
+}
+
+// ServiceConfig contains service mode configuration.
+type ServiceConfig struct {
+	APIPort     int  `yaml:"apiPort"`
+	ServiceMode bool `yaml:"serviceMode"`
 }
 
 // RedisConnection holds Redis connection information.
@@ -76,7 +83,32 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 
+	// Override Service fields from ENV variables
+	applyServiceEnvOverrides(cfg)
+
 	return cfg, nil
+}
+
+// applyServiceEnvOverrides applies environment variable overrides for service configuration
+func applyServiceEnvOverrides(cfg *Config) {
+	// Override metrics port
+	if val, ok := os.LookupEnv("METRICS_PORT"); ok {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			cfg.MetricsPort = intVal
+		}
+	}
+
+	// Override service API port
+	if val, ok := os.LookupEnv("SERVICE_API_PORT"); ok {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			cfg.Service.APIPort = intVal
+		}
+	}
+
+	// Override service mode
+	if val, ok := os.LookupEnv("SERVICE_MODE"); ok {
+		cfg.Service.ServiceMode = val == "true" || val == "1"
+	}
 }
 
 // LoadRedisConnection loads Redis connection information from environment variables.

@@ -1,0 +1,72 @@
+services:
+  # Redis for testing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Development environment
+  redbench-dev:
+    build:
+      context: .
+      target: build
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+    working_dir: /app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SERVICE_API_PORT=8080
+      - METRICS_PORT=8081
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["go", "run", "./cmd/redbench", "-service"]
+
+  # Production-like service
+  redbench-service:
+    build:
+      context: .
+      target: production
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SERVICE_API_PORT=8080
+      - METRICS_PORT=8081
+      - SERVICE_MODE=true
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["/app/redbench", "-service"]
+
+  # One-shot benchmark
+  redbench-oneshot:
+    build:
+      context: .
+      target: production
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - METRICS_PORT=8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["/app/redbench"]
+
+volumes:
+  go-mod-cache:
