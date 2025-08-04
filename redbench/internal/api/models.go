@@ -6,6 +6,13 @@ import "time"
 type BenchmarkRequest struct {
 	RedisTargets []RedisTarget          `json:"redis_targets"`
 	Config       map[string]interface{} `json:"config,omitempty"`
+	// Direct configuration overrides
+	MinClients     *int `json:"min_clients,omitempty"`
+	MaxClients     *int `json:"max_clients,omitempty"`
+	StageIntervalS *int `json:"stage_interval_s,omitempty"`
+	RequestDelayMs *int `json:"request_delay_ms,omitempty"`
+	KeySize        *int `json:"key_size,omitempty"`
+	ValueSize      *int `json:"value_size,omitempty"`
 }
 
 // RedisTarget represents a Redis instance to benchmark

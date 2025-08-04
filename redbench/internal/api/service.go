@@ -68,6 +68,9 @@ func (s *BenchmarkService) Start(req *BenchmarkRequest) error {
 		StartTime: &now,
 	}
 
+	// Create configuration with overrides from request
+	config := s.applyConfigOverrides(req)
+
 	// Start benchmark in background
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
@@ -87,7 +90,7 @@ func (s *BenchmarkService) Start(req *BenchmarkRequest) error {
 				s.mu.Unlock()
 			}
 		}()
-		s.runBenchmark(ctx)
+		s.runBenchmarkWithConfig(ctx, config)
 	}()
 
 	return nil
@@ -117,8 +120,45 @@ func (s *BenchmarkService) GetStatus() BenchmarkStatusResponse {
 	return s.status
 }
 
-// runBenchmark executes the benchmark
-func (s *BenchmarkService) runBenchmark(ctx context.Context) {
+// applyConfigOverrides creates a new config with request overrides applied
+func (s *BenchmarkService) applyConfigOverrides(req *BenchmarkRequest) *config.Config {
+	// Start with a copy of the base config
+	cfg := *s.config
+
+	// Apply test configuration overrides
+	if req.MinClients != nil {
+		cfg.Test.MinClients = *req.MinClients
+	}
+	if req.MaxClients != nil {
+		cfg.Test.MaxClients = *req.MaxClients
+	}
+	if req.StageIntervalS != nil {
+		cfg.Test.StageIntervalS = *req.StageIntervalS
+	}
+	if req.RequestDelayMs != nil {
+		cfg.Test.RequestDelayMs = *req.RequestDelayMs
+	}
+	if req.KeySize != nil {
+		cfg.Test.KeySize = *req.KeySize
+	}
+	if req.ValueSize != nil {
+		cfg.Test.ValueSize = *req.ValueSize
+	}
+
+	slog.Info("Applied configuration overrides", "config", map[string]any{
+		"min_clients":      cfg.Test.MinClients,
+		"max_clients":      cfg.Test.MaxClients,
+		"stage_interval_s": cfg.Test.StageIntervalS,
+		"request_delay_ms": cfg.Test.RequestDelayMs,
+		"key_size":         cfg.Test.KeySize,
+		"value_size":       cfg.Test.ValueSize,
+	})
+
+	return &cfg
+}
+
+// runBenchmarkWithConfig executes the benchmark with custom configuration
+func (s *BenchmarkService) runBenchmarkWithConfig(ctx context.Context, cfg *config.Config) {
 	defer func() {
 		s.mu.Lock()
 		s.running = false
@@ -130,8 +170,8 @@ func (s *BenchmarkService) runBenchmark(ctx context.Context) {
 		s.mu.Unlock()
 	}()
 
-	// Create and run benchmark
-	runner := benchmark.NewRunner(s.config, s.metrics, s.redisClient, s.redisConn)
+	// Create and run benchmark with custom config
+	runner := benchmark.NewRunner(cfg, s.metrics, s.redisClient, s.redisConn)
 	if err := runner.Run(ctx); err != nil {
 		s.mu.Lock()
 		// Distinguish between cancellation and actual failure
