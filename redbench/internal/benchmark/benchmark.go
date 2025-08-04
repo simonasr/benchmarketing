@@ -11,6 +11,11 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/redis"
 )
 
+const (
+	// BackpressureDelayMs is the delay when semaphore is full to prevent busy-waiting
+	BackpressureDelayMs = 1 * time.Millisecond
+)
+
 // Runner handles the benchmark execution.
 type Runner struct {
 	config    *config.Config
@@ -139,7 +144,8 @@ func (r *Runner) Run(ctx context.Context) error {
 						}
 					}()
 				default:
-					// Semaphore full, skip this tick
+					// Semaphore full, add a small delay to avoid busy-waiting
+					time.Sleep(BackpressureDelayMs)
 					continue stageLoop
 				}
 			}
