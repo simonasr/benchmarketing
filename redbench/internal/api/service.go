@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -133,8 +134,14 @@ func (s *BenchmarkService) runBenchmark(ctx context.Context) {
 	runner := benchmark.NewRunner(s.config, s.metrics, s.redisClient, s.redisConn)
 	if err := runner.Run(ctx); err != nil {
 		s.mu.Lock()
-		s.status.Status = "failed"
-		s.status.Error = err.Error()
+		// Distinguish between cancellation and actual failure
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			s.status.Status = "cancelled"
+			s.status.Error = "benchmark was cancelled"
+		} else {
+			s.status.Status = "failed"
+			s.status.Error = err.Error()
+		}
 		s.mu.Unlock()
 	}
 }

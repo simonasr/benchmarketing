@@ -73,7 +73,6 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		// Create a done channel to signal goroutines when stage completes
 		stageDone := make(chan struct{})
-		defer close(stageDone)
 
 	stageLoop:
 		for {
@@ -88,7 +87,12 @@ func (r *Runner) Run(ctx context.Context) error {
 			case <-stageTicker.C:
 				clients <- struct{}{}
 				go func() {
-					defer func() { <-clients }()
+					defer func() {
+						select {
+						case <-clients:
+						default:
+						}
+					}()
 
 					// Check if stage completed before starting operations
 					select {
@@ -133,6 +137,9 @@ func (r *Runner) Run(ctx context.Context) error {
 				}()
 			}
 		}
+
+		// Close the stage done channel to signal goroutines that stage is complete
+		close(stageDone)
 
 		if currentClients == r.config.Test.MaxClients {
 			break
