@@ -12,6 +12,12 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/redis"
 )
 
+const (
+	// MaxSupportedRedisTargets defines the current limit for Phase 1
+	// Phase 2 will remove this limitation for distributed benchmarks
+	MaxSupportedRedisTargets = 1
+)
+
 // BenchmarkService manages benchmark execution and state
 type BenchmarkService struct {
 	config      *config.Config
@@ -49,8 +55,8 @@ func (s *BenchmarkService) Start(req *BenchmarkRequest) error {
 
 	// For Phase 1, we only support the existing single Redis target
 	// Phase 2 will add distributed support for multiple targets
-	if len(req.RedisTargets) != 1 {
-		return fmt.Errorf("currently only single Redis target supported")
+	if len(req.RedisTargets) != MaxSupportedRedisTargets {
+		return fmt.Errorf("currently only %d Redis target(s) supported", MaxSupportedRedisTargets)
 	}
 
 	// Update status

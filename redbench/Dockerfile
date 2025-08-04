@@ -35,9 +35,8 @@ WORKDIR /app
 COPY --from=build /app/redbench /app/redbench
 COPY --from=build /app/config.yaml /app/config.yaml
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["/app/redbench", "-service"] || exit 1
+# Note: Health check via external tools not available in distroless
+# Use Kubernetes liveness/readiness probes: GET http://container:8080/health
 
 # Expose ports
 EXPOSE 8080 8081

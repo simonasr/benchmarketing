@@ -107,7 +107,9 @@ func applyServiceEnvOverrides(cfg *Config) {
 
 	// Override service mode
 	if val, ok := os.LookupEnv("SERVICE_MODE"); ok {
-		cfg.Service.ServiceMode = val == "true" || val == "1"
+		if parsed, err := strconv.ParseBool(val); err == nil {
+			cfg.Service.ServiceMode = parsed
+		}
 	}
 }
 
