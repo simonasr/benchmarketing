@@ -23,7 +23,7 @@ func setupTestServer(t *testing.T) (*Server, *BenchmarkService) {
 	}
 	reg := prometheus.NewRegistry()
 	service := NewBenchmarkService(cfg, reg)
-	server := NewServer(service, 8080)
+	server := NewServer(service, nil, 8080) // nil coordinator for test
 	return server, service
 }
 

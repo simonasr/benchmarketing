@@ -6,23 +6,33 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
 // Config represents the application configuration.
 type Config struct {
-	MetricsPort int         `yaml:"metricsPort"`
-	Debug       bool        `yaml:"debug"`
-	Redis       RedisConfig `yaml:"redis"`
-	Test        Test        `yaml:"test"`
-	Service     Service     `yaml:"service"`
+	MetricsPort  int          `yaml:"metricsPort"`
+	Debug        bool         `yaml:"debug"`
+	Redis        RedisConfig  `yaml:"redis"`
+	Test         Test         `yaml:"test"`
+	Service      Service      `yaml:"service"`
+	Coordination Coordination `yaml:"coordination"`
 }
 
 // Service contains service mode configuration.
 type Service struct {
 	APIPort     int  `yaml:"apiPort"`
 	ServiceMode bool `yaml:"serviceMode"`
+}
+
+// Coordination contains distributed coordination configuration.
+type Coordination struct {
+	IsLeader       bool   `yaml:"isLeader"`       // true for leader, false for worker
+	LeaderURL      string `yaml:"leaderUrl"`      // for workers: "http://leader:8080"
+	WorkerID       string `yaml:"workerId"`       // unique worker identifier (auto-generated if empty)
+	PollIntervalMs int    `yaml:"pollIntervalMs"` // how often workers poll leader
 }
 
 // RedisConfig contains Redis-specific configuration.
@@ -83,6 +93,16 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 
+	// Apply coordination-specific environment variables
+	if err := applyCoordinationEnvOverrides(cfg); err != nil {
+		return nil, fmt.Errorf("failed to apply coordination environment overrides: %w", err)
+	}
+
+	// Generate WorkerID if not specified and in worker mode
+	if !cfg.Coordination.IsLeader && cfg.Coordination.WorkerID == "" {
+		cfg.Coordination.WorkerID = generateWorkerID()
+	}
+
 	return cfg, nil
 }
 
@@ -126,4 +146,60 @@ func toEnvName(s string) string {
 		res += string(c)
 	}
 	return strings.ToUpper(res)
+}
+
+// applyCoordinationEnvOverrides applies environment variable overrides for coordination settings
+func applyCoordinationEnvOverrides(cfg *Config) error {
+	// REDBENCH_LEADER_URL
+	if leaderURL := os.Getenv("REDBENCH_LEADER_URL"); leaderURL != "" {
+		cfg.Coordination.LeaderURL = leaderURL
+	}
+
+	// REDBENCH_WORKER_ID
+	if workerID := os.Getenv("REDBENCH_WORKER_ID"); workerID != "" {
+		cfg.Coordination.WorkerID = workerID
+	}
+
+	// REDBENCH_IS_LEADER
+	if isLeaderStr := os.Getenv("REDBENCH_IS_LEADER"); isLeaderStr != "" {
+		if isLeader, err := strconv.ParseBool(isLeaderStr); err == nil {
+			cfg.Coordination.IsLeader = isLeader
+		}
+	}
+
+	// REDBENCH_POLL_INTERVAL_MS
+	if pollIntervalStr := os.Getenv("REDBENCH_POLL_INTERVAL_MS"); pollIntervalStr != "" {
+		if pollInterval, err := strconv.Atoi(pollIntervalStr); err == nil {
+			cfg.Coordination.PollIntervalMs = pollInterval
+		}
+	}
+
+	// SERVICE_API_PORT (for workers to avoid port conflicts)
+	if apiPortStr := os.Getenv("SERVICE_API_PORT"); apiPortStr != "" {
+		if apiPort, err := strconv.Atoi(apiPortStr); err == nil {
+			cfg.Service.APIPort = apiPort
+		}
+	}
+
+	// METRICS_PORT (for workers to avoid port conflicts)
+	if metricsPortStr := os.Getenv("METRICS_PORT"); metricsPortStr != "" {
+		if metricsPort, err := strconv.Atoi(metricsPortStr); err == nil {
+			cfg.MetricsPort = metricsPort
+		}
+	}
+
+	return nil
+}
+
+// generateWorkerID creates a unique worker ID based on hostname and timestamp
+func generateWorkerID() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
+	// Use current timestamp in nanoseconds to ensure uniqueness
+	timestamp := time.Now().UnixNano()
+
+	return fmt.Sprintf("worker-%s-%d", hostname, timestamp%1000000)
 }

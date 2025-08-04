@@ -6,11 +6,16 @@ redis:
   operationTimeoutMs: 100
 test:
   minClients: 1
-  maxClients: 2000
-  stageIntervalS: 1
-  requestDelayMs: 1000
+  maxClients: 50
+  stageIntervalS: 2
+  requestDelayMs: 500
   keySize: 10
-  valueSize: 10
+  valueSize: 100
 service:
   apiPort: 8080
   serviceMode: false
+coordination:
+  isLeader: false          # Default to worker mode
+  leaderUrl: "http://localhost:8080"  # Default leader URL
+  workerId: ""             # Auto-generated if empty
+  pollIntervalMs: 1000

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/api"
 	"github.com/simonasr/benchmarketing/redbench/internal/benchmark"
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
+	"github.com/simonasr/benchmarketing/redbench/internal/coordination"
 	"github.com/simonasr/benchmarketing/redbench/internal/metrics"
 	"github.com/simonasr/benchmarketing/redbench/internal/redis"
 )
@@ -23,6 +25,8 @@ func main() {
 	var (
 		serviceMode = flag.Bool("service", false, "Run in service mode (overrides config)")
 		configPath  = flag.String("config", "config.yaml", "Path to configuration file")
+		leader      = flag.Bool("leader", false, "Run as leader (overrides config)")
+		worker      = flag.Bool("worker", false, "Run as worker (overrides config)")
 	)
 	flag.Parse()
 
@@ -42,6 +46,20 @@ func main() {
 		cfg.Service.ServiceMode = true
 	}
 
+	// Override coordination role if flags are provided
+	if *leader && *worker {
+		slog.Error("Cannot specify both -leader and -worker flags")
+		os.Exit(1)
+	}
+	if *leader {
+		cfg.Coordination.IsLeader = true
+		cfg.Service.ServiceMode = true // Force service mode
+	}
+	if *worker {
+		cfg.Coordination.IsLeader = false
+		cfg.Service.ServiceMode = true // Force service mode
+	}
+
 	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
 
 	// Initialize Prometheus registry
@@ -55,7 +73,14 @@ func main() {
 }
 
 func runServiceMode(cfg *config.Config, reg *prometheus.Registry) {
-	slog.Info("Starting in service mode", "api_port", cfg.Service.APIPort)
+	roleStr := "worker"
+	if cfg.Coordination.IsLeader {
+		roleStr = "leader"
+	}
+
+	slog.Info("Starting in service mode",
+		"api_port", cfg.Service.APIPort,
+		"role", roleStr)
 
 	// Start Prometheus metrics server
 	metrics.StartPrometheusServer(cfg.MetricsPort, reg)
@@ -63,8 +88,22 @@ func runServiceMode(cfg *config.Config, reg *prometheus.Registry) {
 	// Initialize benchmark service
 	benchmarkService := api.NewBenchmarkService(cfg, reg)
 
-	// Initialize API server
-	apiServer := api.NewServer(benchmarkService, cfg.Service.APIPort)
+	// Initialize coordination components based on role
+	if cfg.Coordination.IsLeader {
+		runLeaderMode(cfg, benchmarkService)
+	} else {
+		runWorkerMode(cfg, benchmarkService)
+	}
+}
+
+func runLeaderMode(cfg *config.Config, benchmarkService *api.BenchmarkService) {
+	slog.Info("Starting in leader mode")
+
+	// Initialize coordinator
+	coordinator := coordination.NewCoordinator()
+
+	// Initialize API server with coordinator
+	apiServer := api.NewServer(benchmarkService, coordinator, cfg.Service.APIPort)
 
 	// Start API server in goroutine
 	go func() {
@@ -79,7 +118,7 @@ func runServiceMode(cfg *config.Config, reg *prometheus.Registry) {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	slog.Info("Shutting down service")
+	slog.Info("Shutting down leader")
 
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -89,7 +128,59 @@ func runServiceMode(cfg *config.Config, reg *prometheus.Registry) {
 		slog.Error("Failed to shutdown API server gracefully", "error", err)
 	}
 
-	slog.Info("Service stopped")
+	coordinator.Shutdown()
+	slog.Info("Leader stopped")
+}
+
+func runWorkerMode(cfg *config.Config, benchmarkService *api.BenchmarkService) {
+	if cfg.Coordination.LeaderURL == "" {
+		slog.Error("Leader URL is required for worker mode")
+		os.Exit(1)
+	}
+
+	// WorkerID should already be generated in config loading if it was empty
+	slog.Info("Starting in worker mode",
+		"worker_id", cfg.Coordination.WorkerID,
+		"leader_url", cfg.Coordination.LeaderURL)
+
+	// Create adapter to bridge api.BenchmarkService to coordination.BenchmarkService interface
+	adapter := &BenchmarkServiceAdapter{service: benchmarkService}
+
+	// Initialize worker client
+	workerClient := coordination.NewWorkerClient(&cfg.Coordination, adapter)
+
+	// Start worker client
+	if err := workerClient.Start(); err != nil {
+		slog.Error("Failed to start worker client", "error", err)
+		os.Exit(1)
+	}
+
+	// Start a minimal API server for health checks (without coordinator)
+	apiServer := api.NewServer(benchmarkService, nil, cfg.Service.APIPort)
+	go func() {
+		if err := apiServer.Start(); err != nil {
+			slog.Error("API server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for shutdown signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("Shutting down worker")
+
+	// Graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := apiServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Failed to shutdown API server gracefully", "error", err)
+	}
+
+	workerClient.Shutdown()
+	slog.Info("Worker stopped")
 }
 
 func runOneShotMode(cfg *config.Config, reg *prometheus.Registry) {
@@ -123,4 +214,89 @@ func runOneShotMode(cfg *config.Config, reg *prometheus.Registry) {
 	}
 
 	slog.Info("Benchmark completed successfully")
+}
+
+// BenchmarkServiceAdapter adapts api.BenchmarkService to coordination.BenchmarkService interface
+type BenchmarkServiceAdapter struct {
+	service *api.BenchmarkService
+}
+
+// Start implements coordination.BenchmarkService.Start
+func (a *BenchmarkServiceAdapter) Start(req interface{}) error {
+	// Convert interface{} request to api.StartBenchmarkRequest
+	reqMap, ok := req.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid request format")
+	}
+
+	// Extract redis targets
+	redisTargetsInterface, ok := reqMap["redis_targets"].([]map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid redis_targets format")
+	}
+
+	var redisTargets []api.RedisTarget
+	for _, targetMap := range redisTargetsInterface {
+		target := api.RedisTarget{}
+		if host, ok := targetMap["host"].(string); ok {
+			target.Host = host
+		}
+		if port, ok := targetMap["port"].(string); ok {
+			target.Port = port
+		}
+		if clusterAddr, ok := targetMap["cluster_address"].(string); ok {
+			target.ClusterAddress = clusterAddr
+		}
+		if label, ok := targetMap["label"].(string); ok {
+			target.Label = label
+		}
+		redisTargets = append(redisTargets, target)
+	}
+
+	// Extract config
+	var testConfig *api.TestConfig
+	if configInterface, ok := reqMap["config"].(map[string]interface{}); ok {
+		testConfig = &api.TestConfig{}
+		if minClients, ok := configInterface["min_clients"].(int); ok {
+			testConfig.MinClients = &minClients
+		}
+		if maxClients, ok := configInterface["max_clients"].(int); ok {
+			testConfig.MaxClients = &maxClients
+		}
+		if stageInterval, ok := configInterface["stage_interval_s"].(int); ok {
+			testConfig.StageIntervalS = &stageInterval
+		}
+		if requestDelay, ok := configInterface["request_delay_ms"].(int); ok {
+			testConfig.RequestDelayMs = &requestDelay
+		}
+		if keySize, ok := configInterface["key_size"].(int); ok {
+			testConfig.KeySize = &keySize
+		}
+		if valueSize, ok := configInterface["value_size"].(int); ok {
+			testConfig.ValueSize = &valueSize
+		}
+	}
+
+	// Create API request
+	apiReq := &api.StartBenchmarkRequest{
+		RedisTargets: redisTargets,
+		Config:       testConfig,
+	}
+
+	return a.service.Start(apiReq)
+}
+
+// GetStatus implements coordination.BenchmarkService.GetStatus
+func (a *BenchmarkServiceAdapter) GetStatus() interface{} {
+	status := a.service.GetStatus()
+
+	// Convert to map[string]interface{} for coordination package
+	return map[string]interface{}{
+		"status":        string(status.Status),
+		"start_time":    status.StartTime,
+		"end_time":      status.EndTime,
+		"current_stage": status.CurrentStage,
+		"max_stage":     status.MaxStage,
+		"error":         status.Error,
+	}
 }
