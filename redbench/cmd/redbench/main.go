@@ -147,7 +147,7 @@ func runWorkerMode(cfg *config.Config, benchmarkService *api.BenchmarkService) {
 	adapter := &BenchmarkServiceAdapter{service: benchmarkService}
 
 	// Initialize worker client
-	workerClient := coordination.NewWorkerClient(&cfg.Coordination, adapter)
+	workerClient := coordination.NewWorkerClient(&cfg.Coordination, adapter, cfg.Service.APIPort)
 
 	// Start worker client
 	if err := workerClient.Start(); err != nil {
@@ -221,15 +221,62 @@ type BenchmarkServiceAdapter struct {
 	service *api.BenchmarkService
 }
 
+// StartRequest represents a coordination start request (avoiding import cycle)
+type StartRequest struct {
+	RedisTargets []RedisTargetRequest   `json:"redis_targets"`
+	Config       map[string]interface{} `json:"config,omitempty"`
+}
+
+// RedisTargetRequest represents a Redis target in a start request
+type RedisTargetRequest struct {
+	Host           string `json:"host,omitempty"`
+	Port           string `json:"port,omitempty"`
+	ClusterAddress string `json:"cluster_address,omitempty"`
+	Label          string `json:"label,omitempty"`
+}
+
 // Start implements coordination.BenchmarkService.Start
 func (a *BenchmarkServiceAdapter) Start(req interface{}) error {
-	// Convert interface{} request to api.StartBenchmarkRequest
-	reqMap, ok := req.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid request format")
+	// Handle both old map[string]interface{} and new StartRequest struct
+	if startReq, ok := req.(*StartRequest); ok {
+		return a.handleStartRequest(startReq)
 	}
 
-	// Extract redis targets
+	// Fallback for map[string]interface{} (legacy support)
+	if reqMap, ok := req.(map[string]interface{}); ok {
+		return a.handleMapRequest(reqMap)
+	}
+
+	return fmt.Errorf("invalid request format")
+}
+
+// handleStartRequest handles the new struct-based request
+func (a *BenchmarkServiceAdapter) handleStartRequest(req *StartRequest) error {
+	redisTargets := make([]api.RedisTarget, 0, len(req.RedisTargets))
+	for _, target := range req.RedisTargets {
+		redisTargets = append(redisTargets, api.RedisTarget{
+			Host:           target.Host,
+			Port:           target.Port,
+			ClusterAddress: target.ClusterAddress,
+			Label:          target.Label,
+		})
+	}
+
+	var testConfig *api.TestConfig
+	if req.Config != nil {
+		testConfig = a.extractTestConfig(req.Config)
+	}
+
+	apiReq := &api.StartBenchmarkRequest{
+		RedisTargets: redisTargets,
+		Config:       testConfig,
+	}
+
+	return a.service.Start(apiReq)
+}
+
+// handleMapRequest handles the legacy map[string]interface{} request
+func (a *BenchmarkServiceAdapter) handleMapRequest(reqMap map[string]interface{}) error {
 	redisTargetsInterface, ok := reqMap["redis_targets"].([]map[string]interface{})
 	if !ok {
 		return fmt.Errorf("invalid redis_targets format")
@@ -253,37 +300,43 @@ func (a *BenchmarkServiceAdapter) Start(req interface{}) error {
 		redisTargets = append(redisTargets, target)
 	}
 
-	// Extract config
 	var testConfig *api.TestConfig
 	if configInterface, ok := reqMap["config"].(map[string]interface{}); ok {
-		testConfig = &api.TestConfig{}
-		if minClients, ok := configInterface["min_clients"].(int); ok {
-			testConfig.MinClients = &minClients
-		}
-		if maxClients, ok := configInterface["max_clients"].(int); ok {
-			testConfig.MaxClients = &maxClients
-		}
-		if stageInterval, ok := configInterface["stage_interval_s"].(int); ok {
-			testConfig.StageIntervalS = &stageInterval
-		}
-		if requestDelay, ok := configInterface["request_delay_ms"].(int); ok {
-			testConfig.RequestDelayMs = &requestDelay
-		}
-		if keySize, ok := configInterface["key_size"].(int); ok {
-			testConfig.KeySize = &keySize
-		}
-		if valueSize, ok := configInterface["value_size"].(int); ok {
-			testConfig.ValueSize = &valueSize
-		}
+		testConfig = a.extractTestConfig(configInterface)
 	}
 
-	// Create API request
 	apiReq := &api.StartBenchmarkRequest{
 		RedisTargets: redisTargets,
 		Config:       testConfig,
 	}
 
 	return a.service.Start(apiReq)
+}
+
+// extractTestConfig extracts test configuration from map[string]interface{}
+func (a *BenchmarkServiceAdapter) extractTestConfig(configMap map[string]interface{}) *api.TestConfig {
+	testConfig := &api.TestConfig{}
+
+	if minClients, ok := configMap["min_clients"].(int); ok {
+		testConfig.MinClients = &minClients
+	}
+	if maxClients, ok := configMap["max_clients"].(int); ok {
+		testConfig.MaxClients = &maxClients
+	}
+	if stageInterval, ok := configMap["stage_interval_s"].(int); ok {
+		testConfig.StageIntervalS = &stageInterval
+	}
+	if requestDelay, ok := configMap["request_delay_ms"].(int); ok {
+		testConfig.RequestDelayMs = &requestDelay
+	}
+	if keySize, ok := configMap["key_size"].(int); ok {
+		testConfig.KeySize = &keySize
+	}
+	if valueSize, ok := configMap["value_size"].(int); ok {
+		testConfig.ValueSize = &valueSize
+	}
+
+	return testConfig
 }
 
 // GetStatus implements coordination.BenchmarkService.GetStatus

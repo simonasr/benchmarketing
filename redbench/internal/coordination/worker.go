@@ -12,6 +12,20 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
+// StartRequest represents a benchmark start request
+type StartRequest struct {
+	RedisTargets []RedisTargetRequest   `json:"redis_targets"`
+	Config       map[string]interface{} `json:"config,omitempty"`
+}
+
+// RedisTargetRequest represents a Redis target in a start request
+type RedisTargetRequest struct {
+	Host           string `json:"host,omitempty"`
+	Port           string `json:"port,omitempty"`
+	ClusterAddress string `json:"cluster_address,omitempty"`
+	Label          string `json:"label,omitempty"`
+}
+
 // BenchmarkService interface to avoid import cycle with api package
 type BenchmarkService interface {
 	Start(req interface{}) error
@@ -21,6 +35,7 @@ type BenchmarkService interface {
 // WorkerClient handles communication with the leader
 type WorkerClient struct {
 	workerID     string
+	workerURL    string
 	leaderURL    string
 	pollInterval time.Duration
 	httpClient   *http.Client
@@ -30,11 +45,15 @@ type WorkerClient struct {
 }
 
 // NewWorkerClient creates a new worker client
-func NewWorkerClient(cfg *config.Coordination, benchmarkSvc BenchmarkService) *WorkerClient {
+func NewWorkerClient(cfg *config.Coordination, benchmarkSvc BenchmarkService, workerPort int) *WorkerClient {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Generate worker URL based on configuration
+	workerURL := fmt.Sprintf("http://localhost:%d", workerPort)
 
 	return &WorkerClient{
 		workerID:     cfg.WorkerID,
+		workerURL:    workerURL,
 		leaderURL:    cfg.LeaderURL,
 		pollInterval: time.Duration(cfg.PollIntervalMs) * time.Millisecond,
 		httpClient: &http.Client{
@@ -65,7 +84,7 @@ func (w *WorkerClient) Start() error {
 func (w *WorkerClient) registerWithLeader() error {
 	reg := &WorkerRegistration{
 		WorkerID: w.workerID,
-		URL:      "http://localhost:8080", // Worker's own URL for callbacks if needed
+		URL:      w.workerURL, // Worker's own URL for callbacks if needed
 	}
 
 	body, err := json.Marshal(reg)
@@ -173,17 +192,17 @@ func (w *WorkerClient) startBenchmark(assignment *Assignment) {
 	// Notify leader that we're starting
 	w.updateStatus(assignment.ID, "running", nil)
 
-	// Create start request using interface{} - the implementation will handle the conversion
-	startReq := map[string]interface{}{
-		"redis_targets": []map[string]interface{}{
+	// Create start request using proper struct type
+	startReq := &StartRequest{
+		RedisTargets: []RedisTargetRequest{
 			{
-				"host":            assignment.RedisTarget.Host,
-				"port":            assignment.RedisTarget.Port,
-				"cluster_address": assignment.RedisTarget.ClusterAddress,
-				"label":           assignment.RedisTarget.Label,
+				Host:           assignment.RedisTarget.Host,
+				Port:           assignment.RedisTarget.Port,
+				ClusterAddress: assignment.RedisTarget.ClusterAddress,
+				Label:          assignment.RedisTarget.Label,
 			},
 		},
-		"config": w.testConfigToMap(assignment.Config),
+		Config: w.testConfigToMap(assignment.Config),
 	}
 
 	// Start the benchmark
@@ -317,33 +336,24 @@ func (w *WorkerClient) testConfigToMap(config *TestConfig) map[string]interface{
 	return result
 }
 
-// parseStatusFromInterface converts interface{} status to BenchmarkStatus
+// parseStatusFromInterface converts interface{} status to BenchmarkStatus using JSON marshaling for type safety
 func (w *WorkerClient) parseStatusFromInterface(statusInterface interface{}) *BenchmarkStatus {
 	if statusInterface == nil {
 		return &BenchmarkStatus{Status: "idle"}
 	}
 
-	// Use reflection or type assertion to extract status
-	// For simplicity, assume it's a map[string]interface{} or similar
-	if statusMap, ok := statusInterface.(map[string]interface{}); ok {
-		status := &BenchmarkStatus{}
-
-		if s, ok := statusMap["status"].(string); ok {
-			status.Status = s
-		}
-		if e, ok := statusMap["error"].(string); ok {
-			status.Error = e
-		}
-		if cs, ok := statusMap["current_stage"].(int); ok {
-			status.CurrentStage = cs
-		}
-		if ms, ok := statusMap["max_stage"].(int); ok {
-			status.MaxStage = ms
-		}
-
-		return status
+	// Use JSON marshaling/unmarshaling for type-safe conversion
+	data, err := json.Marshal(statusInterface)
+	if err != nil {
+		slog.Warn("Failed to marshal status interface", "error", err)
+		return &BenchmarkStatus{Status: "unknown"}
 	}
 
-	// Fallback
-	return &BenchmarkStatus{Status: "unknown"}
+	var status BenchmarkStatus
+	if err := json.Unmarshal(data, &status); err != nil {
+		slog.Warn("Failed to unmarshal status", "error", err)
+		return &BenchmarkStatus{Status: "unknown"}
+	}
+
+	return &status
 }

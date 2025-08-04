@@ -11,6 +11,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	// workerIDTimestampTruncate is used to truncate nanosecond timestamps for WorkerID generation
+	// to create shorter, more readable IDs while maintaining uniqueness
+	workerIDTimestampTruncate = 1000000
+)
+
 // Config represents the application configuration.
 type Config struct {
 	MetricsPort  int          `yaml:"metricsPort"`
@@ -197,5 +203,5 @@ func generateWorkerID() string {
 	// Use current timestamp in nanoseconds to ensure uniqueness
 	timestamp := time.Now().UnixNano()
 
-	return fmt.Sprintf("worker-%s-%d", hostname, timestamp%1000000)
+	return fmt.Sprintf("worker-%s-%d", hostname, timestamp%workerIDTimestampTruncate)
 }
