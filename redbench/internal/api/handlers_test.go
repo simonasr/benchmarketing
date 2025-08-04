@@ -14,7 +14,7 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
-func setupTestServer(t *testing.T) (*Server, *BenchmarkService) {
+func setupTestServer(_ *testing.T) *Server {
 	cfg := &config.Config{
 		Test: config.Test{
 			MinClients: 1,
@@ -24,11 +24,11 @@ func setupTestServer(t *testing.T) (*Server, *BenchmarkService) {
 	reg := prometheus.NewRegistry()
 	service := NewBenchmarkService(cfg, reg)
 	server := NewServer(service, nil, 8080) // nil coordinator for test
-	return server, service
+	return server
 }
 
 func TestServer_HandleHealth(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestServer_HandleHealth(t *testing.T) {
 }
 
 func TestServer_HandleGetStatus(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	req := httptest.NewRequest("GET", "/benchmark/status", nil)
 	w := httptest.NewRecorder()
@@ -67,7 +67,7 @@ func TestServer_HandleGetStatus(t *testing.T) {
 }
 
 func TestServer_HandleStartBenchmark_InvalidJSON(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	req := httptest.NewRequest("POST", "/benchmark/start", bytes.NewReader([]byte("invalid json")))
 	w := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestServer_HandleStartBenchmark_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleStartBenchmark_NoRedisTargets(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	reqData := StartBenchmarkRequest{
 		RedisTargets: []RedisTarget{},
@@ -111,7 +111,7 @@ func TestServer_HandleStartBenchmark_NoRedisTargets(t *testing.T) {
 }
 
 func TestServer_HandleStartBenchmark_InvalidRedisTarget(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	reqData := StartBenchmarkRequest{
 		RedisTargets: []RedisTarget{
@@ -140,7 +140,7 @@ func TestServer_HandleStartBenchmark_InvalidRedisTarget(t *testing.T) {
 }
 
 func TestServer_HandleStopBenchmark_NotRunning(t *testing.T) {
-	server, _ := setupTestServer(t)
+	server := setupTestServer(t)
 
 	req := httptest.NewRequest("POST", "/benchmark/stop", nil)
 	w := httptest.NewRecorder()

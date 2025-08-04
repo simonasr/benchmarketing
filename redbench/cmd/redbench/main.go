@@ -235,7 +235,7 @@ func (a *BenchmarkServiceAdapter) Start(req interface{}) error {
 		return fmt.Errorf("invalid redis_targets format")
 	}
 
-	var redisTargets []api.RedisTarget
+	redisTargets := make([]api.RedisTarget, 0, len(redisTargetsInterface))
 	for _, targetMap := range redisTargetsInterface {
 		target := api.RedisTarget{}
 		if host, ok := targetMap["host"].(string); ok {

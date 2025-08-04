@@ -94,9 +94,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	// Apply coordination-specific environment variables
-	if err := applyCoordinationEnvOverrides(cfg); err != nil {
-		return nil, fmt.Errorf("failed to apply coordination environment overrides: %w", err)
-	}
+	applyCoordinationEnvOverrides(cfg)
 
 	// Generate WorkerID if not specified and in worker mode
 	if !cfg.Coordination.IsLeader && cfg.Coordination.WorkerID == "" {
@@ -149,7 +147,7 @@ func toEnvName(s string) string {
 }
 
 // applyCoordinationEnvOverrides applies environment variable overrides for coordination settings
-func applyCoordinationEnvOverrides(cfg *Config) error {
+func applyCoordinationEnvOverrides(cfg *Config) {
 	// REDBENCH_LEADER_URL
 	if leaderURL := os.Getenv("REDBENCH_LEADER_URL"); leaderURL != "" {
 		cfg.Coordination.LeaderURL = leaderURL
@@ -187,8 +185,6 @@ func applyCoordinationEnvOverrides(cfg *Config) error {
 			cfg.MetricsPort = metricsPort
 		}
 	}
-
-	return nil
 }
 
 // generateWorkerID creates a unique worker ID based on hostname and timestamp

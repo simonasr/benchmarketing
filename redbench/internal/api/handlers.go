@@ -94,10 +94,12 @@ func (s *Server) handleStartBenchmark(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "accepted",
 		"message": "Benchmark started successfully",
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleStopBenchmark handles POST /benchmark/stop
@@ -114,10 +116,12 @@ func (s *Server) handleStopBenchmark(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Benchmark stopped successfully",
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleGetStatus handles GET /benchmark/status
@@ -126,17 +130,21 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleHealth handles GET /health
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status": "healthy",
 		"time":   time.Now().Format(time.RFC3339),
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // writeError writes an error response
@@ -210,10 +218,12 @@ func (s *Server) handleStartDistributedBenchmark(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "accepted",
 		"message": "Distributed benchmark started successfully",
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleGetDistributedStatus handles GET /benchmark/distributed/status
@@ -227,7 +237,9 @@ func (s *Server) handleGetDistributedStatus(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleWorkerRegistration handles POST /workers/register
@@ -250,10 +262,12 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Worker registered successfully",
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleGetWorkers handles GET /workers
@@ -267,7 +281,9 @@ func (s *Server) handleGetWorkers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(workers)
+	if err := json.NewEncoder(w).Encode(workers); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleGetWorkerAssignment handles GET /workers/{id}/assignment
@@ -284,7 +300,9 @@ func (s *Server) handleGetWorkerAssignment(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Update heartbeat
-	s.coordinator.UpdateWorkerHeartbeat(workerID)
+	if err := s.coordinator.UpdateWorkerHeartbeat(workerID); err != nil {
+		slog.Warn("Failed to update worker heartbeat", "worker_id", workerID, "error", err)
+	}
 
 	assignment, err := s.coordinator.GetWorkerAssignment(workerID)
 	if err != nil {
@@ -299,7 +317,9 @@ func (s *Server) handleGetWorkerAssignment(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(assignment)
+	if err := json.NewEncoder(w).Encode(assignment); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // handleWorkerStatusUpdate handles POST /workers/{id}/status
@@ -331,10 +351,12 @@ func (s *Server) handleWorkerStatusUpdate(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Status updated successfully",
-	})
+	}); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 // Type conversion helpers
