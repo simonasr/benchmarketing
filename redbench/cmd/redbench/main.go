@@ -100,7 +100,7 @@ func runLeaderMode(cfg *config.Config, benchmarkService *api.BenchmarkService) {
 	slog.Info("Starting in leader mode")
 
 	// Initialize coordinator
-	coordinator := coordination.NewCoordinator()
+	coordinator := coordination.NewCoordinator(&cfg.Coordination)
 
 	// Initialize API server with coordinator
 	apiServer := api.NewServer(benchmarkService, coordinator, cfg.Service.APIPort)

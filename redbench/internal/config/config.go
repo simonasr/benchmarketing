@@ -6,15 +6,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 )
 
+// Constants for worker ID generation
 const (
-	// workerIDTimestampTruncate is used to truncate nanosecond timestamps for WorkerID generation
-	// to create shorter, more readable IDs while maintaining uniqueness
-	workerIDTimestampTruncate = 1000000
+	workerIDPrefix = "worker"
 )
 
 // Config represents the application configuration.
@@ -38,6 +37,7 @@ type Coordination struct {
 	IsLeader       bool   `yaml:"isLeader"`       // true for leader, false for worker
 	LeaderURL      string `yaml:"leaderUrl"`      // for workers: "http://leader:8080"
 	WorkerID       string `yaml:"workerId"`       // unique worker identifier (auto-generated if empty)
+	WorkerHost     string `yaml:"workerHost"`     // hostname for worker URLs (defaults to localhost)
 	PollIntervalMs int    `yaml:"pollIntervalMs"` // how often workers poll leader
 }
 
@@ -178,6 +178,11 @@ func applyCoordinationEnvOverrides(cfg *Config) {
 		}
 	}
 
+	// REDBENCH_WORKER_HOST
+	if workerHost := os.Getenv("REDBENCH_WORKER_HOST"); workerHost != "" {
+		cfg.Coordination.WorkerHost = workerHost
+	}
+
 	// SERVICE_API_PORT (for workers to avoid port conflicts)
 	if apiPortStr := os.Getenv("SERVICE_API_PORT"); apiPortStr != "" {
 		if apiPort, err := strconv.Atoi(apiPortStr); err == nil {
@@ -193,15 +198,17 @@ func applyCoordinationEnvOverrides(cfg *Config) {
 	}
 }
 
-// generateWorkerID creates a unique worker ID based on hostname and timestamp
+// generateWorkerID creates a unique worker identifier using UUID for guaranteed uniqueness
 func generateWorkerID() string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
 	}
 
-	// Use current timestamp in nanoseconds to ensure uniqueness
-	timestamp := time.Now().UnixNano()
+	// Use UUID for guaranteed uniqueness - no risk of collisions
+	uniqueID := uuid.New().String()
+	// Take first 8 characters of UUID for shorter, readable IDs
+	shortID := uniqueID[:8]
 
-	return fmt.Sprintf("worker-%s-%d", hostname, timestamp%workerIDTimestampTruncate)
+	return fmt.Sprintf("%s-%s-%s", workerIDPrefix, hostname, shortID)
 }

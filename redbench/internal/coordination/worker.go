@@ -49,7 +49,11 @@ func NewWorkerClient(cfg *config.Coordination, benchmarkSvc BenchmarkService, wo
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Generate worker URL based on configuration
-	workerURL := fmt.Sprintf("http://localhost:%d", workerPort)
+	workerHost := cfg.WorkerHost
+	if workerHost == "" {
+		workerHost = "localhost"
+	}
+	workerURL := fmt.Sprintf("http://%s:%d", workerHost, workerPort)
 
 	return &WorkerClient{
 		workerID:     cfg.WorkerID,
@@ -339,7 +343,8 @@ func (w *WorkerClient) testConfigToMap(config *TestConfig) map[string]interface{
 // parseStatusFromInterface converts interface{} status to BenchmarkStatus using JSON marshaling for type safety
 func (w *WorkerClient) parseStatusFromInterface(statusInterface interface{}) *BenchmarkStatus {
 	if statusInterface == nil {
-		return &BenchmarkStatus{Status: "idle"}
+		slog.Warn("Received nil status interface - this may indicate an issue with status reporting")
+		return &BenchmarkStatus{Status: "status_unavailable", Error: "nil status interface"}
 	}
 
 	// Use JSON marshaling/unmarshaling for type-safe conversion

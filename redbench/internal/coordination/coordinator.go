@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
 // Coordinator manages distributed benchmark coordination
@@ -23,7 +24,7 @@ type Coordinator struct {
 }
 
 // NewCoordinator creates a new coordinator instance
-func NewCoordinator() *Coordinator {
+func NewCoordinator(cfg *config.Coordination) *Coordinator {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &Coordinator{
@@ -164,24 +165,24 @@ func (c *Coordinator) StartDistributedBenchmark(req *DistributedBenchmarkRequest
 		"redis_targets", len(req.RedisTargets),
 		"workers", len(availableWorkers))
 
-	// Schedule start signal
-	go c.sendStartSignal(2 * time.Second) // Give workers 2 seconds to poll
+	// Set start signal immediately - workers coordinate via timestamp
+	c.setStartSignal()
 
 	return nil
 }
 
-// sendStartSignal sends start signal to all assigned workers after delay
-func (c *Coordinator) sendStartSignal(delay time.Duration) {
-	time.Sleep(delay)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+// setStartSignal sets start signal timestamp for all assigned workers
+func (c *Coordinator) setStartSignal() {
 	if c.currentBenchmark == nil {
 		return
 	}
 
-	startTime := time.Now().Add(1 * time.Second) // Start in 1 second
+	// Give workers 5 seconds to poll and receive their assignments
+	// This is much better than an artificial delay because:
+	// 1. Workers can start as soon as they receive the assignment
+	// 2. All workers coordinate to the same timestamp
+	// 3. No waiting if all workers are already ready
+	startTime := time.Now().Add(5 * time.Second)
 
 	for _, worker := range c.workers {
 		if worker.Assignment != nil && worker.Status == "assigned" {
@@ -191,7 +192,9 @@ func (c *Coordinator) sendStartSignal(delay time.Duration) {
 	}
 
 	c.currentBenchmark.Status = "starting"
-	slog.Info("Start signal sent to workers", "start_time", startTime)
+	slog.Info("Start signal set for workers",
+		"start_time", startTime,
+		"coordination_window_seconds", 5)
 }
 
 // UpdateWorkerStatus updates worker status

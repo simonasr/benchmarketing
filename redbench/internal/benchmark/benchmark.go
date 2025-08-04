@@ -85,7 +85,15 @@ func (r *Runner) Run(ctx context.Context) error {
 			case <-stageTicker.C:
 				clients <- struct{}{}
 				go func() {
-					defer func() { <-clients }()
+					defer func() {
+						select {
+						case <-clients:
+							// Successfully received from channel
+						default:
+							// Channel might be closed or blocked - log warning
+							slog.Warn("Failed to receive from clients channel in defer")
+						}
+					}()
 
 					opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)

@@ -18,4 +18,5 @@ coordination:
   isLeader: false          # Default to worker mode
   leaderUrl: "http://localhost:8080"  # Default leader URL
   workerId: ""             # Auto-generated if empty
-  pollIntervalMs: 1000
+  workerHost: "localhost"  # Default hostname for worker URLs (override for containers)
+  pollIntervalMs: 1000     # How often workers poll leader
