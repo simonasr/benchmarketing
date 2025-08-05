@@ -1,7 +1,10 @@
 package config
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -20,8 +23,19 @@ type Config struct {
 
 // RedisConfig contains Redis-specific configuration.
 type RedisConfig struct {
-	Expiration         int32 `yaml:"expirationS"`
-	OperationTimeoutMs int   `yaml:"operationTimeoutMs"`
+	Expiration         int32     `yaml:"expirationS"`
+	OperationTimeoutMs int       `yaml:"operationTimeoutMs"`
+	TLS                TLSConfig `yaml:"tls"`
+}
+
+// TLSConfig contains TLS-specific configuration for Redis connections.
+type TLSConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	CertFile           string `yaml:"certFile"`
+	KeyFile            string `yaml:"keyFile"`
+	CAFile             string `yaml:"caFile"`
+	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
+	ServerName         string `yaml:"serverName"`
 }
 
 // Test contains benchmark test configuration.
@@ -36,10 +50,13 @@ type Test struct {
 
 // RedisConnection holds Redis connection information.
 type RedisConnection struct {
-	Host           string
-	Port           string
-	ClusterAddress string
-	TargetLabel    string
+	Host                  string
+	Port                  string
+	ClusterURL            string
+	TargetLabel           string
+	TLS                   TLSConfig
+	URL                   string // Support for rediss:// URLs
+	ConnectTimeoutSeconds int    // Connection timeout in seconds
 }
 
 // LoadConfig loads configuration from the specified YAML file.
@@ -80,33 +97,208 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 // LoadRedisConnection loads Redis connection information from environment variables.
-// It returns the connection details or an error if required variables are missing.
+// It supports both traditional host/port configuration and rediss:// URLs.
 func LoadRedisConnection() (*RedisConnection, error) {
 	conn := &RedisConnection{
-		ClusterAddress: os.Getenv("REDIS_CLUSTER_ADDRESS"),
-		Host:           os.Getenv("REDIS_HOST"),
-		Port:           os.Getenv("REDIS_PORT"),
+		ClusterURL:            os.Getenv("REDIS_CLUSTER_URL"),
+		Host:                  os.Getenv("REDIS_HOST"),
+		Port:                  os.Getenv("REDIS_PORT"),
+		URL:                   os.Getenv("REDIS_URL"),
+		ConnectTimeoutSeconds: getIntEnv("REDIS_CONNECT_TIMEOUT_SECONDS", 10),
 	}
 
-	if conn.Port == "" {
-		conn.Port = "6379"
+	// Load TLS configuration from environment variables
+	conn.TLS = TLSConfig{
+		Enabled:            getBoolEnv("REDIS_TLS_ENABLED", false),
+		CertFile:           os.Getenv("REDIS_TLS_CERT_FILE"),
+		KeyFile:            os.Getenv("REDIS_TLS_KEY_FILE"),
+		CAFile:             os.Getenv("REDIS_TLS_CA_FILE"),
+		InsecureSkipVerify: getBoolEnv("REDIS_TLS_INSECURE_SKIP_VERIFY", false),
+		ServerName:         os.Getenv("REDIS_TLS_SERVER_NAME"),
+	}
+
+	// Parse Redis URL if provided (supports rediss:// for TLS)
+	if conn.URL != "" {
+		if err := parseRedisURL(conn); err != nil {
+			return nil, fmt.Errorf("parsing Redis URL: %w", err)
+		}
+	} else if conn.ClusterURL != "" {
+		// Parse cluster URL (supports rediss:// for TLS)
+		if err := parseRedisClusterURL(conn); err != nil {
+			return nil, fmt.Errorf("parsing Redis cluster URL: %w", err)
+		}
+	} else {
+		// Traditional configuration
+		if conn.Port == "" {
+			conn.Port = "6379"
+		}
 	}
 
 	// Check if we're in a test environment
-	if os.Getenv("GO_TEST") == "1" && conn.Host == "" && conn.ClusterAddress == "" {
+	if os.Getenv("GO_TEST") == "1" && conn.Host == "" && conn.ClusterURL == "" && conn.URL == "" {
 		// For tests, use a default value
 		conn.Host = "test-host"
-	} else if conn.ClusterAddress == "" && conn.Host == "" {
-		return nil, fmt.Errorf("REDIS_HOST or REDIS_CLUSTER_ADDRESS environment variable must be set")
+	} else if conn.ClusterURL == "" && conn.Host == "" && conn.URL == "" {
+		return nil, fmt.Errorf("REDIS_HOST, REDIS_CLUSTER_URL, or REDIS_URL environment variable must be set")
 	}
 
-	if conn.ClusterAddress != "" {
-		conn.TargetLabel = conn.ClusterAddress
+	// Set target label for metrics
+	if conn.ClusterURL != "" {
+		conn.TargetLabel = conn.ClusterURL
+	} else if conn.URL != "" {
+		conn.TargetLabel = conn.URL
 	} else {
 		conn.TargetLabel = conn.Host + ":" + conn.Port
 	}
 
 	return conn, nil
+}
+
+// parseRedisURL parses a Redis URL and populates connection fields.
+// Supports redis:// and rediss:// (TLS) schemes.
+func parseRedisURL(conn *RedisConnection) error {
+	u, err := url.Parse(conn.URL)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// Check for TLS scheme
+	if u.Scheme == "rediss" {
+		conn.TLS.Enabled = true
+	} else if u.Scheme != "redis" {
+		return fmt.Errorf("unsupported scheme: %s (use redis:// or rediss://)", u.Scheme)
+	}
+
+	// Extract host and port
+	conn.Host = u.Hostname()
+	if u.Port() != "" {
+		conn.Port = u.Port()
+	} else {
+		conn.Port = "6379"
+	}
+
+	// Note: Password and database extraction removed - focusing on TLS only
+
+	// Extract server name for TLS from host if not explicitly set
+	if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+		conn.TLS.ServerName = conn.Host
+	}
+
+	return nil
+}
+
+// parseRedisClusterURL parses a Redis cluster URL and populates connection fields.
+// Supports both full URLs (redis://host:port, rediss://host:port) and plain host:port format.
+func parseRedisClusterURL(conn *RedisConnection) error {
+	clusterURL := conn.ClusterURL
+
+	// Check if it's a full URL or just host:port
+	if strings.Contains(clusterURL, "://") {
+		// Full URL format
+		u, err := url.Parse(clusterURL)
+		if err != nil {
+			return fmt.Errorf("invalid cluster URL format: %w", err)
+		}
+
+		// Check for TLS scheme
+		if u.Scheme == "rediss" {
+			conn.TLS.Enabled = true
+		} else if u.Scheme != "redis" {
+			return fmt.Errorf("unsupported cluster URL scheme: %s (use redis:// or rediss://)", u.Scheme)
+		}
+
+		// Extract host:port
+		hostPort := u.Host
+		if u.Port() == "" {
+			// Add default port if not specified
+			hostPort = u.Hostname() + ":6379"
+		}
+
+		// Update ClusterURL to be just the host:port (go-redis expects this format)
+		conn.ClusterURL = hostPort
+
+		// Extract server name for TLS from hostname if not explicitly set
+		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+			conn.TLS.ServerName = u.Hostname()
+		}
+	} else {
+		// Plain host:port format (backward compatibility)
+		// ClusterURL is already in the correct format for go-redis
+		// Add default port if not specified
+		if !strings.Contains(clusterURL, ":") {
+			conn.ClusterURL = clusterURL + ":6379"
+		}
+
+		// Extract hostname for TLS server name if TLS is enabled and server name not set
+		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+			hostname := strings.Split(conn.ClusterURL, ":")[0]
+			conn.TLS.ServerName = hostname
+		}
+	}
+
+	return nil
+}
+
+// CreateTLSConfig creates a TLS configuration from the TLSConfig struct.
+func (tc *TLSConfig) CreateTLSConfig() (*tls.Config, error) {
+	if !tc.Enabled {
+		return nil, nil
+	}
+
+	// Allow TLS without CA file when certificate verification is disabled (testing only)
+	if tc.CAFile == "" && !tc.InsecureSkipVerify {
+		return nil, fmt.Errorf("CA file is required for TLS connections when certificate verification is enabled. Either provide a CA file (e.g., set REDIS_TLS_CA_FILE or the CAFile field), or set InsecureSkipVerify=true (e.g., set REDIS_TLS_INSECURE_SKIP_VERIFY=true) for testing purposes.")
+	}
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: tc.InsecureSkipVerify,
+		ServerName:         tc.ServerName,
+	}
+
+	// Load CA certificate if provided
+	if tc.CAFile != "" {
+		caCert, err := os.ReadFile(tc.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("reading CA file: %w", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Load client certificate if provided (mTLS)
+	if tc.CertFile != "" && tc.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(tc.CertFile, tc.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("loading client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tlsConfig, nil
+}
+
+// getBoolEnv gets a boolean environment variable with a default value.
+func getBoolEnv(key string, defaultValue bool) bool {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := strconv.ParseBool(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}
+
+// getIntEnv gets an integer environment variable with a default value.
+func getIntEnv(key string, defaultValue int) int {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
 }
 
 // toEnvName converts CamelCase to upper snake case (e.g., MinClients -> MINCLIENTS)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
 // Client defines the interface for Redis operations.
@@ -27,41 +28,71 @@ type RedisOptsLog struct {
 	Addr     string `json:"addr"`
 	DB       int    `json:"db"`
 	Protocol int    `json:"protocol"`
+	TLS      bool   `json:"tls"`
 }
 
-// NewRedisClient creates a new Redis client based on the provided connection parameters.
-func NewRedisClient(host, port, clusterAddress string) (*RedisClient, error) {
+// NewRedisClient creates a new Redis client based on the provided connection configuration.
+func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 	var client redis.UniversalClient
 
-	if clusterAddress != "" {
+	// Create TLS configuration if enabled
+	tlsConfig, err := conn.TLS.CreateTLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("creating TLS config: %w", err)
+	}
+
+	if conn.ClusterURL != "" {
 		client = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:           []string{clusterAddress},
+			Addrs:           []string{conn.ClusterURL},
+			TLSConfig:       tlsConfig,
 			DisableIdentity: true,
 		})
-		slog.Info("Redis cluster options", "event", "redis_options", "data", map[string]any{"addr": clusterAddress})
+		slog.Info("Redis cluster options", "event", "redis_options", "data", map[string]any{
+			"addr": conn.ClusterURL,
+			"tls":  tlsConfig != nil,
+		})
 	} else {
 		opts := &redis.Options{
-			Addr:            fmt.Sprintf("%s:%s", host, port),
-			Password:        "",
-			DB:              0,
+			Addr:            fmt.Sprintf("%s:%s", conn.Host, conn.Port),
+			DB:              0, // Always use database 0
 			Protocol:        2,
+			TLSConfig:       tlsConfig,
 			DisableIdentity: true,
 		}
 		slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
 			Addr:     opts.Addr,
-			DB:       opts.DB,
+			DB:       0, // Always use database 0
 			Protocol: opts.Protocol,
+			TLS:      tlsConfig != nil,
 		})
 		client = redis.NewClient(opts)
 	}
 
 	// Ping to verify connection
-	ctx := context.Background()
+	timeoutSeconds := conn.ConnectTimeoutSeconds
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 10 // Default timeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
 	if _, err := client.Ping(ctx).Result(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
+	slog.Info("Successfully connected to Redis", "tls_enabled", tlsConfig != nil)
 	return &RedisClient{client: client}, nil
+}
+
+// NewRedisClientLegacy creates a new Redis client using the legacy parameters.
+// Deprecated: Use NewRedisClient with config.RedisConnection instead.
+func NewRedisClientLegacy(host, port, clusterAddress string) (*RedisClient, error) {
+	conn := &config.RedisConnection{
+		Host:       host,
+		Port:       port,
+		ClusterURL: clusterAddress,
+	}
+	return NewRedisClient(conn)
 }
 
 // Set implements the Client interface for setting a key-value pair.

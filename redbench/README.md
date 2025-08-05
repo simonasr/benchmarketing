@@ -18,9 +18,9 @@ The project follows Clean Architecture principles:
 
 Configuration is done via a YAML file (`config.yaml`) and environment variables:
 
-- `REDIS_HOST` - Redis host (required if `REDIS_CLUSTER_ADDRESS` is not set)
+- `REDIS_HOST` - Redis host (required if `REDIS_CLUSTER_URL` is not set)
 - `REDIS_PORT` - Redis port (defaults to 6379)
-- `REDIS_CLUSTER_ADDRESS` - Redis cluster address (required if `REDIS_HOST` is not set)
+- `REDIS_CLUSTER_URL` - Redis cluster URL in format `redis://host:port` or `rediss://host:port` for TLS (required if `REDIS_HOST` is not set)
 
 ## Running Tests
 

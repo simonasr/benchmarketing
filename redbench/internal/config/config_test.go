@@ -105,13 +105,13 @@ func TestLoadRedisConnection(t *testing.T) {
 	assert.Equal(t, "6380", conn.Port)
 	assert.Equal(t, "localhost:6380", conn.TargetLabel)
 
-	// Test with cluster address
-	os.Setenv("REDIS_CLUSTER_ADDRESS", "cluster.example.com:6379")
-	defer os.Unsetenv("REDIS_CLUSTER_ADDRESS")
+	// Test with cluster URL
+	os.Setenv("REDIS_CLUSTER_URL", "redis://cluster.example.com:6379")
+	defer os.Unsetenv("REDIS_CLUSTER_URL")
 
 	conn, err = LoadRedisConnection()
 	require.NoError(t, err)
-	assert.Equal(t, "cluster.example.com:6379", conn.ClusterAddress)
+	assert.Equal(t, "cluster.example.com:6379", conn.ClusterURL)
 	assert.Equal(t, "cluster.example.com:6379", conn.TargetLabel)
 }
 
@@ -131,6 +131,220 @@ func TestToEnvName(t *testing.T) {
 		t.Run(test.input, func(t *testing.T) {
 			result := toEnvName(test.input)
 			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestParseRedisURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		url         string
+		expected    RedisConnection
+		expectError bool
+	}{
+		{
+			name: "redis URL",
+			url:  "redis://localhost:6379",
+			expected: RedisConnection{
+				Host: "localhost",
+				Port: "6379",
+				TLS:  TLSConfig{Enabled: false},
+			},
+		},
+		{
+			name: "rediss URL (TLS)",
+			url:  "rediss://redis.example.com:6380",
+			expected: RedisConnection{
+				Host: "redis.example.com",
+				Port: "6380",
+				TLS:  TLSConfig{Enabled: true, ServerName: "redis.example.com"},
+			},
+		},
+		{
+			name: "rediss URL with port",
+			url:  "rediss://redis.example.com:6380",
+			expected: RedisConnection{
+				Host: "redis.example.com",
+				Port: "6380",
+				TLS:  TLSConfig{Enabled: true, ServerName: "redis.example.com"},
+			},
+		},
+		{
+			name:        "invalid scheme",
+			url:         "http://localhost:6379",
+			expectError: true,
+		},
+		{
+			name: "default port",
+			url:  "redis://localhost",
+			expected: RedisConnection{
+				Host: "localhost",
+				Port: "6379",
+				TLS:  TLSConfig{Enabled: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn := &RedisConnection{URL: tt.url}
+			err := parseRedisURL(conn)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Host, conn.Host)
+			assert.Equal(t, tt.expected.Port, conn.Port)
+			assert.Equal(t, tt.expected.TLS.Enabled, conn.TLS.Enabled)
+			assert.Equal(t, tt.expected.TLS.ServerName, conn.TLS.ServerName)
+		})
+	}
+}
+
+func TestParseRedisClusterURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		url         string
+		expected    RedisConnection
+		expectError bool
+	}{
+		{
+			name: "redis cluster URL",
+			url:  "redis://cluster.localhost:6379",
+			expected: RedisConnection{
+				ClusterURL: "cluster.localhost:6379",
+				TLS:        TLSConfig{Enabled: false},
+			},
+		},
+		{
+			name: "rediss cluster URL (TLS)",
+			url:  "rediss://cluster.example.com:6380",
+			expected: RedisConnection{
+				ClusterURL: "cluster.example.com:6380",
+				TLS:        TLSConfig{Enabled: true, ServerName: "cluster.example.com"},
+			},
+		},
+		{
+			name: "rediss cluster URL with default port",
+			url:  "rediss://cluster.example.com",
+			expected: RedisConnection{
+				ClusterURL: "cluster.example.com:6379",
+				TLS:        TLSConfig{Enabled: true, ServerName: "cluster.example.com"},
+			},
+		},
+		{
+			name:        "invalid cluster scheme",
+			url:         "http://cluster.localhost:6379",
+			expectError: true,
+		},
+		{
+			name: "plain host:port without scheme",
+			url:  "cluster.example.com:6379",
+			expected: RedisConnection{
+				ClusterURL: "cluster.example.com:6379",
+				TLS:        TLSConfig{Enabled: false},
+			},
+		},
+		{
+			name: "plain hostname without scheme",
+			url:  "cluster.example.com",
+			expected: RedisConnection{
+				ClusterURL: "cluster.example.com:6379",
+				TLS:        TLSConfig{Enabled: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn := &RedisConnection{ClusterURL: tt.url}
+			err := parseRedisClusterURL(conn)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.ClusterURL, conn.ClusterURL)
+			assert.Equal(t, tt.expected.TLS.Enabled, conn.TLS.Enabled)
+			assert.Equal(t, tt.expected.TLS.ServerName, conn.TLS.ServerName)
+		})
+	}
+}
+
+func TestTLSConfigCreateTLSConfig(t *testing.T) {
+	t.Run("disabled TLS", func(t *testing.T) {
+		tlsConfig := TLSConfig{Enabled: false}
+		tls, err := tlsConfig.CreateTLSConfig()
+		require.NoError(t, err)
+		assert.Nil(t, tls)
+	})
+
+	t.Run("enabled TLS without CA file should fail when verification enabled", func(t *testing.T) {
+		tlsConfig := TLSConfig{
+			Enabled:            true,
+			InsecureSkipVerify: false, // Verification enabled
+			ServerName:         "test.example.com",
+		}
+		_, err := tlsConfig.CreateTLSConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "CA file is required for TLS connections when certificate verification is enabled")
+	})
+
+	t.Run("enabled TLS without CA file should work when verification disabled", func(t *testing.T) {
+		tlsConfig := TLSConfig{
+			Enabled:            true,
+			InsecureSkipVerify: true, // Verification disabled
+			ServerName:         "test.example.com",
+		}
+		tls, err := tlsConfig.CreateTLSConfig()
+		require.NoError(t, err)
+		require.NotNil(t, tls)
+		assert.True(t, tls.InsecureSkipVerify)
+		assert.Equal(t, "test.example.com", tls.ServerName)
+		assert.Nil(t, tls.RootCAs) // No CA pool when verification is disabled
+	})
+
+	t.Run("invalid CA file", func(t *testing.T) {
+		tlsConfig := TLSConfig{
+			Enabled: true,
+			CAFile:  "/nonexistent/ca.pem",
+		}
+		_, err := tlsConfig.CreateTLSConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "reading CA file")
+	})
+}
+
+func TestGetBoolEnv(t *testing.T) {
+	tests := []struct {
+		name         string
+		envValue     string
+		defaultValue bool
+		expected     bool
+	}{
+		{"true string", "true", false, true},
+		{"false string", "false", true, false},
+		{"1 string", "1", false, true},
+		{"0 string", "0", true, false},
+		{"empty string", "", true, true},
+		{"invalid string", "invalid", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := "TEST_BOOL_VAR"
+			if tt.envValue != "" {
+				os.Setenv(key, tt.envValue)
+				defer os.Unsetenv(key)
+			}
+
+			result := getBoolEnv(key, tt.defaultValue)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
