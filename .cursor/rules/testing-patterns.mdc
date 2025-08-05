@@ -1,0 +1,94 @@
+---
+description: "Testing patterns for Redis client and configuration"
+globs: "*_test.go"
+---
+
+# Testing Patterns and Best Practices
+
+## Redis Client Testing
+Use the established pattern in [internal/redis/client_test.go](mdc:internal/redis/client_test.go):
+
+### Test Setup Pattern
+```go
+func setupMiniredis(t *testing.T) (*miniredis.Miniredis, *config.RedisConnection) {
+    mr, err := miniredis.Run()
+    require.NoError(t, err)
+    
+    conn := &config.RedisConnection{
+        Host: mr.Host(),
+        Port: mr.Port(),
+        TLS:  config.TLSConfig{Enabled: false},
+    }
+    return mr, conn
+}
+
+// For cluster testing
+func setupClusterConnection(t *testing.T) *config.RedisConnection {
+    return &config.RedisConnection{
+        ClusterURL: "redis://cluster.test:6379",
+        TLS:        config.TLSConfig{Enabled: false},
+    }
+}
+```
+
+### TLS Configuration Testing
+Always test these TLS scenarios:
+- **Disabled TLS**: `TLS.Enabled = false` should return `nil` config
+- **Invalid CA file**: Should return appropriate error
+- **Missing CA with verification enabled**: Should fail
+- **InsecureSkipVerify mode**: Should work without CA file
+- **Valid TLS config**: Should create proper `tls.Config`
+
+## Configuration Testing
+Test configuration loading in [internal/config/config_test.go](mdc:internal/config/config_test.go):
+
+### URL Parsing Tests
+Test both single instance and cluster URL parsing:
+```go
+func TestParseRedisURL(t *testing.T) {
+    tests := []struct {
+        name     string
+        url      string
+        expected config.RedisConnection
+        wantErr  bool
+    }{
+        // Test cases for redis:// and rediss:// URLs
+    }
+}
+
+func TestParseRedisClusterURL(t *testing.T) {
+    tests := []struct {
+        name     string
+        url      string
+        expected config.RedisConnection
+        wantErr  bool
+    }{
+        // Test cases for cluster URLs: redis://, rediss://, and plain host:port
+    }
+}
+```
+
+### Environment Variable Testing
+- Test `getBoolEnv` and `getIntEnv` helper functions
+- Test default value handling
+- Test invalid value parsing
+
+## Test Organization
+- Use table-driven tests for multiple scenarios
+- Group related test cases with descriptive names
+- Use `require.NoError(t, err)` for setup that must succeed
+- Use `assert.Error(t, err)` when testing error conditions
+- Clean up resources in `defer` statements
+
+## Integration Testing
+Located in [test/integration/](mdc:test/integration/):
+- Test actual Redis connections when possible
+- Use Docker containers for realistic testing
+- Test TLS connections with real certificates
+- Verify cluster mode functionality
+
+## Mock and Stub Patterns
+- Use `miniredis` for lightweight Redis mocking
+- Create configuration objects directly in tests
+- Mock external dependencies (file system, network)
+- Use dependency injection to make code testable
