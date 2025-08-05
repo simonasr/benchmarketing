@@ -53,6 +53,50 @@ docker compose -f compose-example.yaml restart [service-name]
 docker compose -f compose-example.yaml logs [service-name]
 ```
 
+## Redis TLS Configuration
+
+RedBench supports secure Redis connections using TLS. Configure TLS using environment variables or URLs.
+
+### Basic Setup
+
+```bash
+# Using Redis URL (recommended)
+export REDIS_URL="rediss://redis.example.com:6380"
+export REDIS_TLS_CA_FILE="/path/to/ca.pem"
+
+# Using traditional host/port
+export REDIS_HOST="redis.example.com"
+export REDIS_TLS_ENABLED="true"
+export REDIS_TLS_CA_FILE="/path/to/ca.pem"
+
+# Redis cluster
+export REDIS_CLUSTER_URL="rediss://cluster.example.com:6380"
+export REDIS_TLS_CA_FILE="/path/to/ca.pem"
+```
+
+### Key Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `REDIS_URL` | Redis URL (rediss:// for TLS) | `rediss://redis.example.com:6380` |
+| `REDIS_CLUSTER_URL` | Redis cluster URL | `rediss://cluster.example.com:6380` |
+| `REDIS_TLS_CA_FILE` | Path to CA certificate | `/certs/ca.pem` |
+| `REDIS_TLS_CERT_FILE` | Client certificate (mTLS) | `/certs/client.pem` |
+| `REDIS_TLS_KEY_FILE` | Client private key (mTLS) | `/certs/client-key.pem` |
+| `REDIS_TLS_INSECURE_SKIP_VERIFY` | Skip verification (testing) | `true` |
+
+### Testing with Docker
+
+```bash
+# Generate test certificates
+./scripts/generate-tls-certs.sh
+
+# Test TLS connection (insecure for testing)
+export REDIS_URL="rediss://localhost:6380"
+export REDIS_TLS_INSECURE_SKIP_VERIFY="true"
+go run redbench/cmd/redbench/main.go
+```
+
 ## Acknowledgments
 
 Inspired by [Anton Putra's Tutorials](https://github.com/antonputra/tutorials/tree/main)

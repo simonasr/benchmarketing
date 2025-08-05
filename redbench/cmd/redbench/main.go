@@ -24,7 +24,6 @@ func main() {
 		slog.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
 
 	// Load Redis connection details
 	redisConn, err := config.LoadRedisConnection()
@@ -33,8 +32,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Log final effective configuration (after environment variable processing)
+	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg)
+	slog.Info("Redis connection config", "event", "redis_config", "data", map[string]any{
+		"cluster_url":     redisConn.ClusterURL,
+		"host":            redisConn.Host,
+		"port":            redisConn.Port,
+		"tls_enabled":     redisConn.TLS.Enabled,
+		"tls_ca_file":     redisConn.TLS.CAFile,
+		"tls_server_name": redisConn.TLS.ServerName,
+		"target_label":    redisConn.TargetLabel,
+	})
+
 	// Initialize Redis client
-	redisClient, err := redis.NewRedisClient(redisConn.Host, redisConn.Port, redisConn.ClusterAddress)
+	redisClient, err := redis.NewRedisClient(redisConn)
 	if err != nil {
 		slog.Error("Failed to initialize Redis client", "error", err)
 		os.Exit(1)

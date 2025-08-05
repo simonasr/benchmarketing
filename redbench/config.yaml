@@ -4,6 +4,13 @@ debug: false
 redis:
   expirationS: 20
   operationTimeoutMs: 100
+  tls:
+    enabled: false
+    certFile: ""
+    keyFile: ""
+    caFile: ""
+    insecureSkipVerify: false
+    serverName: ""
 test:
   minClients: 1
   maxClients: 2000
@@ -11,3 +18,27 @@ test:
   requestDelayMs: 1000
   keySize: 10
   valueSize: 10
+
+# Example TLS configurations:
+# 
+# Basic TLS with private CA:
+# redis:
+#   tls:
+#     enabled: true
+#     caFile: "/certs/ca.pem"
+#     serverName: "my-redis.redis-cluster.service.consul"
+#
+# mTLS (client certificates):
+# redis:
+#   tls:
+#     enabled: true
+#     certFile: "/certs/client.pem" 
+#     keyFile: "/certs/client-key.pem"
+#     caFile: "/certs/ca.pem"
+#     serverName: "my-redis.redis-cluster.service.consul"
+#
+# Testing without certificate verification:
+# redis:
+#   tls:
+#     enabled: true
+#     insecureSkipVerify: true
