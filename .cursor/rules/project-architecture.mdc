@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+---
+
+# RedBench Project Architecture
+
+## Project Structure
+The project follows Clean Architecture principles with clear separation of concerns:
+
+- `cmd/redbench/` - Application entry point ([main.go](mdc:cmd/redbench/main.go))
+- `internal/config/` - Configuration management ([config.go](mdc:internal/config/config.go))
+- `internal/redis/` - Redis client abstraction ([client.go](mdc:internal/redis/client.go))
+- `internal/benchmark/` - Benchmarking logic
+- `internal/metrics/` - Prometheus metrics
+- `pkg/utils/` - Shared utilities
+- `test/integration/` - Integration tests
+
+## Configuration Management
+Configuration is loaded through a hierarchical approach:
+1. YAML file ([config.yaml](mdc:config.yaml)) for defaults
+2. Environment variables for runtime overrides
+3. Unified URL-based configuration for Redis connections (supports `redis://` and `rediss://` schemes)
+
+## Redis Client Architecture
+The Redis client supports multiple connection modes with unified URL configuration:
+- **Single Instance**: `REDIS_URL=rediss://redis.example.com:6380`
+- **Cluster Mode**: `REDIS_CLUSTER_URL=rediss://cluster.example.com:6380` with automatic slot management
+
+## Key Design Patterns
+- **Interface-driven development**: Use `Client` interface for Redis operations
+- **Dependency injection**: Pass `*config.RedisConnection` to constructors
+- **Error wrapping**: Always provide context in error messages
+- **Structured logging**: Use structured logging with `slog` package
+- **Environment-first**: Prioritize environment variables for Docker deployments
+
+## Database and Authentication Scope
+- **Database**: Always use database `0` (hardcoded) - Redis clusters don't support multiple databases
+- **Authentication**: TLS-focused, no Redis password support currently (future ACL support planned)
+- **Focus**: Minimal scope - TLS implementation only, avoid feature creep

@@ -1,0 +1,76 @@
+---
+description: "Docker and deployment configuration patterns"
+globs: "compose*.yaml,Dockerfile,*.conf"
+---
+
+# Docker and Deployment Patterns
+
+## Docker Compose Configuration
+
+### Service Configuration
+- Use environment variables for all dynamic configuration
+- Mount certificates as read-only volumes
+- Use meaningful service names that reflect their purpose
+- Include configuration comments for different scenarios
+
+### Volume Mounting Pattern
+```yaml
+volumes:
+  - /host/path/to/cert.pem:/container/certs/cert.pem:ro
+```
+- Always use `:ro` (read-only) for certificate files
+- Use consistent container paths (`/container/certs/`)
+- Map individual files, not directories, to avoid "is a directory" errors
+
+### Environment Variable Patterns
+Use unified URL schemes for simplified configuration:
+```yaml
+environment:
+  # Single Instance TLS
+  - REDIS_URL=rediss://redis.example.com:6380
+  - REDIS_TLS_CA_FILE=/certs/ca.pem
+  
+  # Cluster TLS
+  - REDIS_CLUSTER_URL=rediss://cluster.example.com:6380
+  - REDIS_TLS_CA_FILE=/certs/ca.pem
+  
+  # Testing (skip verification)
+  - REDIS_TLS_INSECURE_SKIP_VERIFY=true
+```
+
+## Redis Server TLS Configuration
+- Enable TLS port and disable plain port for security
+- Configure certificate paths consistently  
+- Use strong TLS protocols and ciphers
+
+## Certificate Management
+### Development/Testing
+- Provide script for generating self-signed certificates
+- Use `generate-tls-certs.sh` pattern for automation
+- Include CA, server, and client certificates
+
+### Production
+- Mount real certificate files from host system
+- Use proper CA certificates (not self-signed)
+- Rotate certificates using volume mounts without container rebuilds
+
+## Configuration Flexibility
+Support deployment scenarios:
+- **Basic TLS**: CA file verification with `rediss://` URL scheme
+- **Testing Mode**: `REDIS_TLS_INSECURE_SKIP_VERIFY=true` 
+- **mTLS**: Add client certificate and key files
+- **Cluster Mode**: Use `REDIS_CLUSTER_URL=rediss://cluster.example.com:port`
+
+## Documentation Standards
+Include usage comments in Docker Compose files:
+```yaml
+# Usage:
+# 1. Generate certificates: ./scripts/generate-tls-certs.sh  
+# 2. Start services: docker-compose up
+#
+# Configuration options:
+# - Basic TLS: REDIS_URL=rediss://redis.example.com:6380
+# - Testing mode: Set REDIS_TLS_INSECURE_SKIP_VERIFY=true
+# - mTLS: Add REDIS_TLS_CERT_FILE and REDIS_TLS_KEY_FILE
+# - Cluster mode: Use REDIS_CLUSTER_URL=rediss://cluster.example.com:6380
+```

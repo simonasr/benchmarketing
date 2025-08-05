@@ -1,0 +1,105 @@
+---
+description: "Configuration loading, environment variables, and Redis TLS patterns"
+globs: "internal/config/*.go,internal/redis/*.go,*.yaml,compose*.yaml"
+---
+
+# Configuration Management and TLS Patterns
+
+## Configuration Loading Priority
+1. **YAML Configuration** ([config.yaml](mdc:config.yaml)) - Base configuration
+2. **Environment Variables** - Runtime overrides (highest priority)
+3. **URL Configuration** - Simplified Redis connection setup
+
+## Environment Variable Conventions
+- Use `REDIS_` prefix for Redis-related configuration
+- Use `TEST_` prefix for test configuration  
+- Use underscores to separate words: `REDIS_TLS_CA_FILE`
+- Boolean values: `true`/`false` (case-insensitive)
+- Integer values: Plain numbers (e.g., `10`)
+
+## Helper Functions Pattern
+Always implement these helper functions in [internal/config/config.go](mdc:internal/config/config.go):
+
+```go
+func getBoolEnv(key string, defaultValue bool) bool
+func getIntEnv(key string, defaultValue int) int
+```
+
+## Unified URL Configuration Support  
+Support both traditional and URL-based configuration with consistent schemes:
+
+### Single Instance
+- `REDIS_URL=rediss://redis.example.com:6380` - TLS enabled automatically
+- `REDIS_URL=redis://redis.example.com:6379` - Plain connection
+
+### Cluster Mode (Unified Approach)
+- `REDIS_CLUSTER_URL=rediss://cluster.example.com:6380` - TLS enabled automatically
+- `REDIS_CLUSTER_URL=redis://cluster.example.com:6379` - Plain connection
+
+### URL Parsing Best Practice
+Parse Redis URLs with scheme validation:
+```go
+u, err := url.Parse(clusterURL)
+if err != nil {
+    return fmt.Errorf("invalid cluster URL format: %w", err)
+}
+if u.Scheme != "redis" && u.Scheme != "rediss" {
+    return fmt.Errorf("unsupported scheme: %s (use redis:// or rediss://)", u.Scheme)
+}
+```
+
+## Configuration Validation
+- Validate required fields during initialization
+- Provide clear error messages for missing configuration
+- Use early validation in `LoadRedisConnection()`
+- Check mutual dependencies (e.g., TLS cert + key files)
+
+## Docker Compose Patterns
+- Use environment variables for all dynamic configuration
+- Mount certificate files as read-only volumes: `- /host/path:/container/path:ro`
+- Provide clear comments for configuration options
+- Support both development and production scenarios
+
+## Testing Configuration
+- Use `GO_TEST=1` environment variable to detect test runs
+- Provide default test values when environment is not set
+- Mock configuration objects in unit tests
+- Use separate test configuration files when needed
+
+## Redis TLS Configuration Requirements
+
+### Private CA Only Approach
+- **Always require CA file** when `InsecureSkipVerify` is `false`
+- Only use private CAs - no system CA store fallback
+- CA file is mandatory for production TLS connections
+- Allow `InsecureSkipVerify=true` only for testing without CA file
+
+### TLS Configuration Structure
+```go
+type TLSConfig struct {
+    Enabled            bool   `yaml:"enabled"`
+    CertFile           string `yaml:"certFile"`           // Client cert for mTLS
+    KeyFile            string `yaml:"keyFile"`            // Client key for mTLS  
+    CAFile             string `yaml:"caFile"`             // Required for verification
+    InsecureSkipVerify bool   `yaml:"insecureSkipVerify"` // Testing only
+    ServerName         string `yaml:"serverName"`         // TLS server name
+}
+```
+
+### TLS Environment Variables
+- `REDIS_TLS_ENABLED=true` - Enable TLS (when not using URL schemes)
+- `REDIS_TLS_CA_FILE=/path/to/ca.pem` - CA certificate file
+- `REDIS_TLS_CERT_FILE=/path/to/client.pem` - Client cert (mTLS)
+- `REDIS_TLS_KEY_FILE=/path/to/client-key.pem` - Client key (mTLS)
+- `REDIS_TLS_INSECURE_SKIP_VERIFY=true` - Skip verification (testing only)
+- `REDIS_TLS_SERVER_NAME=hostname` - Override server name
+
+### TLS Error Handling
+- Wrap TLS errors with context: `fmt.Errorf("creating TLS config: %w", err)`
+- Validate CA file existence before attempting to read
+- Return clear error messages for missing CA files in production mode
+
+### TLS Testing Patterns
+- Always test both verified and unverified TLS connections
+- Mock TLS configurations in unit tests
+- Use `InsecureSkipVerify=true` for testing scenarios only
