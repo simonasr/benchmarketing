@@ -136,7 +136,6 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 }
 
 // applyTLSOverrides applies TLS configuration overrides.
-// Note: TLS enabled/disabled is determined by URL scheme (redis:// vs rediss://).
 func applyTLSOverrides(tlsConfig *config.TLSConfig, overrides *TLSOverrides) {
 	if overrides.CAFile != nil {
 		tlsConfig.CAFile = *overrides.CAFile
