@@ -46,18 +46,8 @@ func NewGlobalState() *GlobalState {
 // GetState returns a copy of the current benchmark state.
 func (gs *GlobalState) GetState() BenchmarkState {
 	gs.mu.RLock()
-	defer gs.mu.RUnlock()
-
-	// Return a copy to avoid race conditions
 	state := gs.state
-	if state.StartTime != nil {
-		startTime := *state.StartTime
-		state.StartTime = &startTime
-	}
-	if state.EndTime != nil {
-		endTime := *state.EndTime
-		state.EndTime = &endTime
-	}
+	gs.mu.RUnlock()
 
 	return state
 }

@@ -13,8 +13,19 @@ SERVICE_PID=""
 cleanup() {
     if [[ -n "$SERVICE_PID" ]]; then
         echo "Stopping service (PID: $SERVICE_PID)..."
-        kill $SERVICE_PID 2>/dev/null || true
-        wait $SERVICE_PID 2>/dev/null || true
+        kill -TERM $SERVICE_PID 2>/dev/null || true
+        # Wait up to 5 seconds for process to exit
+        for i in {1..5}; do
+            if ! kill -0 $SERVICE_PID 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        # If still running, force kill
+        if kill -0 $SERVICE_PID 2>/dev/null; then
+            echo "Service did not stop gracefully, sending SIGKILL..."
+            kill -9 $SERVICE_PID 2>/dev/null || true
+        fi
     fi
 }
 

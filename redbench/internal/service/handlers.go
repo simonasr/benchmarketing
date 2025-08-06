@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -51,7 +52,10 @@ type Service struct {
 	baseConfig      *config.Config
 	baseRedisConn   *config.RedisConnection
 	metricsRegistry *prometheus.Registry
-	cancelFunc      context.CancelFunc // To cancel running benchmark
+
+	// Synchronize access to cancelFunc to prevent race conditions
+	cancelMu   sync.Mutex
+	cancelFunc context.CancelFunc // To cancel running benchmark
 }
 
 // NewService creates a new Service instance.
@@ -62,6 +66,22 @@ func NewService(baseConfig *config.Config, baseRedisConn *config.RedisConnection
 		baseRedisConn:   baseRedisConn,
 		metricsRegistry: metricsRegistry,
 	}
+}
+
+// setCancelFunc safely sets the cancel function for the running benchmark.
+func (s *Service) setCancelFunc(cancel context.CancelFunc) {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	s.cancelFunc = cancel
+}
+
+// getCancelFunc safely gets and clears the cancel function.
+func (s *Service) getCancelFunc() context.CancelFunc {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	cancel := s.cancelFunc
+	s.cancelFunc = nil
+	return cancel
 }
 
 // StatusHandler handles GET requests for benchmark status.
@@ -115,7 +135,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Start the benchmark in a goroutine
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelFunc = cancel
+	s.setCancelFunc(cancel)
 
 	go s.runBenchmark(ctx, mergedConfig, redisConn)
 
@@ -137,9 +157,8 @@ func (s *Service) StopHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cancel the running benchmark
-	if s.cancelFunc != nil {
-		s.cancelFunc()
-		s.cancelFunc = nil
+	if cancel := s.getCancelFunc(); cancel != nil {
+		cancel()
 	}
 
 	// Return the updated state
