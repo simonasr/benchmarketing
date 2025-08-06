@@ -227,7 +227,7 @@ func TestCreateRedisConnection_NoRedisOverrides(t *testing.T) {
 	}
 }
 
-func TestCreateRedisConnection_WithHostOverride(t *testing.T) {
+func TestCreateRedisConnection_WithURLOverride_Alternative(t *testing.T) {
 	baseConn := &config.RedisConnection{
 		URL:                   "redis://base-host:6379",
 		ConnectTimeoutSeconds: 10,
@@ -236,8 +236,7 @@ func TestCreateRedisConnection_WithHostOverride(t *testing.T) {
 
 	requestBody := BenchmarkRequest{
 		Redis: &RedisOverrides{
-			Host: stringPtr("new-host"),
-			Port: stringPtr("6380"),
+			URL: stringPtr("redis://new-host:6380"),
 		},
 	}
 
@@ -255,7 +254,6 @@ func TestCreateRedisConnection_WithHostOverride(t *testing.T) {
 		t.Fatal("Expected connection to be created")
 	}
 
-	// Host/Port are converted to URL format
 	expectedURL := "redis://new-host:6380"
 	if conn.URL != expectedURL {
 		t.Errorf("Expected URL '%s', got '%s'", expectedURL, conn.URL)
@@ -348,7 +346,7 @@ func TestCreateRedisConnection_WithTLSOverrides(t *testing.T) {
 
 	requestBody := BenchmarkRequest{
 		Redis: &RedisOverrides{
-			Host: stringPtr("secure-host"),
+			URL: stringPtr("rediss://secure-host:6379"),
 			TLS: &TLSOverrides{
 				Enabled:            boolPtr(true),
 				CAFile:             stringPtr("/path/to/ca.pem"),

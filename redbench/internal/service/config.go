@@ -19,8 +19,6 @@ type RedisOverrides struct {
 	// URL supports both redis:// and rediss:// schemes
 	URL        *string `json:"url,omitempty"`
 	ClusterURL *string `json:"clusterUrl,omitempty"`
-	Host       *string `json:"host,omitempty"`
-	Port       *string `json:"port,omitempty"`
 	// TLS configuration
 	TLS *TLSOverrides `json:"tls,omitempty"`
 }
@@ -111,7 +109,7 @@ func CreateRedisConnection(baseRedisConn *config.RedisConnection, requestBody []
 
 // applyRedisOverrides applies Redis configuration overrides to the connection.
 func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides) error {
-	// Handle URL-based configuration (highest priority)
+	// Handle URL-based configuration
 	if overrides.URL != nil {
 		conn.URL = *overrides.URL
 		if err := conn.ParseURL(); err != nil {
@@ -121,17 +119,6 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 		conn.ClusterURL = *overrides.ClusterURL
 		if err := conn.ParseClusterURL(); err != nil {
 			return fmt.Errorf("parsing Redis cluster URL: %w", err)
-		}
-	} else if overrides.Host != nil {
-		// Handle legacy host/port configuration by converting to URL
-		host := *overrides.Host
-		port := "6379" // default port
-		if overrides.Port != nil {
-			port = *overrides.Port
-		}
-		conn.URL = fmt.Sprintf("redis://%s:%s", host, port)
-		if err := conn.ParseURL(); err != nil {
-			return fmt.Errorf("parsing converted Redis URL: %w", err)
 		}
 	}
 
