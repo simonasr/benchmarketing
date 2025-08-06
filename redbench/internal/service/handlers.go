@@ -136,7 +136,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate that we have a valid Redis target
-	if redisConn.URL == "" && redisConn.ClusterURL == "" {
+	if redisConn == nil || (redisConn.URL == "" && redisConn.ClusterURL == "") {
 		logAndRespond(w, "Redis target validation failed", nil, "Redis connection requires either URL or ClusterURL to be specified")
 		return
 	}
