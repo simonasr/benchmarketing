@@ -11,7 +11,7 @@ SERVICE_PID=""
 
 # Function to cleanup on exit
 cleanup() {
-    if [ ! -z "$SERVICE_PID" ]; then
+    if [[ -n "$SERVICE_PID" ]]; then
         echo "Stopping service (PID: $SERVICE_PID)..."
         kill $SERVICE_PID 2>/dev/null || true
         wait $SERVICE_PID 2>/dev/null || true
@@ -26,7 +26,7 @@ echo
 
 # Start the service
 echo "Starting service..."
-REDIS_HOST=test-host ./redbench --service &
+./redbench --service &
 SERVICE_PID=$!
 sleep 2
 

@@ -68,8 +68,11 @@ func (conn *RedisConnection) SetTargetLabel() {
 		conn.TargetLabel = conn.ClusterURL
 	} else if conn.URL != "" {
 		conn.TargetLabel = conn.URL
-	} else {
+	} else if conn.Host != "" {
 		conn.TargetLabel = conn.Host + ":" + conn.Port
+	} else {
+		// No connection info available (service mode without config)
+		conn.TargetLabel = "unspecified"
 	}
 }
 
@@ -207,9 +210,20 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// LoadRedisConnection loads Redis connection information from environment variables.
+// LoadRedisConnection loads Redis connection configuration from environment variables.
 // It supports both traditional host/port configuration and rediss:// URLs.
 func LoadRedisConnection() (*RedisConnection, error) {
+	return LoadRedisConnectionWithValidation(true)
+}
+
+// LoadRedisConnectionForService loads Redis connection configuration for service mode.
+// In service mode, Redis configuration is optional as it can be provided via API.
+func LoadRedisConnectionForService() (*RedisConnection, error) {
+	return LoadRedisConnectionWithValidation(false)
+}
+
+// LoadRedisConnectionWithValidation loads Redis connection configuration with optional validation.
+func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, error) {
 	conn := &RedisConnection{
 		ClusterURL:            os.Getenv("REDIS_CLUSTER_URL"),
 		Host:                  os.Getenv("REDIS_HOST"),
@@ -247,7 +261,7 @@ func LoadRedisConnection() (*RedisConnection, error) {
 	if os.Getenv("GO_TEST") == "1" && conn.Host == "" && conn.ClusterURL == "" && conn.URL == "" {
 		// For tests, use a default value
 		conn.Host = "test-host"
-	} else if conn.ClusterURL == "" && conn.Host == "" && conn.URL == "" {
+	} else if requireConfig && conn.ClusterURL == "" && conn.Host == "" && conn.URL == "" {
 		return nil, fmt.Errorf("REDIS_HOST, REDIS_CLUSTER_URL, or REDIS_URL environment variable must be set")
 	}
 
@@ -278,7 +292,7 @@ func (tc *TLSConfig) CreateTLSConfig() (*tls.Config, error) {
 
 	// Allow TLS without CA file when certificate verification is disabled (testing only)
 	if tc.CAFile == "" && !tc.InsecureSkipVerify {
-		return nil, fmt.Errorf("CA file is required for TLS connections when certificate verification is enabled. Either provide a CA file (e.g., set REDIS_TLS_CA_FILE or the CAFile field), or set InsecureSkipVerify=true (e.g., set REDIS_TLS_INSECURE_SKIP_VERIFY=true) for testing purposes.")
+		return nil, fmt.Errorf("CA file is required for TLS connections when certificate verification is enabled. Either provide a CA file (e.g., set REDIS_TLS_CA_FILE or the CAFile field), or set InsecureSkipVerify=true (e.g., set REDIS_TLS_INSECURE_SKIP_VERIFY=true) for testing purposes")
 	}
 
 	tlsConfig := &tls.Config{

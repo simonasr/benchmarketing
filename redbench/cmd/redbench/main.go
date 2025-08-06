@@ -35,7 +35,14 @@ func main() {
 	}
 
 	// Load Redis connection details
-	redisConn, err := config.LoadRedisConnection()
+	var redisConn *config.RedisConnection
+	if *serviceMode {
+		// In service mode, Redis config is optional (can be provided via API)
+		redisConn, err = config.LoadRedisConnectionForService()
+	} else {
+		// In CLI mode, Redis config is required
+		redisConn, err = config.LoadRedisConnection()
+	}
 	if err != nil {
 		slog.Error("Failed to load Redis connection details", "error", err)
 		os.Exit(1)

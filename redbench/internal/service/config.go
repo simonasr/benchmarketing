@@ -141,7 +141,7 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 
 	// Validate that we have enough information to connect
 	if conn.URL == "" && conn.ClusterURL == "" && conn.Host == "" {
-		return fmt.Errorf("Redis connection requires either url, clusterUrl, or host to be specified")
+		return fmt.Errorf("redis connection requires either url, clusterUrl, or host to be specified")
 	}
 
 	return nil
