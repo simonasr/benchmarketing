@@ -35,6 +35,7 @@ func NewRunner(cfg *config.Config, m *metrics.Metrics, client redis.Client, redi
 // Run executes the benchmark test.
 func (r *Runner) Run(ctx context.Context) error {
 	currentClients := r.config.Test.MinClients
+	stageInterval := time.Duration(r.config.Test.StageIntervalMs) * time.Millisecond
 
 	// Periodically update Redis pool stats metrics
 	go func() {
@@ -75,7 +76,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				<-clients
 			}()
 
-			if time.Since(now).Milliseconds() >= int64(r.config.Test.StageIntervalMs) {
+			if time.Since(now) >= stageInterval {
 				break
 			}
 		}
