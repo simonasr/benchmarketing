@@ -22,6 +22,37 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, target, m.target, "Target should match the provided value")
 }
 
+func TestNewWithDuplicateRegistration(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	target := "test-target"
+
+	// First call should succeed
+	m1 := New(reg, target)
+	assert.NotNil(t, m1, "First metrics instance should not be nil")
+
+	// Second call with same target should not panic (this was the bug)
+	m2 := New(reg, target)
+	assert.NotNil(t, m2, "Second metrics instance should not be nil")
+
+	// Both instances should have the same target
+	assert.Equal(t, target, m1.target, "First instance target should match")
+	assert.Equal(t, target, m2.target, "Second instance target should match")
+}
+
+func TestNewWithDifferentTargets(t *testing.T) {
+	reg := prometheus.NewRegistry()
+
+	// Create metrics for different targets - should work without issues
+	m1 := New(reg, "target-1")
+	assert.NotNil(t, m1, "Metrics for target-1 should not be nil")
+
+	m2 := New(reg, "target-2")
+	assert.NotNil(t, m2, "Metrics for target-2 should not be nil")
+
+	assert.Equal(t, "target-1", m1.target, "First target should match")
+	assert.Equal(t, "target-2", m2.target, "Second target should match")
+}
+
 func TestUpdateRedisPoolStats(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
