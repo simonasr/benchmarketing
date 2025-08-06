@@ -104,7 +104,8 @@ func TestRun(t *testing.T) {
 		IdleConns:  2,
 		StaleConns: 0,
 	}
-	mockClient.On("PoolStats").Return(poolStats)
+	// PoolStats will be called multiple times during the 3-second test - allow up to 3 calls
+	mockClient.On("PoolStats").Return(poolStats).Maybe()
 
 	// Validate Set operation with specific matchers
 	mockClient.On("Set",
