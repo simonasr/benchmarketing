@@ -188,7 +188,7 @@ func TestParseRedisURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			conn := &RedisConnection{URL: tt.url}
-			err := parseRedisURL(conn)
+			err := conn.ParseURL()
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -261,7 +261,7 @@ func TestParseRedisClusterURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			conn := &RedisConnection{ClusterURL: tt.url}
-			err := parseRedisClusterURL(conn)
+			err := conn.ParseClusterURL()
 
 			if tt.expectError {
 				assert.Error(t, err)

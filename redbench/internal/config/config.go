@@ -13,6 +13,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// DefaultRedisPort is the default Redis port when none is specified.
+const DefaultRedisPort = "6379"
+
 // Config represents the application configuration.
 type Config struct {
 	MetricsPort int         `yaml:"metricsPort"`
@@ -57,6 +60,114 @@ type RedisConnection struct {
 	TLS                   TLSConfig
 	URL                   string // Support for rediss:// URLs
 	ConnectTimeoutSeconds int    // Connection timeout in seconds
+}
+
+// SetTargetLabel sets the target label for metrics based on the connection configuration.
+func (conn *RedisConnection) SetTargetLabel() {
+	if conn.ClusterURL != "" {
+		conn.TargetLabel = conn.ClusterURL
+	} else if conn.URL != "" {
+		conn.TargetLabel = conn.URL
+	} else {
+		conn.TargetLabel = conn.Host + ":" + conn.Port
+	}
+}
+
+// SetDefaultPort sets the default Redis port if not already set.
+func (conn *RedisConnection) SetDefaultPort() {
+	if conn.Port == "" {
+		conn.Port = DefaultRedisPort
+	}
+}
+
+// ParseURL parses a Redis URL and populates connection fields.
+// Supports redis:// and rediss:// (TLS) schemes.
+func (conn *RedisConnection) ParseURL() error {
+	if conn.URL == "" {
+		return nil
+	}
+
+	u, err := url.Parse(conn.URL)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// Check for TLS scheme
+	if u.Scheme == "rediss" {
+		conn.TLS.Enabled = true
+	} else if u.Scheme != "redis" {
+		return fmt.Errorf("unsupported scheme: %s (use redis:// or rediss://)", u.Scheme)
+	}
+
+	// Extract host and port
+	conn.Host = u.Hostname()
+	if u.Port() != "" {
+		conn.Port = u.Port()
+	} else {
+		conn.Port = DefaultRedisPort
+	}
+
+	// Extract server name for TLS from host if not explicitly set
+	if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+		conn.TLS.ServerName = conn.Host
+	}
+
+	return nil
+}
+
+// ParseClusterURL parses a Redis cluster URL and populates connection fields.
+// Supports both full URLs (redis://host:port, rediss://host:port) and plain host:port format.
+func (conn *RedisConnection) ParseClusterURL() error {
+	if conn.ClusterURL == "" {
+		return nil
+	}
+
+	clusterURL := conn.ClusterURL
+
+	// Check if it's a full URL or just host:port
+	if strings.Contains(clusterURL, "://") {
+		// Full URL format
+		u, err := url.Parse(clusterURL)
+		if err != nil {
+			return fmt.Errorf("invalid cluster URL format: %w", err)
+		}
+
+		// Check for TLS scheme
+		if u.Scheme == "rediss" {
+			conn.TLS.Enabled = true
+		} else if u.Scheme != "redis" {
+			return fmt.Errorf("unsupported cluster URL scheme: %s (use redis:// or rediss://)", u.Scheme)
+		}
+
+		// Extract host:port
+		hostPort := u.Host
+		if u.Port() == "" {
+			// Add default port if not specified
+			hostPort = u.Hostname() + ":" + DefaultRedisPort
+		}
+
+		// Update ClusterURL to be just the host:port (go-redis expects this format)
+		conn.ClusterURL = hostPort
+
+		// Extract server name for TLS from hostname if not explicitly set
+		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+			conn.TLS.ServerName = u.Hostname()
+		}
+	} else {
+		// Plain host:port format (backward compatibility)
+		// Add default port if not specified
+		if !strings.Contains(clusterURL, ":") {
+			conn.ClusterURL = clusterURL + ":" + DefaultRedisPort
+		}
+
+		// Extract hostname for TLS server name if TLS is enabled and server name not set
+		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
+			hostname := strings.Split(conn.ClusterURL, ":")[0]
+			conn.TLS.ServerName = hostname
+		}
+	}
+
+	return nil
 }
 
 // LoadConfig loads configuration from the specified YAML file.
@@ -119,19 +230,17 @@ func LoadRedisConnection() (*RedisConnection, error) {
 
 	// Parse Redis URL if provided (supports rediss:// for TLS)
 	if conn.URL != "" {
-		if err := parseRedisURL(conn); err != nil {
+		if err := conn.ParseURL(); err != nil {
 			return nil, fmt.Errorf("parsing Redis URL: %w", err)
 		}
 	} else if conn.ClusterURL != "" {
 		// Parse cluster URL (supports rediss:// for TLS)
-		if err := parseRedisClusterURL(conn); err != nil {
+		if err := conn.ParseClusterURL(); err != nil {
 			return nil, fmt.Errorf("parsing Redis cluster URL: %w", err)
 		}
 	} else {
 		// Traditional configuration
-		if conn.Port == "" {
-			conn.Port = "6379"
-		}
+		conn.SetDefaultPort()
 	}
 
 	// Check if we're in a test environment
@@ -143,100 +252,22 @@ func LoadRedisConnection() (*RedisConnection, error) {
 	}
 
 	// Set target label for metrics
-	if conn.ClusterURL != "" {
-		conn.TargetLabel = conn.ClusterURL
-	} else if conn.URL != "" {
-		conn.TargetLabel = conn.URL
-	} else {
-		conn.TargetLabel = conn.Host + ":" + conn.Port
-	}
+	conn.SetTargetLabel()
 
 	return conn, nil
 }
 
-// parseRedisURL parses a Redis URL and populates connection fields.
-// Supports redis:// and rediss:// (TLS) schemes.
-func parseRedisURL(conn *RedisConnection) error {
-	u, err := url.Parse(conn.URL)
-	if err != nil {
-		return fmt.Errorf("invalid URL format: %w", err)
+// NewRedisConnection creates a new RedisConnection with the given timeout.
+func NewRedisConnection(timeoutSeconds int) *RedisConnection {
+	return &RedisConnection{
+		ConnectTimeoutSeconds: timeoutSeconds,
 	}
-
-	// Check for TLS scheme
-	if u.Scheme == "rediss" {
-		conn.TLS.Enabled = true
-	} else if u.Scheme != "redis" {
-		return fmt.Errorf("unsupported scheme: %s (use redis:// or rediss://)", u.Scheme)
-	}
-
-	// Extract host and port
-	conn.Host = u.Hostname()
-	if u.Port() != "" {
-		conn.Port = u.Port()
-	} else {
-		conn.Port = "6379"
-	}
-
-	// Note: Password and database extraction removed - focusing on TLS only
-
-	// Extract server name for TLS from host if not explicitly set
-	if conn.TLS.Enabled && conn.TLS.ServerName == "" {
-		conn.TLS.ServerName = conn.Host
-	}
-
-	return nil
 }
 
-// parseRedisClusterURL parses a Redis cluster URL and populates connection fields.
-// Supports both full URLs (redis://host:port, rediss://host:port) and plain host:port format.
-func parseRedisClusterURL(conn *RedisConnection) error {
-	clusterURL := conn.ClusterURL
-
-	// Check if it's a full URL or just host:port
-	if strings.Contains(clusterURL, "://") {
-		// Full URL format
-		u, err := url.Parse(clusterURL)
-		if err != nil {
-			return fmt.Errorf("invalid cluster URL format: %w", err)
-		}
-
-		// Check for TLS scheme
-		if u.Scheme == "rediss" {
-			conn.TLS.Enabled = true
-		} else if u.Scheme != "redis" {
-			return fmt.Errorf("unsupported cluster URL scheme: %s (use redis:// or rediss://)", u.Scheme)
-		}
-
-		// Extract host:port
-		hostPort := u.Host
-		if u.Port() == "" {
-			// Add default port if not specified
-			hostPort = u.Hostname() + ":6379"
-		}
-
-		// Update ClusterURL to be just the host:port (go-redis expects this format)
-		conn.ClusterURL = hostPort
-
-		// Extract server name for TLS from hostname if not explicitly set
-		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
-			conn.TLS.ServerName = u.Hostname()
-		}
-	} else {
-		// Plain host:port format (backward compatibility)
-		// ClusterURL is already in the correct format for go-redis
-		// Add default port if not specified
-		if !strings.Contains(clusterURL, ":") {
-			conn.ClusterURL = clusterURL + ":6379"
-		}
-
-		// Extract hostname for TLS server name if TLS is enabled and server name not set
-		if conn.TLS.Enabled && conn.TLS.ServerName == "" {
-			hostname := strings.Split(conn.ClusterURL, ":")[0]
-			conn.TLS.ServerName = hostname
-		}
-	}
-
-	return nil
+// ApplyDefaults ensures all required fields have default values.
+func (conn *RedisConnection) ApplyDefaults() {
+	conn.SetDefaultPort()
+	conn.SetTargetLabel()
 }
 
 // CreateTLSConfig creates a TLS configuration from the TLSConfig struct.
