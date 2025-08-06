@@ -210,7 +210,6 @@ func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, er
 
 	// Load TLS configuration from environment variables
 	conn.TLS = TLSConfig{
-		Enabled:            getBoolEnv("REDIS_TLS_ENABLED", false),
 		CertFile:           os.Getenv("REDIS_TLS_CERT_FILE"),
 		KeyFile:            os.Getenv("REDIS_TLS_KEY_FILE"),
 		CAFile:             os.Getenv("REDIS_TLS_CA_FILE"),

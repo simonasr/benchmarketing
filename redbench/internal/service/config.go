@@ -24,8 +24,8 @@ type RedisOverrides struct {
 }
 
 // TLSOverrides allows overriding TLS configuration for Redis connections.
+// TLS is enabled/disabled based on the URL scheme (redis:// vs rediss://).
 type TLSOverrides struct {
-	Enabled            *bool   `json:"enabled,omitempty"`
 	CAFile             *string `json:"caFile,omitempty"`
 	CertFile           *string `json:"certFile,omitempty"`
 	KeyFile            *string `json:"keyFile,omitempty"`
@@ -136,10 +136,8 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 }
 
 // applyTLSOverrides applies TLS configuration overrides.
+// Note: TLS enabled/disabled is determined by URL scheme (redis:// vs rediss://).
 func applyTLSOverrides(tlsConfig *config.TLSConfig, overrides *TLSOverrides) {
-	if overrides.Enabled != nil {
-		tlsConfig.Enabled = *overrides.Enabled
-	}
 	if overrides.CAFile != nil {
 		tlsConfig.CAFile = *overrides.CAFile
 	}

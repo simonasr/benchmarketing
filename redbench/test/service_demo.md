@@ -108,7 +108,6 @@ Expected response:
     "url": "rediss://secure-redis.example.com:6379",
     "targetLabel": "rediss://secure-redis.example.com:6379",
     "tls": {
-      "enabled": true,
       "caFile": "/path/to/ca.pem",
       "serverName": "secure-redis.example.com"
     }

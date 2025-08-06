@@ -346,9 +346,8 @@ func TestCreateRedisConnection_WithTLSOverrides(t *testing.T) {
 
 	requestBody := BenchmarkRequest{
 		Redis: &RedisOverrides{
-			URL: stringPtr("rediss://secure-host:6379"),
+			URL: stringPtr("rediss://secure-host:6379"), // TLS URL (enables TLS automatically)
 			TLS: &TLSOverrides{
-				Enabled:            boolPtr(true),
 				CAFile:             stringPtr("/path/to/ca.pem"),
 				InsecureSkipVerify: boolPtr(false),
 				ServerName:         stringPtr("secure-host.example.com"),
@@ -370,8 +369,9 @@ func TestCreateRedisConnection_WithTLSOverrides(t *testing.T) {
 		t.Fatal("Expected connection to be created")
 	}
 
+	// TLS should be enabled by rediss:// URL scheme
 	if !conn.TLS.Enabled {
-		t.Error("Expected TLS to be enabled")
+		t.Error("Expected TLS to be enabled by rediss:// URL scheme")
 	}
 	if conn.TLS.CAFile != "/path/to/ca.pem" {
 		t.Errorf("Expected CA file '/path/to/ca.pem', got '%s'", conn.TLS.CAFile)
