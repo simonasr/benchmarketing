@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -51,9 +52,21 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 			"addr": conn.ClusterURL,
 			"tls":  tlsConfig != nil,
 		})
-	} else {
+	} else if conn.URL != "" {
+		// Extract host:port from URL
+		u, err := url.Parse(conn.URL)
+		if err != nil {
+			return nil, fmt.Errorf("parsing Redis URL: %w", err)
+		}
+
+		addr := u.Host
+		if u.Port() == "" {
+			// Add default port if not specified
+			addr = u.Hostname() + ":6379"
+		}
+
 		opts := &redis.Options{
-			Addr:            fmt.Sprintf("%s:%s", conn.Host, conn.Port),
+			Addr:            addr,
 			DB:              0, // Always use database 0
 			Protocol:        2,
 			TLSConfig:       tlsConfig,
@@ -66,6 +79,8 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 			TLS:      tlsConfig != nil,
 		})
 		client = redis.NewClient(opts)
+	} else {
+		return nil, fmt.Errorf("either REDIS_URL or REDIS_CLUSTER_URL must be configured")
 	}
 
 	// Ping to verify connection
@@ -88,10 +103,14 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 // Deprecated: Use NewRedisClient with config.RedisConnection instead.
 func NewRedisClientLegacy(host, port, clusterAddress string) (*RedisClient, error) {
 	conn := &config.RedisConnection{
-		Host:       host,
-		Port:       port,
 		ClusterURL: clusterAddress,
 	}
+
+	// Convert host:port to URL format if no cluster address
+	if clusterAddress == "" && host != "" {
+		conn.URL = fmt.Sprintf("redis://%s:%s", host, port)
+	}
+
 	return NewRedisClient(conn)
 }
 

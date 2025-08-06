@@ -122,15 +122,16 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 		if err := conn.ParseClusterURL(); err != nil {
 			return fmt.Errorf("parsing Redis cluster URL: %w", err)
 		}
-	} else {
-		// Handle host/port configuration
-		if overrides.Host != nil {
-			conn.Host = *overrides.Host
-		}
+	} else if overrides.Host != nil {
+		// Handle legacy host/port configuration by converting to URL
+		host := *overrides.Host
+		port := "6379" // default port
 		if overrides.Port != nil {
-			conn.Port = *overrides.Port
-		} else {
-			conn.SetDefaultPort()
+			port = *overrides.Port
+		}
+		conn.URL = fmt.Sprintf("redis://%s:%s", host, port)
+		if err := conn.ParseURL(); err != nil {
+			return fmt.Errorf("parsing converted Redis URL: %w", err)
 		}
 	}
 
@@ -140,8 +141,8 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 	}
 
 	// Validate that we have enough information to connect
-	if conn.URL == "" && conn.ClusterURL == "" && conn.Host == "" {
-		return fmt.Errorf("redis connection requires either url, clusterUrl, or host to be specified")
+	if conn.URL == "" && conn.ClusterURL == "" {
+		return fmt.Errorf("redis connection requires either url or clusterUrl to be specified")
 	}
 
 	return nil

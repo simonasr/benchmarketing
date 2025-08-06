@@ -13,9 +13,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// DefaultRedisPort is the default Redis port when none is specified.
-const DefaultRedisPort = "6379"
-
 // Config represents the application configuration.
 type Config struct {
 	MetricsPort int         `yaml:"metricsPort"`
@@ -53,8 +50,6 @@ type Test struct {
 
 // RedisConnection holds Redis connection information.
 type RedisConnection struct {
-	Host                  string
-	Port                  string
 	ClusterURL            string
 	TargetLabel           string
 	TLS                   TLSConfig
@@ -68,18 +63,9 @@ func (conn *RedisConnection) SetTargetLabel() {
 		conn.TargetLabel = conn.ClusterURL
 	} else if conn.URL != "" {
 		conn.TargetLabel = conn.URL
-	} else if conn.Host != "" {
-		conn.TargetLabel = conn.Host + ":" + conn.Port
 	} else {
 		// No connection info available (service mode without config)
 		conn.TargetLabel = "unspecified"
-	}
-}
-
-// SetDefaultPort sets the default Redis port if not already set.
-func (conn *RedisConnection) SetDefaultPort() {
-	if conn.Port == "" {
-		conn.Port = DefaultRedisPort
 	}
 }
 
@@ -102,17 +88,9 @@ func (conn *RedisConnection) ParseURL() error {
 		return fmt.Errorf("unsupported scheme: %s (use redis:// or rediss://)", u.Scheme)
 	}
 
-	// Extract host and port
-	conn.Host = u.Hostname()
-	if u.Port() != "" {
-		conn.Port = u.Port()
-	} else {
-		conn.Port = DefaultRedisPort
-	}
-
 	// Extract server name for TLS from host if not explicitly set
 	if conn.TLS.Enabled && conn.TLS.ServerName == "" {
-		conn.TLS.ServerName = conn.Host
+		conn.TLS.ServerName = u.Hostname()
 	}
 
 	return nil
@@ -146,7 +124,7 @@ func (conn *RedisConnection) ParseClusterURL() error {
 		hostPort := u.Host
 		if u.Port() == "" {
 			// Add default port if not specified
-			hostPort = u.Hostname() + ":" + DefaultRedisPort
+			hostPort = u.Hostname() + ":6379"
 		}
 
 		// Update ClusterURL to be just the host:port (go-redis expects this format)
@@ -160,7 +138,7 @@ func (conn *RedisConnection) ParseClusterURL() error {
 		// Plain host:port format (backward compatibility)
 		// Add default port if not specified
 		if !strings.Contains(clusterURL, ":") {
-			conn.ClusterURL = clusterURL + ":" + DefaultRedisPort
+			conn.ClusterURL = clusterURL + ":6379"
 		}
 
 		// Extract hostname for TLS server name if TLS is enabled and server name not set
@@ -226,8 +204,6 @@ func LoadRedisConnectionForService() (*RedisConnection, error) {
 func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, error) {
 	conn := &RedisConnection{
 		ClusterURL:            os.Getenv("REDIS_CLUSTER_URL"),
-		Host:                  os.Getenv("REDIS_HOST"),
-		Port:                  os.Getenv("REDIS_PORT"),
 		URL:                   os.Getenv("REDIS_URL"),
 		ConnectTimeoutSeconds: getIntEnv("REDIS_CONNECT_TIMEOUT_SECONDS", 10),
 	}
@@ -252,17 +228,17 @@ func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, er
 		if err := conn.ParseClusterURL(); err != nil {
 			return nil, fmt.Errorf("parsing Redis cluster URL: %w", err)
 		}
-	} else {
-		// Traditional configuration
-		conn.SetDefaultPort()
 	}
 
 	// Check if we're in a test environment
-	if os.Getenv("GO_TEST") == "1" && conn.Host == "" && conn.ClusterURL == "" && conn.URL == "" {
+	if os.Getenv("GO_TEST") == "1" && conn.ClusterURL == "" && conn.URL == "" {
 		// For tests, use a default value
-		conn.Host = "test-host"
-	} else if requireConfig && conn.ClusterURL == "" && conn.Host == "" && conn.URL == "" {
-		return nil, fmt.Errorf("REDIS_HOST, REDIS_CLUSTER_URL, or REDIS_URL environment variable must be set")
+		conn.URL = "redis://test-host:6379"
+		if err := conn.ParseURL(); err != nil {
+			return nil, fmt.Errorf("parsing test Redis URL: %w", err)
+		}
+	} else if requireConfig && conn.ClusterURL == "" && conn.URL == "" {
+		return nil, fmt.Errorf("REDIS_CLUSTER_URL or REDIS_URL environment variable must be set")
 	}
 
 	// Set target label for metrics
@@ -280,7 +256,6 @@ func NewRedisConnection(timeoutSeconds int) *RedisConnection {
 
 // ApplyDefaults ensures all required fields have default values.
 func (conn *RedisConnection) ApplyDefaults() {
-	conn.SetDefaultPort()
 	conn.SetTargetLabel()
 }
 

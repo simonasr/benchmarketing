@@ -46,12 +46,10 @@ redis:
 	require.NoError(t, err)
 
 	// Set environment variables for Redis connection
-	os.Setenv("REDIS_HOST", "localhost")
-	os.Setenv("REDIS_PORT", "6379")
+	os.Setenv("REDIS_URL", "redis://localhost:6379")
 	os.Setenv("REDIS_TARGET_LABEL", "test-redis")
 	defer func() {
-		os.Unsetenv("REDIS_HOST")
-		os.Unsetenv("REDIS_PORT")
+		os.Unsetenv("REDIS_URL")
 		os.Unsetenv("REDIS_TARGET_LABEL")
 	}()
 
@@ -85,23 +83,20 @@ func TestConfigFileExists(t *testing.T) {
 // TestEnvironmentVariables verifies that environment variables are properly handled
 func TestEnvironmentVariables(t *testing.T) {
 	// Set test environment variables
-	os.Setenv("REDIS_HOST", "test-host")
-	os.Setenv("REDIS_PORT", "1234")
+	os.Setenv("REDIS_URL", "redis://test-host:1234")
 	os.Setenv("REDIS_TARGET_LABEL", "test-label")
-	os.Setenv("REDIS_CLUSTER_ADDRESS", "cluster:6379")
+	os.Setenv("REDIS_CLUSTER_URL", "redis://cluster:6379")
 
 	defer func() {
-		os.Unsetenv("REDIS_HOST")
-		os.Unsetenv("REDIS_PORT")
+		os.Unsetenv("REDIS_URL")
 		os.Unsetenv("REDIS_TARGET_LABEL")
-		os.Unsetenv("REDIS_CLUSTER_ADDRESS")
+		os.Unsetenv("REDIS_CLUSTER_URL")
 	}()
 
 	// We can't directly test the LoadRedisConnection function here
 	// since it's in a different package, but we can verify that
 	// environment variables are set correctly
-	assert.Equal(t, "test-host", os.Getenv("REDIS_HOST"))
-	assert.Equal(t, "1234", os.Getenv("REDIS_PORT"))
+	assert.Equal(t, "redis://test-host:1234", os.Getenv("REDIS_URL"))
 	assert.Equal(t, "test-label", os.Getenv("REDIS_TARGET_LABEL"))
-	assert.Equal(t, "cluster:6379", os.Getenv("REDIS_CLUSTER_ADDRESS"))
+	assert.Equal(t, "redis://cluster:6379", os.Getenv("REDIS_CLUSTER_URL"))
 }

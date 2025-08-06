@@ -6,7 +6,7 @@ This document demonstrates how to use the new service mode functionality.
 
 1. **Start in service mode:**
 ```bash
-REDIS_HOST=localhost API_PORT=8080 ./redbench --service
+REDIS_URL=redis://localhost:6379 API_PORT=8080 ./redbench --service
 ```
 
 2. **Check status (should be idle initially):**
@@ -242,7 +242,7 @@ TEST_MIN_CLIENTS=10 TEST_MAX_CLIENTS=100 ./redbench --service
 
 The original CLI mode still works exactly as before:
 ```bash
-REDIS_HOST=localhost ./redbench
+REDIS_URL=redis://localhost:6379 ./redbench
 ```
 
 This runs a one-shot benchmark and exits, just like before.

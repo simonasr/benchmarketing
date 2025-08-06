@@ -60,13 +60,8 @@ RedBench supports secure Redis connections using TLS. Configure TLS using enviro
 ### Basic Setup
 
 ```bash
-# Using Redis URL (recommended)
+# Using Redis URL
 export REDIS_URL="rediss://redis.example.com:6380"
-export REDIS_TLS_CA_FILE="/path/to/ca.pem"
-
-# Using traditional host/port
-export REDIS_HOST="redis.example.com"
-export REDIS_TLS_ENABLED="true"
 export REDIS_TLS_CA_FILE="/path/to/ca.pem"
 
 # Redis cluster

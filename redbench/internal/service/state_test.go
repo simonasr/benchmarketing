@@ -42,9 +42,8 @@ func TestGlobalState_StartBenchmark(t *testing.T) {
 		},
 	}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 
 	// Test successful start
@@ -75,9 +74,8 @@ func TestGlobalState_StopBenchmark(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 
 	// Test stop when not running
@@ -107,9 +105,8 @@ func TestGlobalState_CompleteBenchmark(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 
 	gs.StartBenchmark(cfg, redisConn)
@@ -129,9 +126,8 @@ func TestGlobalState_FailBenchmark(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 	errorMsg := "test error"
 
@@ -156,9 +152,8 @@ func TestGlobalState_IsRunning(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 
 	if gs.IsRunning() {
@@ -180,9 +175,8 @@ func TestGlobalState_ThreadSafety(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{
-		Host:        "localhost",
-		Port:        "6379",
-		TargetLabel: "localhost:6379",
+		URL:         "redis://localhost:6379",
+		TargetLabel: "redis://localhost:6379",
 	}
 
 	// Test concurrent access

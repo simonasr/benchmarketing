@@ -18,9 +18,8 @@ The project follows Clean Architecture principles:
 
 Configuration is done via a YAML file (`config.yaml`) and environment variables:
 
-- `REDIS_HOST` - Redis host (required if `REDIS_CLUSTER_URL` is not set)
-- `REDIS_PORT` - Redis port (defaults to 6379)
-- `REDIS_CLUSTER_URL` - Redis cluster URL in format `redis://host:port` or `rediss://host:port` for TLS (required if `REDIS_HOST` is not set)
+- `REDIS_URL` - Redis connection URL in format `redis://host:port` or `rediss://host:port` for TLS (required if `REDIS_CLUSTER_URL` is not set)
+- `REDIS_CLUSTER_URL` - Redis cluster URL in format `redis://host:port` or `rediss://host:port` for TLS (required if `REDIS_URL` is not set)
 
 ## Running Tests
 
@@ -29,8 +28,8 @@ Configuration is done via a YAML file (`config.yaml`) and environment variables:
 Run the unit tests with:
 
 ```bash
-# Set a test Redis host (required for tests)
-REDIS_HOST=test-host go test -v ./...
+# Set a test Redis URL (required for tests)
+REDIS_URL=redis://test-host:6379 go test -v ./...
 ```
 
 ### Integration Tests
@@ -44,7 +43,7 @@ docker run -d --name redis-test -p 6379:6379 redis:7
 Then run the integration tests with:
 
 ```bash
-REDIS_HOST=localhost go test -v -tags=integration ./test/integration
+REDIS_URL=redis://localhost:6379 go test -v -tags=integration ./test/integration
 ```
 
 Don't forget to clean up after:

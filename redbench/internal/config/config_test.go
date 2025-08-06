@@ -91,23 +91,24 @@ test:
 }
 
 func TestLoadRedisConnection(t *testing.T) {
-	// Test with host and port
-	os.Setenv("REDIS_HOST", "localhost")
-	os.Setenv("REDIS_PORT", "6380")
+	// Clear all Redis environment variables first
 	defer func() {
-		os.Unsetenv("REDIS_HOST")
-		os.Unsetenv("REDIS_PORT")
+		os.Unsetenv("REDIS_URL")
+		os.Unsetenv("REDIS_CLUSTER_URL")
 	}()
+
+	// Test with Redis URL
+	os.Setenv("REDIS_URL", "redis://localhost:6380")
+	os.Unsetenv("REDIS_CLUSTER_URL") // Ensure cluster URL is not set
 
 	conn, err := LoadRedisConnection()
 	require.NoError(t, err)
-	assert.Equal(t, "localhost", conn.Host)
-	assert.Equal(t, "6380", conn.Port)
-	assert.Equal(t, "localhost:6380", conn.TargetLabel)
+	assert.Equal(t, "redis://localhost:6380", conn.URL)
+	assert.Equal(t, "redis://localhost:6380", conn.TargetLabel)
 
-	// Test with cluster URL
+	// Test with cluster URL (clear Redis URL first)
+	os.Unsetenv("REDIS_URL")
 	os.Setenv("REDIS_CLUSTER_URL", "redis://cluster.example.com:6379")
-	defer os.Unsetenv("REDIS_CLUSTER_URL")
 
 	conn, err = LoadRedisConnection()
 	require.NoError(t, err)
@@ -139,35 +140,23 @@ func TestParseRedisURL(t *testing.T) {
 	tests := []struct {
 		name        string
 		url         string
-		expected    RedisConnection
+		expectedTLS TLSConfig
 		expectError bool
 	}{
 		{
-			name: "redis URL",
-			url:  "redis://localhost:6379",
-			expected: RedisConnection{
-				Host: "localhost",
-				Port: "6379",
-				TLS:  TLSConfig{Enabled: false},
-			},
+			name:        "redis URL",
+			url:         "redis://localhost:6379",
+			expectedTLS: TLSConfig{Enabled: false},
 		},
 		{
-			name: "rediss URL (TLS)",
-			url:  "rediss://redis.example.com:6380",
-			expected: RedisConnection{
-				Host: "redis.example.com",
-				Port: "6380",
-				TLS:  TLSConfig{Enabled: true, ServerName: "redis.example.com"},
-			},
+			name:        "rediss URL (TLS)",
+			url:         "rediss://redis.example.com:6380",
+			expectedTLS: TLSConfig{Enabled: true, ServerName: "redis.example.com"},
 		},
 		{
-			name: "rediss URL with port",
-			url:  "rediss://redis.example.com:6380",
-			expected: RedisConnection{
-				Host: "redis.example.com",
-				Port: "6380",
-				TLS:  TLSConfig{Enabled: true, ServerName: "redis.example.com"},
-			},
+			name:        "rediss URL with port",
+			url:         "rediss://redis.example.com:6380",
+			expectedTLS: TLSConfig{Enabled: true, ServerName: "redis.example.com"},
 		},
 		{
 			name:        "invalid scheme",
@@ -175,13 +164,9 @@ func TestParseRedisURL(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "default port",
-			url:  "redis://localhost",
-			expected: RedisConnection{
-				Host: "localhost",
-				Port: "6379",
-				TLS:  TLSConfig{Enabled: false},
-			},
+			name:        "default port",
+			url:         "redis://localhost",
+			expectedTLS: TLSConfig{Enabled: false},
 		},
 	}
 
@@ -196,10 +181,8 @@ func TestParseRedisURL(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected.Host, conn.Host)
-			assert.Equal(t, tt.expected.Port, conn.Port)
-			assert.Equal(t, tt.expected.TLS.Enabled, conn.TLS.Enabled)
-			assert.Equal(t, tt.expected.TLS.ServerName, conn.TLS.ServerName)
+			assert.Equal(t, tt.expectedTLS.Enabled, conn.TLS.Enabled)
+			assert.Equal(t, tt.expectedTLS.ServerName, conn.TLS.ServerName)
 		})
 	}
 }
