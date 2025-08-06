@@ -91,6 +91,14 @@ func (s *Service) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := s.globalState.GetState()
+
+	// Only show configuration when benchmark has been started (running, stopped, completed, or failed)
+	// Don't show default configuration when idle
+	if state.Status == StatusIdle {
+		state.Configuration = nil
+		state.RedisTarget = nil
+	}
+
 	writeJSONResponse(w, state, http.StatusOK)
 }
 
