@@ -41,12 +41,12 @@ func TestNewRunner(t *testing.T) {
 	cfg := &config.Config{
 		Debug: true,
 		Test: config.Test{
-			MinClients:     1,
-			MaxClients:     10,
-			RequestDelayMs: 100,
-			StageIntervalS: 5,
-			KeySize:        10,
-			ValueSize:      100,
+			MinClients:      1,
+			MaxClients:      10,
+			RequestDelayMs:  100,
+			StageIntervalMs: 5000,
+			KeySize:         10,
+			ValueSize:       100,
 		},
 		Redis: config.RedisConfig{
 			OperationTimeoutMs: 1000,
@@ -77,12 +77,12 @@ func TestRun(t *testing.T) {
 	cfg := &config.Config{
 		Debug: false,
 		Test: config.Test{
-			MinClients:     1,
-			MaxClients:     1, // Set to 1 to make test run faster
-			RequestDelayMs: 10,
-			StageIntervalS: 1, // Short interval for testing
-			KeySize:        5,
-			ValueSize:      10,
+			MinClients:      1,
+			MaxClients:      1, // Set to 1 to make test run faster
+			RequestDelayMs:  10,
+			StageIntervalMs: 1000, // Short interval for testing
+			KeySize:         5,
+			ValueSize:       10,
 		},
 		Redis: config.RedisConfig{
 			OperationTimeoutMs: 100,

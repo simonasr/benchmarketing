@@ -37,12 +37,12 @@ type TLSOverrides struct {
 
 // TestOverrides allows overriding specific test configuration values.
 type TestOverrides struct {
-	MinClients     *int `json:"minClients,omitempty"`
-	MaxClients     *int `json:"maxClients,omitempty"`
-	StageIntervalS *int `json:"stageIntervalS,omitempty"`
-	RequestDelayMs *int `json:"requestDelayMs,omitempty"`
-	KeySize        *int `json:"keySize,omitempty"`
-	ValueSize      *int `json:"valueSize,omitempty"`
+	MinClients      *int `json:"minClients,omitempty"`
+	MaxClients      *int `json:"maxClients,omitempty"`
+	StageIntervalMs *int `json:"stageIntervalMs,omitempty"`
+	RequestDelayMs  *int `json:"requestDelayMs,omitempty"`
+	KeySize         *int `json:"keySize,omitempty"`
+	ValueSize       *int `json:"valueSize,omitempty"`
 }
 
 // MergeConfiguration creates a new configuration by merging base config with API request overrides.
@@ -177,8 +177,8 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	if overrides.MaxClients != nil {
 		testConfig.MaxClients = *overrides.MaxClients
 	}
-	if overrides.StageIntervalS != nil {
-		testConfig.StageIntervalS = *overrides.StageIntervalS
+	if overrides.StageIntervalMs != nil {
+		testConfig.StageIntervalMs = *overrides.StageIntervalMs
 	}
 	if overrides.RequestDelayMs != nil {
 		testConfig.RequestDelayMs = *overrides.RequestDelayMs

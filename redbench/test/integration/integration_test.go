@@ -81,12 +81,12 @@ func TestIntegrationWithConfig(t *testing.T) {
 			OperationTimeoutMs: 200,
 		},
 		Test: config.Test{
-			MinClients:     5,
-			MaxClients:     10,
-			StageIntervalS: 1,
-			RequestDelayMs: 100,
-			KeySize:        8,
-			ValueSize:      16,
+			MinClients:      5,
+			MaxClients:      10,
+			StageIntervalMs: 1000,
+			RequestDelayMs:  100,
+			KeySize:         8,
+			ValueSize:       16,
 		},
 	}
 

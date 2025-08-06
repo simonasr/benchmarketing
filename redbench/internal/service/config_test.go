@@ -11,12 +11,12 @@ func TestMergeConfiguration_EmptyBody(t *testing.T) {
 	baseConfig := &config.Config{
 		MetricsPort: 8081,
 		Test: config.Test{
-			MinClients:     1,
-			MaxClients:     100,
-			StageIntervalS: 10,
-			RequestDelayMs: 1000,
-			KeySize:        10,
-			ValueSize:      10,
+			MinClients:      1,
+			MaxClients:      100,
+			StageIntervalMs: 10000,
+			RequestDelayMs:  1000,
+			KeySize:         10,
+			ValueSize:       10,
 		},
 	}
 
@@ -38,12 +38,12 @@ func TestMergeConfiguration_WithOverrides(t *testing.T) {
 	baseConfig := &config.Config{
 		MetricsPort: 8081,
 		Test: config.Test{
-			MinClients:     1,
-			MaxClients:     100,
-			StageIntervalS: 10,
-			RequestDelayMs: 1000,
-			KeySize:        10,
-			ValueSize:      10,
+			MinClients:      1,
+			MaxClients:      100,
+			StageIntervalMs: 10000,
+			RequestDelayMs:  1000,
+			KeySize:         10,
+			ValueSize:       10,
 		},
 	}
 
@@ -77,8 +77,8 @@ func TestMergeConfiguration_WithOverrides(t *testing.T) {
 	}
 
 	// Check non-overridden values remain the same
-	if mergedConfig.Test.StageIntervalS != baseConfig.Test.StageIntervalS {
-		t.Errorf("Expected StageIntervalS %d, got %d", baseConfig.Test.StageIntervalS, mergedConfig.Test.StageIntervalS)
+	if mergedConfig.Test.StageIntervalMs != baseConfig.Test.StageIntervalMs {
+		t.Errorf("Expected StageIntervalMs %d, got %d", baseConfig.Test.StageIntervalMs, mergedConfig.Test.StageIntervalMs)
 	}
 	if mergedConfig.Test.RequestDelayMs != baseConfig.Test.RequestDelayMs {
 		t.Errorf("Expected RequestDelayMs %d, got %d", baseConfig.Test.RequestDelayMs, mergedConfig.Test.RequestDelayMs)
@@ -92,12 +92,12 @@ func TestMergeConfiguration_PartialOverrides(t *testing.T) {
 	baseConfig := &config.Config{
 		MetricsPort: 8081,
 		Test: config.Test{
-			MinClients:     1,
-			MaxClients:     100,
-			StageIntervalS: 10,
-			RequestDelayMs: 1000,
-			KeySize:        10,
-			ValueSize:      10,
+			MinClients:      1,
+			MaxClients:      100,
+			StageIntervalMs: 10000,
+			RequestDelayMs:  1000,
+			KeySize:         10,
+			ValueSize:       10,
 		},
 	}
 
