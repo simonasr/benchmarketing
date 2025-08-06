@@ -12,7 +12,7 @@ globs: "internal/config/*.go,internal/redis/*.go,*.yaml,compose*.yaml"
 
 ## Environment Variable Conventions
 - Use `REDIS_` prefix for Redis-related configuration
-- Use `TEST_` prefix for test configuration  
+- Use `TEST_` prefix for test configuration
 - Use underscores to separate words: `REDIS_TLS_CA_FILE`
 - Boolean values: `true`/`false` (case-insensitive)
 - Integer values: Plain numbers (e.g., `10`)
@@ -25,7 +25,7 @@ func getBoolEnv(key string, defaultValue bool) bool
 func getIntEnv(key string, defaultValue int) int
 ```
 
-## Unified URL Configuration Support  
+## Unified URL Configuration Support
 Support both traditional and URL-based configuration with consistent schemes:
 
 ### Single Instance
@@ -79,7 +79,7 @@ if u.Scheme != "redis" && u.Scheme != "rediss" {
 type TLSConfig struct {
     Enabled            bool   `yaml:"enabled"`
     CertFile           string `yaml:"certFile"`           // Client cert for mTLS
-    KeyFile            string `yaml:"keyFile"`            // Client key for mTLS  
+    KeyFile            string `yaml:"keyFile"`            // Client key for mTLS
     CAFile             string `yaml:"caFile"`             // Required for verification
     InsecureSkipVerify bool   `yaml:"insecureSkipVerify"` // Testing only
     ServerName         string `yaml:"serverName"`         // TLS server name
@@ -87,7 +87,6 @@ type TLSConfig struct {
 ```
 
 ### TLS Environment Variables
-- `REDIS_TLS_ENABLED=true` - Enable TLS (when not using URL schemes)
 - `REDIS_TLS_CA_FILE=/path/to/ca.pem` - CA certificate file
 - `REDIS_TLS_CERT_FILE=/path/to/client.pem` - Client cert (mTLS)
 - `REDIS_TLS_KEY_FILE=/path/to/client-key.pem` - Client key (mTLS)

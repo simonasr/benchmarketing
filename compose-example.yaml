@@ -17,21 +17,21 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOST=redis8
+      - REDIS_URL=redis://redis8:6379
 
   bench_redis7:
     <<: *bench_base
     ports:
       - "8083:8081"
     environment:
-      - REDIS_HOST=redis7
+      - REDIS_URL=redis://redis7:6379
 
   bench_valkey:
     <<: *bench_base
     ports:
       - "8082:8081"
     environment:
-      - REDIS_HOST=valkey
+      - REDIS_URL=redis://valkey:6379
 
   redis8:
     image: redis:8.0

@@ -57,8 +57,7 @@ func TestNewRunner(t *testing.T) {
 	mockMetrics := metrics.New(prometheus.NewRegistry(), "test-target")
 	mockClient := &MockRedisClient{}
 	redisConn := &config.RedisConnection{
-		Host: "localhost",
-		Port: "6379",
+		URL: "redis://localhost:6379",
 	}
 
 	// Execute
@@ -93,8 +92,7 @@ func TestRun(t *testing.T) {
 	mockMetrics := metrics.New(prometheus.NewRegistry(), "test-target")
 	mockClient := &MockRedisClient{}
 	redisConn := &config.RedisConnection{
-		Host: "localhost",
-		Port: "6379",
+		URL: "redis://localhost:6379",
 	}
 
 	// Setup expectations

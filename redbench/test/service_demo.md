@@ -6,7 +6,7 @@ This document demonstrates how to use the new service mode functionality.
 
 1. **Start in service mode:**
 ```bash
-REDIS_HOST=localhost API_PORT=8080 ./redbench --service
+REDIS_URL=redis://localhost:6379 API_PORT=8080 ./redbench --service
 ```
 
 2. **Check status (should be idle initially):**
@@ -54,8 +54,7 @@ curl -X POST http://localhost:8080/start \
   -H "Content-Type: application/json" \
   -d '{
     "redis": {
-      "host": "redis-cluster.example.com",
-      "port": "6380"
+      "url": "redis://redis-cluster.example.com:6380"
     },
     "test": {
       "maxClients": 100
@@ -91,9 +90,8 @@ curl -X POST http://localhost:8080/start \
   -H "Content-Type: application/json" \
   -d '{
     "redis": {
-      "host": "secure-redis.example.com",
+      "url": "rediss://secure-redis.example.com:6379",
       "tls": {
-        "enabled": true,
         "caFile": "/path/to/ca.pem",
         "serverName": "secure-redis.example.com"
       }
@@ -107,11 +105,9 @@ Expected response:
   "status": "running",
   "configuration": {...},
   "redisTarget": {
-    "host": "secure-redis.example.com",
-    "port": "6380",
-    "targetLabel": "secure-redis.example.com:6380",
+    "url": "rediss://secure-redis.example.com:6379",
+    "targetLabel": "rediss://secure-redis.example.com:6379",
     "tls": {
-      "enabled": true,
       "caFile": "/path/to/ca.pem",
       "serverName": "secure-redis.example.com"
     }
@@ -172,17 +168,7 @@ The service supports flexible Redis target configuration via the API request:
 
 ### Connection Methods
 
-1. **Host/Port** (traditional):
-```json
-{
-  "redis": {
-    "host": "redis.example.com",
-    "port": "6379"
-  }
-}
-```
-
-2. **Redis URL** (supports redis:// and rediss://):
+**Redis URL** (supports redis:// and rediss://):
 ```json
 {
   "redis": {
@@ -207,9 +193,8 @@ You can specify TLS settings per benchmark:
 ```json
 {
   "redis": {
-    "host": "redis.example.com",
+    "url": "rediss://redis.example.com:6379",
     "tls": {
-      "enabled": true,
       "caFile": "/path/to/ca.pem",
       "certFile": "/path/to/client.pem",
       "keyFile": "/path/to/client-key.pem",
@@ -242,7 +227,7 @@ TEST_MIN_CLIENTS=10 TEST_MAX_CLIENTS=100 ./redbench --service
 
 The original CLI mode still works exactly as before:
 ```bash
-REDIS_HOST=localhost ./redbench
+REDIS_URL=redis://localhost:6379 ./redbench
 ```
 
 This runs a one-shot benchmark and exits, just like before.

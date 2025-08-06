@@ -19,15 +19,13 @@ type RedisOverrides struct {
 	// URL supports both redis:// and rediss:// schemes
 	URL        *string `json:"url,omitempty"`
 	ClusterURL *string `json:"clusterUrl,omitempty"`
-	Host       *string `json:"host,omitempty"`
-	Port       *string `json:"port,omitempty"`
 	// TLS configuration
 	TLS *TLSOverrides `json:"tls,omitempty"`
 }
 
 // TLSOverrides allows overriding TLS configuration for Redis connections.
+// TLS is enabled/disabled based on the URL scheme (redis:// vs rediss://).
 type TLSOverrides struct {
-	Enabled            *bool   `json:"enabled,omitempty"`
 	CAFile             *string `json:"caFile,omitempty"`
 	CertFile           *string `json:"certFile,omitempty"`
 	KeyFile            *string `json:"keyFile,omitempty"`
@@ -111,7 +109,7 @@ func CreateRedisConnection(baseRedisConn *config.RedisConnection, requestBody []
 
 // applyRedisOverrides applies Redis configuration overrides to the connection.
 func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides) error {
-	// Handle URL-based configuration (highest priority)
+	// Handle URL-based configuration
 	if overrides.URL != nil {
 		conn.URL = *overrides.URL
 		if err := conn.ParseURL(); err != nil {
@@ -122,16 +120,6 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 		if err := conn.ParseClusterURL(); err != nil {
 			return fmt.Errorf("parsing Redis cluster URL: %w", err)
 		}
-	} else {
-		// Handle host/port configuration
-		if overrides.Host != nil {
-			conn.Host = *overrides.Host
-		}
-		if overrides.Port != nil {
-			conn.Port = *overrides.Port
-		} else {
-			conn.SetDefaultPort()
-		}
 	}
 
 	// Apply TLS overrides
@@ -140,8 +128,8 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 	}
 
 	// Validate that we have enough information to connect
-	if conn.URL == "" && conn.ClusterURL == "" && conn.Host == "" {
-		return fmt.Errorf("redis connection requires either url, clusterUrl, or host to be specified")
+	if conn.URL == "" && conn.ClusterURL == "" {
+		return fmt.Errorf("redis connection requires either url or clusterUrl to be specified")
 	}
 
 	return nil
@@ -149,9 +137,6 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 
 // applyTLSOverrides applies TLS configuration overrides.
 func applyTLSOverrides(tlsConfig *config.TLSConfig, overrides *TLSOverrides) {
-	if overrides.Enabled != nil {
-		tlsConfig.Enabled = *overrides.Enabled
-	}
 	if overrides.CAFile != nil {
 		tlsConfig.CAFile = *overrides.CAFile
 	}

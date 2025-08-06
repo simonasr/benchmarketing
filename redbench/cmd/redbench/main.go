@@ -52,8 +52,7 @@ func main() {
 	slog.Info("Loaded configuration", "event", "config_loaded", "data", cfg, "service_mode", *serviceMode)
 	slog.Info("Redis connection config", "event", "redis_config", "data", map[string]any{
 		"cluster_url":     redisConn.ClusterURL,
-		"host":            redisConn.Host,
-		"port":            redisConn.Port,
+		"url":             redisConn.URL,
 		"tls_enabled":     redisConn.TLS.Enabled,
 		"tls_ca_file":     redisConn.TLS.CAFile,
 		"tls_server_name": redisConn.TLS.ServerName,

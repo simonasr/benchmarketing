@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -22,8 +23,7 @@ func setupMiniredis(t *testing.T) (*miniredis.Miniredis, *config.RedisConnection
 	})
 
 	return mr, &config.RedisConnection{
-		Host: "localhost",
-		Port: mr.Port(),
+		URL: fmt.Sprintf("redis://localhost:%s", mr.Port()),
 	}
 }
 
@@ -47,8 +47,7 @@ func TestNewRedisClient(t *testing.T) {
 
 	t.Run("connection failure", func(t *testing.T) {
 		conn := &config.RedisConnection{
-			Host: "non-existent-host",
-			Port: "12345",
+			URL: "redis://non-existent-host:12345",
 		}
 
 		client, err := NewRedisClient(conn)
@@ -58,9 +57,9 @@ func TestNewRedisClient(t *testing.T) {
 	})
 
 	t.Run("legacy client creation", func(t *testing.T) {
-		_, conn := setupMiniredis(t)
+		mr, _ := setupMiniredis(t)
 
-		client, err := NewRedisClientLegacy(conn.Host, conn.Port, "")
+		client, err := NewRedisClientLegacy("localhost", mr.Port(), "")
 		require.NoError(t, err)
 		require.NotNil(t, client)
 	})
