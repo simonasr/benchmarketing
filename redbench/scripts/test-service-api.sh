@@ -70,7 +70,7 @@ START_RESPONSE=$(curl -s -X POST "$API_URL/start" \
     "test": {
       "minClients": 1,
       "maxClients": 2,
-      "stageIntervalS": 1,
+      "stageIntervalMs": 1000,
       "keySize": 8,
       "valueSize": 16
     }

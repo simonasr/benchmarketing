@@ -14,13 +14,13 @@ redis:
 test:
   minClients: 1
   maxClients: 2000
-  stageIntervalS: 1
+  stageIntervalMs: 1000
   requestDelayMs: 1000
   keySize: 10
   valueSize: 10
 
 # Example TLS configurations:
-# 
+#
 # Basic TLS with private CA:
 # redis:
 #   tls:
@@ -32,7 +32,7 @@ test:
 # redis:
 #   tls:
 #     enabled: true
-#     certFile: "/certs/client.pem" 
+#     certFile: "/certs/client.pem"
 #     keyFile: "/certs/client-key.pem"
 #     caFile: "/certs/ca.pem"
 #     serverName: "my-redis.redis-cluster.service.consul"

@@ -23,7 +23,7 @@ redis:
 test:
   minClients: 1
   maxClients: 10
-  stageIntervalS: 5
+  stageIntervalMs: 5000
   requestDelayMs: 50
   keySize: 16
   valueSize: 32
@@ -43,7 +43,7 @@ test:
 	assert.Equal(t, 100, cfg.Redis.OperationTimeoutMs)
 	assert.Equal(t, 1, cfg.Test.MinClients)
 	assert.Equal(t, 10, cfg.Test.MaxClients)
-	assert.Equal(t, 5, cfg.Test.StageIntervalS)
+	assert.Equal(t, 5000, cfg.Test.StageIntervalMs)
 	assert.Equal(t, 50, cfg.Test.RequestDelayMs)
 	assert.Equal(t, 16, cfg.Test.KeySize)
 	assert.Equal(t, 32, cfg.Test.ValueSize)
@@ -64,7 +64,7 @@ redis:
 test:
   minClients: 1
   maxClients: 10
-  stageIntervalS: 5
+  stageIntervalMs: 5000
   requestDelayMs: 50
   keySize: 16
   valueSize: 32

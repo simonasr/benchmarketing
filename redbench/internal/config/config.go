@@ -43,12 +43,12 @@ type TLSConfig struct {
 
 // Test contains benchmark test configuration.
 type Test struct {
-	MinClients     int `yaml:"minClients"`
-	MaxClients     int `yaml:"maxClients"`
-	StageIntervalS int `yaml:"stageIntervalS"`
-	RequestDelayMs int `yaml:"requestDelayMs"`
-	KeySize        int `yaml:"keySize"`
-	ValueSize      int `yaml:"valueSize"`
+	MinClients      int `yaml:"minClients"`
+	MaxClients      int `yaml:"maxClients"`
+	StageIntervalMs int `yaml:"stageIntervalMs"`
+	RequestDelayMs  int `yaml:"requestDelayMs"`
+	KeySize         int `yaml:"keySize"`
+	ValueSize       int `yaml:"valueSize"`
 }
 
 // RedisConnection holds Redis connection information.

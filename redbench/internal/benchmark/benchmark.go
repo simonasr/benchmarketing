@@ -75,7 +75,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				<-clients
 			}()
 
-			if time.Since(now).Seconds() >= float64(r.config.Test.StageIntervalS) {
+			if time.Since(now).Milliseconds() >= int64(r.config.Test.StageIntervalMs) {
 				break
 			}
 		}

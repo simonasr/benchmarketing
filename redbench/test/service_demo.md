@@ -41,7 +41,7 @@ curl -X POST http://localhost:8080/start \
     "test": {
       "minClients": 5,
       "maxClients": 50,
-      "stageIntervalS": 2,
+      "stageIntervalMs": 2000,
       "keySize": 15,
       "valueSize": 20
     }
@@ -230,7 +230,7 @@ You can specify TLS settings per benchmark:
 
 The configuration follows this priority order:
 1. **API Request Body** (highest) - JSON parameters in POST request
-2. **Environment Variables** (medium) - `TEST_*` variables  
+2. **Environment Variables** (medium) - `TEST_*` variables
 3. **config.yaml** (lowest) - Default configuration file
 
 Example with environment override:
