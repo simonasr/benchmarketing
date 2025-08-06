@@ -31,10 +31,10 @@ func writeJSONResponse(w http.ResponseWriter, data interface{}, statusCode int) 
 	}
 }
 
-// logAndRespond logs an error and sends an HTTP error response.
-func logAndRespond(w http.ResponseWriter, logMsg string, err error, httpMsg string, statusCode int) {
+// logAndRespond logs an error and sends a 400 Bad Request HTTP error response.
+func logAndRespond(w http.ResponseWriter, logMsg string, err error, httpMsg string) {
 	slog.Error(logMsg, "error", err)
-	http.Error(w, httpMsg, statusCode)
+	http.Error(w, httpMsg, http.StatusBadRequest)
 }
 
 // checkMethod validates the HTTP method and returns false if invalid.
@@ -103,7 +103,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		logAndRespond(w, "Failed to read request body", err, "Failed to read request body", http.StatusBadRequest)
+		logAndRespond(w, "Failed to read request body", err, "Failed to read request body")
 		return
 	}
 	defer r.Body.Close()
@@ -111,20 +111,26 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	// Merge configuration with request overrides
 	mergedConfig, err := MergeConfiguration(s.baseConfig, body)
 	if err != nil {
-		logAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		logAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
 	// Create Redis connection from request overrides or use base connection
 	redisConn, err := CreateRedisConnection(s.baseRedisConn, body)
 	if err != nil {
-		logAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err), http.StatusBadRequest)
+		logAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err))
 		return
 	}
 
 	// Use base connection if no override provided
 	if redisConn == nil {
 		redisConn = s.baseRedisConn
+	}
+
+	// Validate that we have a valid Redis target
+	if redisConn.URL == "" && redisConn.ClusterURL == "" {
+		logAndRespond(w, "Redis target validation failed", nil, "Redis connection requires either URL or ClusterURL to be specified")
+		return
 	}
 
 	// Try to start the benchmark
