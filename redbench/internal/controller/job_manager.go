@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
@@ -10,9 +11,10 @@ import (
 
 // JobManager manages coordinated benchmark jobs.
 type JobManager struct {
-	mu       sync.RWMutex
-	jobs     map[string]*Job
-	registry *Registry
+	mu         sync.RWMutex
+	jobs       map[string]*Job
+	registry   *Registry
+	jobCounter int64
 }
 
 // NewJobManager creates a new job manager.
@@ -45,7 +47,8 @@ func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 	}
 
 	// Generate job ID
-	jobID := fmt.Sprintf("job-%d", time.Now().Unix())
+	counter := atomic.AddInt64(&jm.jobCounter, 1)
+	jobID := fmt.Sprintf("job-%d-%d", time.Now().Unix(), counter)
 
 	// Create job with assignments
 	job := &Job{
