@@ -66,8 +66,9 @@ func main() {
 		// Run in service mode (metrics served on same port as API)
 		runServiceMode(cfg, redisConn, reg)
 	} else {
-		// Run in traditional CLI mode - start metrics server on port 8080
-		metrics.StartPrometheusServer(8080, reg)
+		// Run in traditional CLI mode - start metrics server on resolved port
+		apiPort := resolveAPIPort()
+		metrics.StartPrometheusServer(apiPort, reg)
 
 		// Initialize Redis client and metrics for single run
 		redisClient, err := redis.NewRedisClient(redisConn)
@@ -94,15 +95,21 @@ func runCLIMode(cfg *config.Config, redisClient redis.Client, redisConn *config.
 	slog.Info("Benchmark completed successfully")
 }
 
-// runServiceMode starts the HTTP API server and waits for shutdown signals.
-func runServiceMode(cfg *config.Config, redisConn *config.RedisConnection, reg *prometheus.Registry) {
-	// Default to port 8080 for the API server if not specified
+// resolveAPIPort resolves the API port from environment variable or returns default 8080.
+func resolveAPIPort() int {
+	// Default to port 8080 if not specified
 	apiPort := 8080
 	if envPort := os.Getenv("API_PORT"); envPort != "" {
 		if parsed, err := strconv.Atoi(envPort); err == nil {
 			apiPort = parsed
 		}
 	}
+	return apiPort
+}
+
+// runServiceMode starts the HTTP API server and waits for shutdown signals.
+func runServiceMode(cfg *config.Config, redisConn *config.RedisConnection, reg *prometheus.Registry) {
+	apiPort := resolveAPIPort()
 
 	server := service.NewServer(apiPort, cfg, redisConn, reg)
 
