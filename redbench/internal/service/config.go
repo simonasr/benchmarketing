@@ -14,11 +14,14 @@ type BenchmarkRequest struct {
 	Test  *TestOverrides  `json:"test,omitempty"`
 }
 
-// RedisOverrides allows specifying Redis target for the benchmark.
+// RedisOverrides allows specifying Redis target and configuration for the benchmark.
 type RedisOverrides struct {
 	// URL supports both redis:// and rediss:// schemes
 	URL        *string `json:"url,omitempty"`
 	ClusterURL *string `json:"clusterUrl,omitempty"`
+	// Redis configuration overrides
+	OperationTimeoutMs *int `json:"operationTimeoutMs,omitempty"`
+	Expiration         *int `json:"expiration,omitempty"`
 	// TLS configuration
 	TLS *TLSOverrides `json:"tls,omitempty"`
 }
@@ -69,6 +72,11 @@ func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.
 	// Apply test configuration overrides if provided
 	if req.Test != nil {
 		applyTestOverrides(&mergedConfig.Test, req.Test)
+	}
+
+	// Apply Redis configuration overrides if provided
+	if req.Redis != nil {
+		applyRedisConfigOverrides(&mergedConfig.Redis, req.Redis)
 	}
 
 	return mergedConfig, nil
@@ -173,5 +181,15 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	}
 	if overrides.ValueSize != nil {
 		testConfig.ValueSize = *overrides.ValueSize
+	}
+}
+
+// applyRedisConfigOverrides applies non-nil override values to the Redis configuration.
+func applyRedisConfigOverrides(redisConfig *config.RedisConfig, overrides *RedisOverrides) {
+	if overrides.OperationTimeoutMs != nil {
+		redisConfig.OperationTimeoutMs = *overrides.OperationTimeoutMs
+	}
+	if overrides.Expiration != nil {
+		redisConfig.Expiration = int32(*overrides.Expiration)
 	}
 }

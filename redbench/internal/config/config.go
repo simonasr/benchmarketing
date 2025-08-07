@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -15,46 +16,63 @@ import (
 
 // Config represents the application configuration.
 type Config struct {
-	MetricsPort int         `yaml:"metricsPort"`
-	Debug       bool        `yaml:"debug"`
-	Redis       RedisConfig `yaml:"redis"`
-	Test        Test        `yaml:"test"`
+	MetricsPort int         `yaml:"metricsPort" json:"metricsPort"`
+	Debug       bool        `yaml:"debug" json:"debug"`
+	Redis       RedisConfig `yaml:"redis" json:"redis"`
+	Test        Test        `yaml:"test" json:"test"`
 }
 
 // RedisConfig contains Redis-specific configuration.
 type RedisConfig struct {
-	Expiration         int32     `yaml:"expirationS"`
-	OperationTimeoutMs int       `yaml:"operationTimeoutMs"`
-	TLS                TLSConfig `yaml:"tls"`
+	Expiration         int32     `yaml:"expirationS" json:"expiration"`
+	OperationTimeoutMs int       `yaml:"operationTimeoutMs" json:"operationTimeoutMs"`
+	TLS                TLSConfig `yaml:"tls" json:"tls,omitempty"`
 }
 
 // TLSConfig contains TLS-specific configuration for Redis connections.
 type TLSConfig struct {
-	Enabled            bool   `yaml:"enabled"`
-	CertFile           string `yaml:"certFile"`
-	KeyFile            string `yaml:"keyFile"`
-	CAFile             string `yaml:"caFile"`
-	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
-	ServerName         string `yaml:"serverName"`
+	Enabled            bool   `yaml:"enabled" json:"enabled"`
+	CertFile           string `yaml:"certFile" json:"certFile,omitempty"`
+	KeyFile            string `yaml:"keyFile" json:"keyFile,omitempty"`
+	CAFile             string `yaml:"caFile" json:"caFile,omitempty"`
+	InsecureSkipVerify bool   `yaml:"insecureSkipVerify" json:"insecureSkipVerify,omitempty"`
+	ServerName         string `yaml:"serverName" json:"serverName,omitempty"`
+}
+
+// MarshalJSON customizes JSON output to show only relevant fields.
+// When disabled: shows only {"enabled": false}
+// When enabled: shows all fields with omitempty behavior
+func (t TLSConfig) MarshalJSON() ([]byte, error) {
+	if !t.Enabled {
+		return json.Marshal(struct {
+			Enabled bool `json:"enabled"`
+		}{
+			Enabled: false,
+		})
+	}
+
+	// When enabled, show all fields
+	type Alias TLSConfig
+	return json.Marshal(Alias(t))
 }
 
 // Test contains benchmark test configuration.
 type Test struct {
-	MinClients      int `yaml:"minClients"`
-	MaxClients      int `yaml:"maxClients"`
-	StageIntervalMs int `yaml:"stageIntervalMs"`
-	RequestDelayMs  int `yaml:"requestDelayMs"`
-	KeySize         int `yaml:"keySize"`
-	ValueSize       int `yaml:"valueSize"`
+	MinClients      int `yaml:"minClients" json:"minClients"`
+	MaxClients      int `yaml:"maxClients" json:"maxClients"`
+	StageIntervalMs int `yaml:"stageIntervalMs" json:"stageIntervalMs"`
+	RequestDelayMs  int `yaml:"requestDelayMs" json:"requestDelayMs"`
+	KeySize         int `yaml:"keySize" json:"keySize"`
+	ValueSize       int `yaml:"valueSize" json:"valueSize"`
 }
 
 // RedisConnection holds Redis connection information.
 type RedisConnection struct {
-	ClusterURL            string
-	TargetLabel           string
-	TLS                   TLSConfig
-	URL                   string // Support for rediss:// URLs
-	ConnectTimeoutSeconds int    // Connection timeout in seconds
+	ClusterURL            string    `json:"clusterURL,omitempty"`
+	TargetLabel           string    `json:"targetLabel,omitempty"`
+	TLS                   TLSConfig `json:"tls,omitempty"`
+	URL                   string    `json:"url,omitempty"`                   // Support for rediss:// URLs
+	ConnectTimeoutSeconds int       `json:"connectTimeoutSeconds,omitempty"` // Connection timeout in seconds
 }
 
 // SetTargetLabel sets the target label for metrics based on the connection configuration.
@@ -208,8 +226,8 @@ func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, er
 		ConnectTimeoutSeconds: getIntEnv("REDIS_CONNECT_TIMEOUT_SECONDS", 10),
 	}
 
-	// Load TLS configuration from environment variables
-	conn.TLS = TLSConfig{
+	// Initialize TLS configuration from environment variables
+	tlsConfig := TLSConfig{
 		CertFile:           os.Getenv("REDIS_TLS_CERT_FILE"),
 		KeyFile:            os.Getenv("REDIS_TLS_KEY_FILE"),
 		CAFile:             os.Getenv("REDIS_TLS_CA_FILE"),
@@ -239,6 +257,9 @@ func LoadRedisConnectionWithValidation(requireConfig bool) (*RedisConnection, er
 	} else if requireConfig && conn.ClusterURL == "" && conn.URL == "" {
 		return nil, fmt.Errorf("REDIS_CLUSTER_URL or REDIS_URL environment variable must be set")
 	}
+
+	// Set TLS configuration
+	conn.TLS = tlsConfig
 
 	// Set target label for metrics
 	conn.SetTargetLabel()

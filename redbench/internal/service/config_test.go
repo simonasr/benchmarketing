@@ -88,6 +88,47 @@ func TestMergeConfiguration_WithOverrides(t *testing.T) {
 	}
 }
 
+func TestMergeConfiguration_WithRedisOverrides(t *testing.T) {
+	// Base configuration with default Redis values
+	baseConfig := &config.Config{
+		Redis: config.RedisConfig{
+			OperationTimeoutMs: 100,
+			Expiration:         20,
+		},
+		Test: config.Test{
+			MinClients: 1,
+			MaxClients: 10,
+		},
+	}
+
+	// Request with Redis configuration overrides
+	body := `{
+		"redis": {
+			"operationTimeoutMs": 1000,
+			"expiration": 60
+		}
+	}`
+	bodyBytes := []byte(body)
+
+	mergedConfig, err := MergeConfiguration(baseConfig, bodyBytes)
+	if err != nil {
+		t.Fatalf("MergeConfiguration failed: %v", err)
+	}
+
+	// Verify Redis overrides were applied
+	if mergedConfig.Redis.OperationTimeoutMs != 1000 {
+		t.Errorf("Expected OperationTimeoutMs 1000, got %d", mergedConfig.Redis.OperationTimeoutMs)
+	}
+	if mergedConfig.Redis.Expiration != 60 {
+		t.Errorf("Expected Expiration 60, got %d", mergedConfig.Redis.Expiration)
+	}
+
+	// Verify test config was not affected
+	if mergedConfig.Test.MinClients != baseConfig.Test.MinClients {
+		t.Errorf("Expected MinClients %d, got %d", baseConfig.Test.MinClients, mergedConfig.Test.MinClients)
+	}
+}
+
 func TestMergeConfiguration_PartialOverrides(t *testing.T) {
 	baseConfig := &config.Config{
 		MetricsPort: 8081,

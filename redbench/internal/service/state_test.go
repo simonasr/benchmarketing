@@ -206,3 +206,73 @@ func TestGlobalState_ThreadSafety(t *testing.T) {
 
 	// If we reach here without panic, thread safety test passed
 }
+
+func TestStatusHandler_IdleConfigFilter(t *testing.T) {
+	// Test that StatusHandler filters out configuration when idle
+	baseConfig := &config.Config{
+		Debug: false,
+		Test: config.Test{
+			MinClients:      5,
+			MaxClients:      50,
+			RequestDelayMs:  1000,
+			StageIntervalMs: 2000,
+			KeySize:         15,
+			ValueSize:       20,
+		},
+		Redis: config.RedisConfig{
+			OperationTimeoutMs: 100,
+			Expiration:         20,
+		},
+	}
+
+	baseRedisConn := &config.RedisConnection{
+		URL: "redis://localhost:6379",
+	}
+
+	service := NewService(baseConfig, baseRedisConn, nil)
+
+	// Test initial idle state - should have no configuration
+	state := service.globalState.GetState()
+	if state.Status != StatusIdle {
+		t.Errorf("Expected status to be %s, got %s", StatusIdle, state.Status)
+	}
+
+	// Simulate StatusHandler behavior
+	if state.Status == StatusIdle {
+		state.Configuration = nil
+		state.RedisTarget = nil
+	}
+
+	if state.Configuration != nil {
+		t.Error("Configuration should be nil when idle")
+	}
+	if state.RedisTarget != nil {
+		t.Error("RedisTarget should be nil when idle")
+	}
+
+	// Start a benchmark
+	service.globalState.StartBenchmark(baseConfig, baseRedisConn)
+	state = service.globalState.GetState()
+	if state.Status != StatusRunning {
+		t.Errorf("Expected status to be %s, got %s", StatusRunning, state.Status)
+	}
+	if state.Configuration == nil {
+		t.Error("Configuration should be present when running")
+	}
+	if state.RedisTarget == nil {
+		t.Error("RedisTarget should be present when running")
+	}
+
+	// Stop the benchmark
+	service.globalState.StopBenchmark()
+	state = service.globalState.GetState()
+	if state.Status != StatusStopped {
+		t.Errorf("Expected status to be %s, got %s", StatusStopped, state.Status)
+	}
+	if state.Configuration == nil {
+		t.Error("Configuration should still be present when stopped")
+	}
+	if state.RedisTarget == nil {
+		t.Error("RedisTarget should still be present when stopped")
+	}
+}
