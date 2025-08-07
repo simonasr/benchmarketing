@@ -21,7 +21,6 @@ func TestMainIntegration(t *testing.T) {
 	configPath := filepath.Join(tempDir, "config.yaml")
 
 	configContent := `debug: true
-metrics_port: 9090
 test:
   min_clients: 1
   max_clients: 10

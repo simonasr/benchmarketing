@@ -30,7 +30,7 @@ type Controller struct {
 // NewController creates a new controller instance.
 func NewController(cfg *config.Config) *Controller {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	jobManager := NewJobManager(registry, cfg)
 
 	return &Controller{
 		registry:   registry,

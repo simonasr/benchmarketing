@@ -48,7 +48,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	}()
 
 	// Wait for controller to start
-	time.Sleep(CycleDelay)
+	time.Sleep(StartupDelay)
 
 	// Test controller health
 	controllerURL := fmt.Sprintf("http://localhost:%d", controllerPort)

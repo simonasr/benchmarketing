@@ -13,25 +13,21 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
-const (
-	// HTTPClientTimeout defines the timeout for HTTP requests to workers.
-	// This timeout is used for both job start and stop operations.
-	HTTPClientTimeout = 10 * time.Second
-)
-
 // JobManager manages coordinated benchmark jobs.
 type JobManager struct {
 	mu         sync.RWMutex
 	jobs       map[string]*Job
 	registry   *Registry
 	jobCounter int64
+	config     *config.Config
 }
 
 // NewJobManager creates a new job manager.
-func NewJobManager(registry *Registry) *JobManager {
+func NewJobManager(registry *Registry, cfg *config.Config) *JobManager {
 	return &JobManager{
 		jobs:     make(map[string]*Job),
 		registry: registry,
+		config:   cfg,
 	}
 }
 
@@ -285,7 +281,7 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 
 	// Send POST request to worker's /start endpoint
 	workerURL := fmt.Sprintf("http://%s:%d/start", worker.Address, worker.Port)
-	client := &http.Client{Timeout: HTTPClientTimeout}
+	client := &http.Client{Timeout: jm.config.Controller.HTTPTimeout()}
 
 	resp, err := client.Post(workerURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -313,7 +309,7 @@ func (jm *JobManager) stopJobOnWorker(workerID string) {
 
 	// Send DELETE request to worker's /stop endpoint
 	workerURL := fmt.Sprintf("http://%s:%d/stop", worker.Address, worker.Port)
-	client := &http.Client{Timeout: HTTPClientTimeout}
+	client := &http.Client{Timeout: jm.config.Controller.HTTPTimeout()}
 
 	req, err := http.NewRequest(http.MethodDelete, workerURL, nil)
 	if err != nil {

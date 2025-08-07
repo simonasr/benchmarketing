@@ -9,7 +9,10 @@ import (
 
 func TestNewJobManager(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	if jobManager == nil {
 		t.Fatal("NewJobManager returned nil")
@@ -24,7 +27,10 @@ func TestNewJobManager(t *testing.T) {
 
 func TestCreateJob(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Register some workers
 	for i := 1; i <= 3; i++ {
@@ -123,7 +129,10 @@ func TestCreateJob(t *testing.T) {
 
 func TestStartJob(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Register workers
 	for i := 1; i <= 2; i++ {
@@ -193,7 +202,10 @@ func TestStartJob(t *testing.T) {
 
 func TestStopJob(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Register workers
 	for i := 1; i <= 2; i++ {
@@ -258,7 +270,10 @@ func TestStopJob(t *testing.T) {
 
 func TestGetJob(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Test getting non-existent job
 	_, exists := jobManager.GetJob("non-existent")
@@ -302,7 +317,10 @@ func TestGetJob(t *testing.T) {
 
 func TestListJobs(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Test empty job list
 	jobs := jobManager.ListJobs()
@@ -353,7 +371,10 @@ func TestListJobs(t *testing.T) {
 
 func TestParseRedisTarget(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	tests := []struct {
 		name     string
@@ -405,7 +426,10 @@ func TestParseRedisTarget(t *testing.T) {
 
 func TestJobWorkflow(t *testing.T) {
 	registry := NewRegistry()
-	jobManager := NewJobManager(registry)
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
 
 	// Register workers
 	for i := 1; i <= 4; i++ {

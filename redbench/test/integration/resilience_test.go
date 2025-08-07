@@ -520,7 +520,7 @@ func TestGracefulShutdown(t *testing.T) {
 	time.Sleep(WorkerRegistrationWait)
 
 	// Verify controller is no longer responsive
-	client := &http.Client{Timeout: CycleDelay}
+	client := &http.Client{Timeout: QuickTimeoutCheck}
 	_, err = client.Get(fmt.Sprintf("%s/health", controllerURL))
 	if err == nil {
 		t.Error("Expected controller to be shut down")

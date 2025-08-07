@@ -40,6 +40,7 @@ const (
 	LongRunDuration        = 3 * time.Second         // Extended operations (long timeout tests)
 	WorkerRegistrationWait = 500 * time.Millisecond  // Time to wait for workers to register
 	ControllerRestartWait  = 1000 * time.Millisecond // Time to wait for controller restart operations
+	QuickTimeoutCheck      = 100 * time.Millisecond  // Quick HTTP timeout for responsiveness checks
 
 	// Test benchmark configuration - balanced for reliable CI execution
 	// and meaningful operation generation

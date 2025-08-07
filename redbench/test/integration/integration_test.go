@@ -74,8 +74,7 @@ func TestIntegrationWithRedis(t *testing.T) {
 func TestIntegrationWithConfig(t *testing.T) {
 	// Create a test config
 	cfg := &config.Config{
-		MetricsPort: 8080,
-		Debug:       true,
+		Debug: true,
 		Redis: config.RedisConfig{
 			Expiration:         30,
 			OperationTimeoutMs: 200,
