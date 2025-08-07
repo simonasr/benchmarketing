@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
@@ -27,6 +28,10 @@ func NewServer(port int, baseConfig *config.Config, redisConn *config.RedisConne
 	mux.HandleFunc("/status", service.StatusHandler)
 	mux.HandleFunc("/start", service.StartHandler)
 	mux.HandleFunc("/stop", service.StopHandler)
+
+	// Add metrics endpoint to the same server
+	promHandler := promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{})
+	mux.Handle("/metrics", promHandler)
 
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),

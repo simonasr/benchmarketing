@@ -11,9 +11,9 @@ scrape_configs:
   scheme: http
   static_configs:
   - targets:
-    - bench_redis8:8081
-    - bench_redis7:8081
-    - bench_valkey:8081
+    - bench_redis8:8080
+    - bench_redis7:8080
+    - bench_valkey:8080
 
 - job_name: redis_exporters
   honor_timestamps: true

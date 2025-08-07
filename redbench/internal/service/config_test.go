@@ -9,7 +9,7 @@ import (
 
 func TestMergeConfiguration_EmptyBody(t *testing.T) {
 	baseConfig := &config.Config{
-		MetricsPort: 8081,
+		MetricsPort: 8080,
 		Test: config.Test{
 			MinClients:      1,
 			MaxClients:      100,
@@ -36,7 +36,7 @@ func TestMergeConfiguration_EmptyBody(t *testing.T) {
 
 func TestMergeConfiguration_WithOverrides(t *testing.T) {
 	baseConfig := &config.Config{
-		MetricsPort: 8081,
+		MetricsPort: 8080,
 		Test: config.Test{
 			MinClients:      1,
 			MaxClients:      100,
@@ -131,7 +131,7 @@ func TestMergeConfiguration_WithRedisOverrides(t *testing.T) {
 
 func TestMergeConfiguration_PartialOverrides(t *testing.T) {
 	baseConfig := &config.Config{
-		MetricsPort: 8081,
+		MetricsPort: 8080,
 		Test: config.Test{
 			MinClients:      1,
 			MaxClients:      100,
@@ -181,7 +181,7 @@ func TestMergeConfiguration_InvalidJSON(t *testing.T) {
 
 func TestMergeConfiguration_NoTestOverrides(t *testing.T) {
 	baseConfig := &config.Config{
-		MetricsPort: 8081,
+		MetricsPort: 8080,
 		Test: config.Test{
 			MinClients: 1,
 			MaxClients: 100,
