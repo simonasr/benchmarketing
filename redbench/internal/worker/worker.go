@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,7 +24,7 @@ type Worker struct {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, controllerURL string, reg *prometheus.Registry) (*Worker, error) {
+func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, controllerURL string, bindAddress string, reg *prometheus.Registry) (*Worker, error) {
 	// Generate worker ID based on hostname and port
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -31,11 +32,26 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 	}
 	workerID := fmt.Sprintf("worker-%s-%d", hostname, port)
 
+	// Determine appropriate address for worker registration
+	var address string
+	if bindAddress != "" {
+		// Use explicitly provided bind address
+		address = bindAddress
+	} else {
+		// Auto-detect address based on environment
+		address = hostname
+		// Use localhost for local development/testing
+		// This helps with hostname resolution issues in test setups
+		if strings.Contains(controllerURL, "localhost") || strings.Contains(controllerURL, "127.0.0.1") {
+			address = "localhost"
+		}
+	}
+
 	// Create the service server (reusing existing service logic)
 	server := service.NewServer(port, cfg, redisConn, reg)
 
 	// Create registration client
-	regClient := NewRegistrationClient(controllerURL, workerID, hostname, port)
+	regClient := NewRegistrationClient(controllerURL, workerID, address, port)
 
 	return &Worker{
 		server:    server,

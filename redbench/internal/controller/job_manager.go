@@ -1,7 +1,11 @@
 package controller
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -124,6 +128,9 @@ func (jm *JobManager) StartJob(jobID string) error {
 			// Log error but continue with other workers
 			continue
 		}
+
+		// Send job assignment to worker
+		go jm.sendJobToWorker(assignment.WorkerID, job.Config, assignment.RedisConfig)
 	}
 
 	return nil
@@ -152,6 +159,9 @@ func (jm *JobManager) StopJob(jobID string) error {
 	for i := range job.Assignments {
 		assignment := &job.Assignments[i]
 		assignment.Status = "stopped"
+
+		// Send stop request to worker
+		go jm.stopJobOnWorker(assignment.WorkerID)
 
 		// Update worker status in registry
 		if err := jm.registry.UpdateWorkerStatus(assignment.WorkerID, "idle"); err != nil {
@@ -216,4 +226,79 @@ func (jm *JobManager) parseRedisTarget(redisURL string) (*config.RedisConnection
 	}
 
 	return redisConfig, nil
+}
+
+// sendJobToWorker sends a job assignment to a specific worker.
+func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
+	// Get worker details from registry
+	worker, exists := jm.registry.GetWorker(workerID)
+	if !exists {
+		slog.Error("Worker not found", "worker_id", workerID)
+		return
+	}
+
+	// Create start request payload
+	startRequest := map[string]interface{}{
+		"config": jobConfig,
+		"redis":  redisConfig,
+	}
+
+	// Marshal request
+	jsonData, err := json.Marshal(startRequest)
+	if err != nil {
+		slog.Error("Failed to marshal job assignment", "worker_id", workerID, "error", err)
+		return
+	}
+
+	// Send POST request to worker's /start endpoint
+	workerURL := fmt.Sprintf("http://%s:%d/start", worker.Address, worker.Port)
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Post(workerURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		slog.Error("Failed to send job to worker", "worker_id", workerID, "url", workerURL, "error", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		slog.Error("Worker rejected job assignment", "worker_id", workerID, "status", resp.StatusCode)
+		return
+	}
+
+	slog.Info("Job assignment sent to worker", "worker_id", workerID, "url", workerURL)
+}
+
+// stopJobOnWorker sends a stop request to a specific worker.
+func (jm *JobManager) stopJobOnWorker(workerID string) {
+	// Get worker details from registry
+	worker, exists := jm.registry.GetWorker(workerID)
+	if !exists {
+		slog.Error("Worker not found for stop", "worker_id", workerID)
+		return
+	}
+
+	// Send DELETE request to worker's /stop endpoint
+	workerURL := fmt.Sprintf("http://%s:%d/stop", worker.Address, worker.Port)
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	req, err := http.NewRequest(http.MethodDelete, workerURL, nil)
+	if err != nil {
+		slog.Error("Failed to create stop request", "worker_id", workerID, "error", err)
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Error("Failed to send stop to worker", "worker_id", workerID, "url", workerURL, "error", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("Worker failed to stop", "worker_id", workerID, "status", resp.StatusCode)
+		return
+	}
+
+	slog.Info("Stop signal sent to worker", "worker_id", workerID, "url", workerURL)
 }

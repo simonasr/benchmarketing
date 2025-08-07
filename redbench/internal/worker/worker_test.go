@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestNewWorker(t *testing.T) {
 	}
 	reg := prometheus.NewRegistry()
 
-	worker, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", reg)
+	worker, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
 	if err != nil {
 		t.Fatalf("Unexpected error creating worker: %v", err)
 	}
@@ -49,8 +50,8 @@ func TestWorkerIDGeneration(t *testing.T) {
 	reg := prometheus.NewRegistry()
 
 	// Create multiple workers with same parameters
-	worker1, _ := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", reg)
-	worker2, _ := NewWorker(cfg, redisConn, 8081, "http://localhost:8081", reg)
+	worker1, _ := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
+	worker2, _ := NewWorker(cfg, redisConn, 8081, "http://localhost:8081", "", reg)
 
 	// Worker IDs should be different (include port)
 	if worker1.workerID == worker2.workerID {
@@ -95,7 +96,7 @@ func TestWorkerStartRegistration(t *testing.T) {
 	}
 	reg := prometheus.NewRegistry()
 
-	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, reg)
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -124,6 +125,61 @@ func TestWorkerStartRegistration(t *testing.T) {
 	}
 }
 
+func TestWorkerBindAddressOption(t *testing.T) {
+	cfg := &config.Config{
+		Test: config.Test{MinClients: 1, MaxClients: 10},
+	}
+	redisConn := &config.RedisConnection{
+		URL: "redis://localhost:6379",
+	}
+	reg := prometheus.NewRegistry()
+
+	// Test 1: Auto-detection with localhost controller
+	worker1, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	// Should use localhost for local development
+	if worker1.regClient.workerAddress != "localhost" {
+		t.Errorf("Expected localhost address in local development, got %s", worker1.regClient.workerAddress)
+	}
+
+	// Test 2: Explicit bind address overrides auto-detection
+	worker2, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "10.1.2.3", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with explicit bind address: %v", err)
+	}
+
+	// Should use explicit bind address
+	if worker2.regClient.workerAddress != "10.1.2.3" {
+		t.Errorf("Expected explicit bind address 10.1.2.3, got %s", worker2.regClient.workerAddress)
+	}
+
+	// Test 3: Auto-detection with remote controller
+	worker3, err := NewWorker(cfg, redisConn, 8080, "http://redbench-controller:8081", "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with remote controller URL: %v", err)
+	}
+
+	// Should use actual hostname for remote controller
+	hostname, _ := os.Hostname()
+	if worker3.regClient.workerAddress != hostname {
+		t.Errorf("Expected hostname %s with remote controller, got %s", hostname, worker3.regClient.workerAddress)
+	}
+
+	// Test 4: Explicit bind address with remote controller
+	worker4, err := NewWorker(cfg, redisConn, 8080, "http://redbench-controller:8081", "192.168.1.100", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with explicit bind address and remote controller: %v", err)
+	}
+
+	// Should use explicit bind address regardless of controller URL
+	if worker4.regClient.workerAddress != "192.168.1.100" {
+		t.Errorf("Expected explicit bind address 192.168.1.100, got %s", worker4.regClient.workerAddress)
+	}
+}
+
 func TestWorkerStartRegistrationFailure(t *testing.T) {
 	// Create mock controller that rejects registration
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +194,7 @@ func TestWorkerStartRegistrationFailure(t *testing.T) {
 	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
 	reg := prometheus.NewRegistry()
 
-	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, reg)
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -161,7 +217,7 @@ func TestWorkerStartControllerUnavailable(t *testing.T) {
 	reg := prometheus.NewRegistry()
 
 	// Use invalid controller URL
-	worker, err := NewWorker(cfg, redisConn, 8080, "http://invalid-url:99999", reg)
+	worker, err := NewWorker(cfg, redisConn, 8080, "http://invalid-url:99999", "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -205,7 +261,7 @@ func TestWorkerConfiguration(t *testing.T) {
 			redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
 			reg := prometheus.NewRegistry()
 
-			worker, err := NewWorker(cfg, redisConn, tt.port, tt.controllerURL, reg)
+			worker, err := NewWorker(cfg, redisConn, tt.port, tt.controllerURL, "", reg)
 
 			if tt.expectedWorker {
 				if err != nil {

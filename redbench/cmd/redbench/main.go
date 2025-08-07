@@ -26,6 +26,7 @@ func main() {
 	mode := flag.String("mode", "", "Execution mode: 'controller' or 'worker'")
 	port := flag.Int("port", 0, "Port for controller or worker (default: 8081 for controller, 8080 for worker)")
 	controllerURL := flag.String("controller", "", "Controller URL for worker mode (e.g., http://localhost:8081)")
+	bindAddress := flag.String("bind-address", "", "Address for worker to register with controller (defaults to hostname)")
 	flag.Parse()
 
 	// Set up slog to use JSON output
@@ -72,7 +73,7 @@ func main() {
 	case *mode == "controller":
 		runControllerMode(cfg, *port, reg)
 	case *mode == "worker":
-		runWorkerMode(cfg, redisConn, *port, *controllerURL, reg)
+		runWorkerMode(cfg, redisConn, *port, *controllerURL, *bindAddress, reg)
 	case *serviceMode:
 		// Run in service mode (metrics served on same port as API)
 		runServiceMode(cfg, redisConn, reg)
@@ -179,7 +180,7 @@ func runControllerMode(cfg *config.Config, port int, reg *prometheus.Registry) {
 }
 
 // runWorkerMode starts the worker with controller registration.
-func runWorkerMode(cfg *config.Config, redisConn *config.RedisConnection, port int, controllerURL string, reg *prometheus.Registry) {
+func runWorkerMode(cfg *config.Config, redisConn *config.RedisConnection, port int, controllerURL string, bindAddress string, reg *prometheus.Registry) {
 	if port == 0 {
 		port = 8080 // Default worker port
 	}
@@ -192,7 +193,7 @@ func runWorkerMode(cfg *config.Config, redisConn *config.RedisConnection, port i
 	slog.Info("Starting worker mode", "port", port, "controller", controllerURL)
 
 	// Create worker instance
-	workerInstance, err := worker.NewWorker(cfg, redisConn, port, controllerURL, reg)
+	workerInstance, err := worker.NewWorker(cfg, redisConn, port, controllerURL, bindAddress, reg)
 	if err != nil {
 		slog.Error("Failed to create worker", "error", err)
 		os.Exit(1)

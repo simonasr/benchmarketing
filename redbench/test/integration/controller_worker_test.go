@@ -64,7 +64,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 
 	// Create worker
 	workerPort := 18080
-	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, reg)
+	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}

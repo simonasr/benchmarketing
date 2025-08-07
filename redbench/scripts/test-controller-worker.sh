@@ -45,6 +45,9 @@ WORKER1_PID=$!
 ./redbench --mode=worker --port=8082 --controller=http://localhost:8081 &
 WORKER2_PID=$!
 
+# Example with explicit bind address (useful for Kubernetes)
+# ./redbench --mode=worker --port=8080 --controller=http://localhost:8081 --bind-address=192.168.1.100 &
+
 # Wait for workers to register
 sleep 3
 

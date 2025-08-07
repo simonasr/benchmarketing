@@ -41,7 +41,19 @@ RedBench now supports centralized control with a controller-worker architecture.
 ./redbench --mode=worker --port=8080 --controller=http://localhost:8081
 ./redbench --mode=worker --port=8082 --controller=http://localhost:8081
 ./redbench --mode=worker --port=8083 --controller=http://localhost:8081
+
+# Kubernetes deployment with explicit bind address
+./redbench --mode=worker --port=8080 --controller=http://controller:8081 --bind-address=$POD_IP
+
+# Local development with custom bind address
+./redbench --mode=worker --port=8080 --controller=http://localhost:8081 --bind-address=192.168.1.100
 ```
+
+#### Worker Address Registration
+
+Workers automatically determine their registration address:
+- **Auto-detect**: Uses hostname by default, or `localhost` for local development (when controller URL contains `localhost`)
+- **Explicit**: Use `--bind-address` to override auto-detection (recommended for Kubernetes deployments)
 
 ### 3. Manage Jobs via Controller API
 
