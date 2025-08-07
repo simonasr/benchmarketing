@@ -183,7 +183,7 @@ curl -X POST http://localhost:8080/start \
 {
   "status": "running",
   "configuration": {
-    "MetricsPort": 8081,
+    "MetricsPort": 8080,
     "Debug": false,
     "Redis": { ... },
     "Test": { ... }
@@ -219,11 +219,11 @@ Redis connection requires either URL or ClusterURL to be specified
 
 ### Prometheus Metrics
 
-Metrics are available at `http://localhost:8081/metrics`:
+Metrics are available at `http://localhost:8080/metrics` (unified port for both CLI and service modes):
 
 ```bash
 # View all redbench metrics
-curl http://localhost:8081/metrics | grep redbench
+curl http://localhost:8080/metrics | grep redbench
 ```
 
 Key metrics:
@@ -314,9 +314,9 @@ GitHub Actions automatically runs:
    - Check server name matches certificate
    - Use `insecureSkipVerify: true` only for testing
 
-3. **Service mode port conflicts**
-   - Change API port: `API_PORT=9090 ./redbench -service`
-   - Change metrics port in `config.yaml`
+3. **Port conflicts**
+   - Change API/metrics port: `API_PORT=9090 ./redbench -service`
+   - Both API and metrics now use the same unified port (8080 by default)
 
 ### Debug Mode
 

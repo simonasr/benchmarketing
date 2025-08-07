@@ -15,7 +15,7 @@ func TestLoadConfig(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	configContent := `
-metricsPort: 8081
+metricsPort: 8080
 debug: true
 redis:
   expirationS: 30
@@ -37,7 +37,7 @@ test:
 	require.NoError(t, err)
 
 	// Verify config values
-	assert.Equal(t, 8081, cfg.MetricsPort)
+	assert.Equal(t, 8080, cfg.MetricsPort)
 	assert.True(t, cfg.Debug)
 	assert.Equal(t, int32(30), cfg.Redis.Expiration)
 	assert.Equal(t, 100, cfg.Redis.OperationTimeoutMs)
@@ -56,7 +56,7 @@ func TestLoadConfigWithEnvOverrides(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	configContent := `
-metricsPort: 8081
+metricsPort: 8080
 debug: true
 redis:
   expirationS: 30

@@ -61,13 +61,15 @@ func main() {
 
 	// Initialize metrics registry (shared by both modes)
 	reg := prometheus.NewRegistry()
-	metrics.StartPrometheusServer(cfg.MetricsPort, reg)
 
 	if *serviceMode {
-		// Run in service mode
+		// Run in service mode (metrics served on same port as API)
 		runServiceMode(cfg, redisConn, reg)
 	} else {
-		// Run in traditional CLI mode - initialize Redis client and metrics for single run
+		// Run in traditional CLI mode - start metrics server on port 8080
+		metrics.StartPrometheusServer(8080, reg)
+
+		// Initialize Redis client and metrics for single run
 		redisClient, err := redis.NewRedisClient(redisConn)
 		if err != nil {
 			slog.Error("Failed to initialize Redis client", "error", err)
