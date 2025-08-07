@@ -31,21 +31,18 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 	}
 
 	// Configure for quick benchmarks
-	cfg.Test.MinClients = 1
-	cfg.Test.MaxClients = 3
-	cfg.Test.StageIntervalMs = 300 // Short stages
-	cfg.Test.RequestDelayMs = 10   // Quick requests
+	ConfigureNormalBenchmark(cfg)
 
 	// Create Redis connection pointing to miniredis
 	redisConn := &config.RedisConnection{
 		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
-		TargetLabel: "mock-redis",
+		TargetLabel: MockRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
 
 	// Start controller
-	controllerPort := 18120
+	controllerPort := RepeatedLifecycleControllerPort
 	controllerServer := controller.NewServer(controllerPort, cfg, reg)
 	controllerURL := fmt.Sprintf("http://localhost:%d", controllerPort)
 
@@ -58,11 +55,10 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start worker
-	workerPort := 18121
-	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, "", reg)
+	workerInstance, err := worker.NewWorker(cfg, redisConn, RepeatedLifecycleWorkerPort, controllerURL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -73,7 +69,7 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Verify worker is registered
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -93,13 +89,12 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 	}
 
 	// Run multiple benchmark cycles
-	cycles := 3
-	for cycle := 1; cycle <= cycles; cycle++ {
-		t.Logf("=== Starting benchmark cycle %d/%d ===", cycle, cycles)
+	for cycle := 1; cycle <= DefaultTestCycles; cycle++ {
+		t.Logf("=== Starting benchmark cycle %d/%d ===", cycle, DefaultTestCycles)
 
 		// Clear Redis before each cycle
 		mockRedis.FlushAll()
-		mockRedis.Set("cycle-marker", fmt.Sprintf("cycle-%d", cycle))
+		mockRedis.Set(CycleMarkerKey, fmt.Sprintf("cycle-%d", cycle))
 
 		// Get initial metrics snapshot
 		initialMetrics := capturePrometheusMetrics(t, reg)
@@ -115,12 +110,12 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 			},
 			"config": map[string]interface{}{
 				"test": map[string]interface{}{
-					"minClients":      1,
-					"maxClients":      3,
-					"stageIntervalMs": 300,
-					"requestDelayMs":  10,
-					"keySize":         8,
-					"valueSize":       16,
+					"minClients":      TestMinClients,
+					"maxClients":      TestMaxClientsMedium,
+					"stageIntervalMs": TestStageIntervalNormal,
+					"requestDelayMs":  TestRequestDelayFast,
+					"keySize":         TestKeySize,
+					"valueSize":       TestValueSizeNormal,
 				},
 			},
 		}
@@ -145,7 +140,7 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		t.Logf("Cycle %d - Job started with ID: %s", cycle, jobID)
 
 		// Let benchmark run for a bit
-		time.Sleep(800 * time.Millisecond)
+		time.Sleep(BenchmarkRunDuration)
 
 		// Verify benchmark is running and performing operations
 		commandCount := mockRedis.CommandCount()
@@ -172,7 +167,7 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 			t.Logf("Cycle %d - Job stop returned status %d (may be already completed)", cycle, stopResp.StatusCode)
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(StartupDelay)
 
 		// Verify job is stopped
 		statusResp, err := http.Get(fmt.Sprintf("%s/job/status", controllerURL))
@@ -213,10 +208,10 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		verifyMetricsBehavior(t, cycle, initialMetrics, finalMetrics)
 
 		// Verify Redis state
-		if !mockRedis.Exists("cycle-marker") {
+		if !mockRedis.Exists(CycleMarkerKey) {
 			t.Errorf("Cycle %d - Cycle marker was lost", cycle)
 		} else {
-			cycleMarker, _ := mockRedis.Get("cycle-marker")
+			cycleMarker, _ := mockRedis.Get(CycleMarkerKey)
 			if cycleMarker != fmt.Sprintf("cycle-%d", cycle) {
 				t.Errorf("Cycle %d - Cycle marker corrupted: expected 'cycle-%d', got '%s'", cycle, cycle, cycleMarker)
 			}
@@ -225,7 +220,7 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		keys := mockRedis.Keys()
 		benchmarkKeys := 0
 		for _, key := range keys {
-			if key != "cycle-marker" {
+			if key != CycleMarkerKey {
 				benchmarkKeys++
 			}
 		}
@@ -238,14 +233,14 @@ func TestRepeatedBenchmarkLifecycle(t *testing.T) {
 		t.Logf("=== Cycle %d completed successfully ===", cycle)
 
 		// Small delay between cycles
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(CycleDelay)
 	}
 
-	t.Logf("All %d benchmark cycles completed successfully", cycles)
+	t.Logf("All %d benchmark cycles completed successfully", DefaultTestCycles)
 
 	// Cleanup
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 }
 
 // capturePrometheusMetrics captures a snapshot of current metrics values.

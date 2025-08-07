@@ -27,7 +27,7 @@ func TestMultiWorkerJobDistribution(t *testing.T) {
 	// Create test Redis connection
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	// Create metrics registry
@@ -49,7 +49,7 @@ func TestMultiWorkerJobDistribution(t *testing.T) {
 	}()
 
 	// Wait for controller to start
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Verify controller health
 	resp, err := http.Get(fmt.Sprintf("%s/health", controllerURL))
@@ -208,7 +208,7 @@ func TestMultiWorkerJobDistribution(t *testing.T) {
 	}
 
 	// Wait for job to stop
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Verify all workers are available again
 	resp, err = http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -230,7 +230,7 @@ func TestMultiWorkerJobDistribution(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 }
 
 // TestInsufficientWorkers tests job creation when there aren't enough workers.
@@ -243,7 +243,7 @@ func TestInsufficientWorkers(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
@@ -262,7 +262,7 @@ func TestInsufficientWorkers(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start only 2 workers
 	numWorkers := 2
@@ -281,7 +281,7 @@ func TestInsufficientWorkers(t *testing.T) {
 		}(workerInstance)
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Try to create a job that requires 3 workers (more than available)
 	jobReq := map[string]interface{}{
@@ -313,7 +313,7 @@ func TestInsufficientWorkers(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 }
 
 // TestConcurrentJobCreation tests handling of concurrent job creation requests.
@@ -326,7 +326,7 @@ func TestConcurrentJobCreation(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
@@ -345,7 +345,7 @@ func TestConcurrentJobCreation(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start 2 workers
 	numWorkers := 2
@@ -364,7 +364,7 @@ func TestConcurrentJobCreation(t *testing.T) {
 		}(workerInstance)
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Create job request that uses all workers
 	jobReq := map[string]interface{}{
@@ -419,5 +419,5 @@ func TestConcurrentJobCreation(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 }

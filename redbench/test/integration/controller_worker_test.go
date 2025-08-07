@@ -27,7 +27,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	// Create test Redis connection (optional for this test)
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	// Create metrics registry
@@ -48,7 +48,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	}()
 
 	// Wait for controller to start
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 
 	// Test controller health
 	controllerURL := fmt.Sprintf("http://localhost:%d", controllerPort)
@@ -77,7 +77,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	}()
 
 	// Wait for worker to register
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Test worker listing
 	resp, err = http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -147,7 +147,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 
 	t.Log("Controller-Worker integration test completed successfully")
 }

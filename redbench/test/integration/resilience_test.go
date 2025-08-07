@@ -26,7 +26,7 @@ func TestWorkerDisconnectionDuringJob(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
@@ -45,7 +45,7 @@ func TestWorkerDisconnectionDuringJob(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start multiple workers
 	numWorkers := 3
@@ -144,7 +144,7 @@ func TestWorkerDisconnectionDuringJob(t *testing.T) {
 	t.Log("Simulating worker failure by stopping worker 1")
 	workerCancels[1]() // Stop worker 1
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Check worker count - should be reduced
 	resp, err = http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -207,7 +207,7 @@ func TestWorkerDisconnectionDuringJob(t *testing.T) {
 		}
 	}
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 }
 
 // TestControllerRestart tests worker behavior when controller restarts.
@@ -220,7 +220,7 @@ func TestControllerRestart(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	// Start initial controller
@@ -238,7 +238,7 @@ func TestControllerRestart(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start workers pointing to controller
 	numWorkers := 2
@@ -290,7 +290,7 @@ func TestControllerRestart(t *testing.T) {
 	// Simulate controller restart
 	t.Log("Restarting controller...")
 	cancel1()
-	time.Sleep(200 * time.Millisecond) // Wait for first controller to stop
+	time.Sleep(StartupDelay) // Wait for first controller to stop
 
 	// Start new controller on same port
 	reg3 := prometheus.NewRegistry()
@@ -305,7 +305,7 @@ func TestControllerRestart(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Wait for workers to potentially re-register (this depends on implementation)
 	// In a production system, workers might need retry logic to re-register
@@ -336,7 +336,7 @@ func TestControllerRestart(t *testing.T) {
 	// Cleanup
 	workerCancel()
 	cancel2()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 }
 
 // TestNetworkPartitionRecovery tests behavior during network connectivity issues.
@@ -351,7 +351,7 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
@@ -370,7 +370,7 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start worker
 	workerPort := 18114
@@ -385,7 +385,7 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Verify normal operation
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -428,7 +428,7 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 	// (This is more complex to simulate without actual network manipulation)
 
 	// For now, verify that controller doesn't crash when workers disconnect
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 
 	// Controller should still be responsive
 	resp, err = http.Get(fmt.Sprintf("%s/health", controllerURL))
@@ -445,7 +445,7 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 }
 
 // TestGracefulShutdown tests clean shutdown behavior.
@@ -458,7 +458,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	redisConn := &config.RedisConnection{
 		URL:         "redis://localhost:6379",
-		TargetLabel: "test-redis",
+		TargetLabel: TestRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
@@ -476,7 +476,7 @@ func TestGracefulShutdown(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start worker
 	workerPort := 18117
@@ -491,7 +491,7 @@ func TestGracefulShutdown(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Verify worker registered
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -520,7 +520,7 @@ func TestGracefulShutdown(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Verify controller is no longer responsive
-	client := &http.Client{Timeout: 100 * time.Millisecond}
+	client := &http.Client{Timeout: CycleDelay}
 	_, err = client.Get(fmt.Sprintf("%s/health", controllerURL))
 	if err == nil {
 		t.Error("Expected controller to be shut down")

@@ -32,21 +32,20 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 	}
 
 	// Override test configuration for short benchmark
-	cfg.Test.MinClients = 1
-	cfg.Test.MaxClients = 2
-	cfg.Test.StageIntervalMs = 100 // Very short intervals
-	cfg.Test.RequestDelayMs = 10   // Very quick requests to generate more operations
+	ConfigureQuickBenchmark(cfg)
+	// Override to very short intervals for faster test
+	cfg.Test.StageIntervalMs = 100
 
 	// Create Redis connection pointing to miniredis server
 	redisConn := &config.RedisConnection{
 		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
-		TargetLabel: "mock-redis",
+		TargetLabel: MockRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
 
 	// Start controller
-	controllerPort := 18102
+	controllerPort := MockRedisControllerPort
 	controllerServer := controller.NewServer(controllerPort, cfg, reg)
 	controllerURL := fmt.Sprintf("http://localhost:%d", controllerPort)
 
@@ -59,10 +58,10 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start worker
-	workerPort := 18103
+	workerPort := MockRedisWorkerPort
 	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
@@ -74,7 +73,7 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Verify worker is registered and available
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -103,8 +102,8 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 		},
 		"config": map[string]interface{}{
 			"test": map[string]interface{}{
-				"minClients":      1,
-				"maxClients":      2,
+				"minClients":      TestMinClients,
+				"maxClients":      TestMaxClientsSmall,
 				"stageIntervalMs": 500, // 500ms stages (longer to ensure operations)
 				"requestDelayMs":  50,  // 50ms between requests
 				"keySize":         10,
@@ -197,7 +196,7 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 	}
 
 	// Wait for job to stop
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Verify job is stopped
 	resp, err = http.Get(fmt.Sprintf("%s/job/status", controllerURL))
@@ -266,7 +265,7 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 }
 
 // TestJobTimeoutBehavior tests job behavior with different timeout scenarios.
@@ -281,10 +280,10 @@ func TestJobTimeoutBehavior(t *testing.T) {
 	}
 
 	// Configure for very short benchmark that should complete quickly
-	cfg.Test.MinClients = 1
-	cfg.Test.MaxClients = 1
-	cfg.Test.StageIntervalMs = 50  // 50ms stages
-	cfg.Test.RequestDelayMs = 1000 // 1 second between requests (should only make a few)
+	ConfigureQuickBenchmark(cfg)
+	cfg.Test.MaxClients = TestMinClients // Single client for timeout test
+	cfg.Test.StageIntervalMs = 50        // 50ms stages
+	cfg.Test.RequestDelayMs = 1000       // 1 second between requests (should only make a few)
 
 	redisConn := &config.RedisConnection{
 		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
@@ -294,9 +293,8 @@ func TestJobTimeoutBehavior(t *testing.T) {
 	reg := prometheus.NewRegistry()
 
 	// Start controller
-	controllerPort := 18104
-	controllerServer := controller.NewServer(controllerPort, cfg, reg)
-	controllerURL := fmt.Sprintf("http://localhost:%d", controllerPort)
+	controllerServer := controller.NewServer(MockRedisTimeoutControllerPort, cfg, reg)
+	controllerURL := fmt.Sprintf("http://localhost:%d", MockRedisTimeoutControllerPort)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -307,11 +305,10 @@ func TestJobTimeoutBehavior(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
 	// Start worker
-	workerPort := 18105
-	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, "", reg)
+	workerInstance, err := worker.NewWorker(cfg, redisConn, MockRedisTimeoutWorkerPort, controllerURL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -322,7 +319,7 @@ func TestJobTimeoutBehavior(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(RegistrationDelay)
 
 	// Create a very short job that should complete naturally
 	jobReq := map[string]interface{}{
@@ -333,10 +330,10 @@ func TestJobTimeoutBehavior(t *testing.T) {
 			},
 		},
 		"config": map[string]interface{}{
-			"minClients":      1,
-			"maxClients":      1,
-			"stageIntervalMs": 100,  // Short stages
-			"requestDelayMs":  2000, // Long delays = few requests
+			"minClients":      TestMinClients,
+			"maxClients":      TestMinClients, // Single client for quick test
+			"stageIntervalMs": 100,            // Short stages
+			"requestDelayMs":  2000,           // Long delays = few requests
 			"keySize":         5,
 			"valueSize":       5,
 		},
@@ -381,5 +378,5 @@ func TestJobTimeoutBehavior(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(CycleDelay)
 }

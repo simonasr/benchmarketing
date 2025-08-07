@@ -29,22 +29,18 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 	}
 
 	// Configure for quick benchmarks
-	cfg.Test.MinClients = 1
-	cfg.Test.MaxClients = 2
-	cfg.Test.StageIntervalMs = 200 // Short stages
-	cfg.Test.RequestDelayMs = 20   // Quick requests
+	ConfigureQuickBenchmark(cfg)
 
 	// Create Redis connection pointing to miniredis
 	redisConn := &config.RedisConnection{
 		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
-		TargetLabel: "mock-redis",
+		TargetLabel: MockRedisLabel,
 	}
 
 	reg := prometheus.NewRegistry()
 
 	// Start service
-	servicePort := 18125
-	server := service.NewServer(servicePort, cfg, redisConn, reg)
+	server := service.NewServer(ServiceLifecyclePort, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,9 +51,9 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(StartupDelay)
 
-	serviceURL := fmt.Sprintf("http://localhost:%d", servicePort)
+	serviceURL := fmt.Sprintf("http://localhost:%d", ServiceLifecyclePort)
 
 	// Test initial status
 	resp, err := http.Get(fmt.Sprintf("%s/status", serviceURL))
@@ -77,13 +73,12 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 	}
 
 	// Run multiple start/stop cycles
-	cycles := 3
-	for cycle := 1; cycle <= cycles; cycle++ {
-		t.Logf("=== Starting service benchmark cycle %d/%d ===", cycle, cycles)
+	for cycle := 1; cycle <= DefaultTestCycles; cycle++ {
+		t.Logf("=== Starting service benchmark cycle %d/%d ===", cycle, DefaultTestCycles)
 
 		// Clear Redis before each cycle
 		mockRedis.FlushAll()
-		mockRedis.Set("service-cycle", fmt.Sprintf("cycle-%d", cycle))
+		mockRedis.Set(ServiceCycleKey, fmt.Sprintf("cycle-%d", cycle))
 
 		// Prepare start request
 		startReq := map[string]interface{}{
@@ -128,7 +123,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 		t.Logf("Cycle %d - Benchmark started successfully", cycle)
 
 		// Let benchmark run for a bit
-		time.Sleep(600 * time.Millisecond)
+		time.Sleep(ServiceRunDuration)
 
 		// Check if benchmark is actually running and performing operations
 		statusResp, err := http.Get(fmt.Sprintf("%s/status", serviceURL))
@@ -305,7 +300,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 		}
 	}
 
-	t.Logf("All %d service benchmark cycles + state reset test completed successfully", cycles)
+	t.Logf("All %d service benchmark cycles + state reset test completed successfully", DefaultTestCycles)
 
 	// Cleanup
 	cancel()
