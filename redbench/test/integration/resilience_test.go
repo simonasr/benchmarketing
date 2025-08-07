@@ -73,7 +73,7 @@ func TestWorkerDisconnectionDuringJob(t *testing.T) {
 		}(workerInstance, workerCtx)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(WorkerRegistrationWait)
 
 	// Verify all workers are registered
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -266,7 +266,7 @@ func TestControllerRestart(t *testing.T) {
 		}(w)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(WorkerRegistrationWait)
 
 	// Verify workers registered with first controller
 	resp, err := http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -309,7 +309,7 @@ func TestControllerRestart(t *testing.T) {
 
 	// Wait for workers to potentially re-register (this depends on implementation)
 	// In a production system, workers might need retry logic to re-register
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(ControllerRestartWait)
 
 	// Check if workers re-registered with new controller
 	resp, err = http.Get(fmt.Sprintf("%s/workers", controllerURL))
@@ -517,7 +517,7 @@ func TestGracefulShutdown(t *testing.T) {
 	cancel()
 
 	// Wait for clean shutdown
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(WorkerRegistrationWait)
 
 	// Verify controller is no longer responsive
 	client := &http.Client{Timeout: CycleDelay}

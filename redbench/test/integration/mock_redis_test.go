@@ -172,7 +172,7 @@ func TestJobLifecycleWithMockRedis(t *testing.T) {
 	}
 
 	// Let the job run longer to generate some commands
-	time.Sleep(3 * time.Second)
+	time.Sleep(LongRunDuration)
 
 	// Debug: Check if miniredis is receiving any connections at all
 	t.Logf("Current miniredis connections: %d", mockRedis.CurrentConnectionCount())
@@ -352,7 +352,7 @@ func TestJobTimeoutBehavior(t *testing.T) {
 	}
 
 	// Let it run for a short time
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(WorkerRegistrationWait)
 
 	// Check if job completed naturally or is still running
 	resp, err = http.Get(fmt.Sprintf("%s/job/status", controllerURL))

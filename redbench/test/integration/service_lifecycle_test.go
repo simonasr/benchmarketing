@@ -176,7 +176,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 			t.Logf("Cycle %d - Benchmark already completed naturally", cycle)
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(ShutdownDelay)
 
 		// Verify final status
 		finalResp, err := http.Get(fmt.Sprintf("%s/status", serviceURL))
@@ -230,7 +230,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 		t.Logf("=== Service cycle %d completed successfully ===", cycle)
 
 		// Small delay between cycles
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(CycleDelay)
 	}
 
 	// Test that we can start again after multiple cycles (state reset test)
@@ -280,7 +280,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 	t.Log("Final benchmark started successfully - state reset verified")
 
-	time.Sleep(400 * time.Millisecond)
+	time.Sleep(FinalTestDuration)
 
 	// Check final operations
 	finalCommandCount := mockRedis.CommandCount()
@@ -304,5 +304,5 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 	// Cleanup
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(ShutdownDelay)
 }

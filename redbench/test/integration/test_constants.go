@@ -30,14 +30,16 @@ const (
 
 	// Test timeouts and delays - carefully chosen based on CI environment testing
 	// and actual system behavior observation
-	StartupDelay         = 200 * time.Millisecond // HTTP server initialization time
-	RegistrationDelay    = 300 * time.Millisecond // Worker registration + initial handshake
-	ShutdownDelay        = 200 * time.Millisecond // Graceful shutdown completion
-	CycleDelay           = 100 * time.Millisecond // Brief pause between test cycles
-	BenchmarkRunDuration = 800 * time.Millisecond // Min time for meaningful benchmark ops
-	ServiceRunDuration   = 600 * time.Millisecond // Service mode benchmark duration
-	FinalTestDuration    = 400 * time.Millisecond // Final validation runs
-	LongRunDuration      = 3 * time.Second        // Extended operations (long timeout tests)
+	StartupDelay           = 200 * time.Millisecond  // HTTP server initialization time
+	RegistrationDelay      = 300 * time.Millisecond  // Worker registration + initial handshake
+	ShutdownDelay          = 200 * time.Millisecond  // Graceful shutdown completion
+	CycleDelay             = 100 * time.Millisecond  // Brief pause between test cycles
+	BenchmarkRunDuration   = 800 * time.Millisecond  // Min time for meaningful benchmark ops
+	ServiceRunDuration     = 600 * time.Millisecond  // Service mode benchmark duration
+	FinalTestDuration      = 400 * time.Millisecond  // Final validation runs
+	LongRunDuration        = 3 * time.Second         // Extended operations (long timeout tests)
+	WorkerRegistrationWait = 500 * time.Millisecond  // Time to wait for workers to register
+	ControllerRestartWait  = 1000 * time.Millisecond // Time to wait for controller restart operations
 
 	// Test benchmark configuration - balanced for reliable CI execution
 	// and meaningful operation generation

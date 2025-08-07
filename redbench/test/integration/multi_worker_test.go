@@ -82,7 +82,7 @@ func TestMultiWorkerJobDistribution(t *testing.T) {
 	}
 
 	// Wait for all workers to register
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(WorkerRegistrationWait)
 
 	// Verify all workers are registered
 	resp, err = http.Get(fmt.Sprintf("%s/workers", controllerURL))
