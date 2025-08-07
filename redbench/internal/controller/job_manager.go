@@ -13,6 +13,12 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
+const (
+	// HTTPClientTimeout defines the timeout for HTTP requests to workers.
+	// This timeout is used for both job start and stop operations.
+	HTTPClientTimeout = 10 * time.Second
+)
+
 // JobManager manages coordinated benchmark jobs.
 type JobManager struct {
 	mu         sync.RWMutex
@@ -114,6 +120,8 @@ func (jm *JobManager) StartJob(jobID string) error {
 	job.Status = JobStatusRunning
 	job.StartTime = &now
 
+	// Start job assignments with proper goroutine management
+	var wg sync.WaitGroup
 	for i := range job.Assignments {
 		assignment := &job.Assignments[i]
 		assignment.Status = "running"
@@ -131,9 +139,17 @@ func (jm *JobManager) StartJob(jobID string) error {
 			continue
 		}
 
-		// Send job assignment to worker
-		go jm.sendJobToWorker(assignment.WorkerID, job.Config, assignment.RedisConfig)
+		// Send job assignment to worker using properly managed goroutine
+		wg.Add(1)
+		go func(workerID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
+			defer wg.Done()
+			jm.sendJobToWorker(workerID, jobConfig, redisConfig)
+		}(assignment.WorkerID, job.Config, assignment.RedisConfig)
 	}
+
+	// Wait for all job assignments to be sent before returning
+	// This ensures that all workers receive their assignments before we consider the job started
+	wg.Wait()
 
 	return nil
 }
@@ -157,15 +173,28 @@ func (jm *JobManager) StopJob(jobID string) error {
 	job.Status = JobStatusStopped
 	job.EndTime = &now
 
-	// Mark workers as idle again
+	// Stop workers with proper synchronization
+	var wg sync.WaitGroup
 	for i := range job.Assignments {
 		assignment := &job.Assignments[i]
 		assignment.Status = "stopped"
 
-		// Send stop request to worker
-		go jm.stopJobOnWorker(assignment.WorkerID)
+		// Send stop request to worker using properly managed goroutine
+		wg.Add(1)
+		go func(workerID string) {
+			defer wg.Done()
+			jm.stopJobOnWorker(workerID)
+		}(assignment.WorkerID)
+	}
 
-		// Update worker status in registry
+	// Wait for all stop requests to complete before updating worker status
+	// This ensures all workers receive stop signals before we mark them as idle
+	wg.Wait()
+
+	// Now update worker status in registry after all stop operations are complete
+	for i := range job.Assignments {
+		assignment := &job.Assignments[i]
+
 		if err := jm.registry.UpdateWorkerStatus(assignment.WorkerID, "idle"); err != nil {
 			// Log error but continue with other workers
 			slog.Error("Failed to update worker status to idle", "worker_id", assignment.WorkerID, "error", err)
@@ -256,7 +285,7 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 
 	// Send POST request to worker's /start endpoint
 	workerURL := fmt.Sprintf("http://%s:%d/start", worker.Address, worker.Port)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: HTTPClientTimeout}
 
 	resp, err := client.Post(workerURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -284,7 +313,7 @@ func (jm *JobManager) stopJobOnWorker(workerID string) {
 
 	// Send DELETE request to worker's /stop endpoint
 	workerURL := fmt.Sprintf("http://%s:%d/stop", worker.Address, worker.Port)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: HTTPClientTimeout}
 
 	req, err := http.NewRequest(http.MethodDelete, workerURL, nil)
 	if err != nil {
