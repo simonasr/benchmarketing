@@ -33,19 +33,7 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 	workerID := fmt.Sprintf("worker-%s-%d", hostname, port)
 
 	// Determine appropriate address for worker registration
-	var address string
-	if bindAddress != "" {
-		// Use explicitly provided bind address
-		address = bindAddress
-	} else {
-		// Auto-detect address based on environment
-		address = hostname
-		// Use localhost for local development/testing
-		// This helps with hostname resolution issues in test setups
-		if strings.Contains(controllerURL, "localhost") || strings.Contains(controllerURL, "127.0.0.1") {
-			address = "localhost"
-		}
-	}
+	address := resolveWorkerAddress(bindAddress, hostname, controllerURL)
 
 	// Create the service server (reusing existing service logic)
 	server := service.NewServer(port, cfg, redisConn, reg)
@@ -100,4 +88,24 @@ func (w *Worker) Start(ctx context.Context) error {
 
 	slog.Info("Worker shutdown complete", "worker_id", w.workerID)
 	return nil
+}
+
+// resolveWorkerAddress determines the appropriate address for worker registration.
+// This function centralizes the address resolution logic to improve testability
+// and make the logic more explicit.
+func resolveWorkerAddress(bindAddress, hostname, controllerURL string) string {
+	if bindAddress != "" {
+		// Use explicitly provided bind address
+		return bindAddress
+	}
+
+	// Auto-detect address based on environment
+	address := hostname
+	// Use localhost for local development/testing
+	// This helps with hostname resolution issues in test setups
+	if strings.Contains(controllerURL, "localhost") || strings.Contains(controllerURL, "127.0.0.1") {
+		address = "localhost"
+	}
+
+	return address
 }

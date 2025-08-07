@@ -286,3 +286,59 @@ func containsPort(workerID, port string) bool {
 		(workerID[len(workerID)-len(port):] == port ||
 			strings.Contains(workerID, "-"+port))
 }
+
+// TestResolveWorkerAddress tests the address resolution logic in isolation.
+func TestResolveWorkerAddress(t *testing.T) {
+	tests := []struct {
+		name          string
+		bindAddress   string
+		hostname      string
+		controllerURL string
+		expectedAddr  string
+	}{
+		{
+			name:          "explicit bind address takes precedence",
+			bindAddress:   "10.1.2.3",
+			hostname:      "worker-host",
+			controllerURL: "http://controller:8080",
+			expectedAddr:  "10.1.2.3",
+		},
+		{
+			name:          "localhost controller uses localhost",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://localhost:8081",
+			expectedAddr:  "localhost",
+		},
+		{
+			name:          "127.0.0.1 controller uses localhost",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://127.0.0.1:8081",
+			expectedAddr:  "localhost",
+		},
+		{
+			name:          "remote controller uses hostname",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://controller.example.com:8081",
+			expectedAddr:  "worker-host",
+		},
+		{
+			name:          "bind address overrides localhost detection",
+			bindAddress:   "192.168.1.100",
+			hostname:      "worker-host",
+			controllerURL: "http://localhost:8081",
+			expectedAddr:  "192.168.1.100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveWorkerAddress(tt.bindAddress, tt.hostname, tt.controllerURL)
+			if result != tt.expectedAddr {
+				t.Errorf("resolveWorkerAddress() = %v, want %v", result, tt.expectedAddr)
+			}
+		})
+	}
+}
