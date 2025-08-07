@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,7 +230,7 @@ func TestWorkerStartControllerUnavailable(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to controller unavailability")
 	}
-	if !containsSubstring(err.Error(), "failed to register with controller") {
+	if !strings.Contains(err.Error(), "failed to register with controller") {
 		t.Errorf("Expected registration error, got: %v", err)
 	}
 }
@@ -283,20 +284,5 @@ func TestWorkerConfiguration(t *testing.T) {
 func containsPort(workerID, port string) bool {
 	return len(workerID) > len(port) &&
 		(workerID[len(workerID)-len(port):] == port ||
-			containsSubstring(workerID, "-"+port))
-}
-
-// Helper function to check if string contains substring
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && findSubstring(s, substr) >= 0
-}
-
-// Simple substring search
-func findSubstring(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+			strings.Contains(workerID, "-"+port))
 }

@@ -121,11 +121,13 @@ func (jm *JobManager) StartJob(jobID string) error {
 		// Update worker status in registry
 		if err := jm.registry.UpdateWorkerStatus(assignment.WorkerID, "busy"); err != nil {
 			// Log error but continue with other workers
+			slog.Error("Failed to update worker status", "worker_id", assignment.WorkerID, "error", err)
 			continue
 		}
 
 		if err := jm.registry.UpdateWorkerJob(assignment.WorkerID, jobID); err != nil {
 			// Log error but continue with other workers
+			slog.Error("Failed to update worker job", "worker_id", assignment.WorkerID, "job_id", jobID, "error", err)
 			continue
 		}
 
@@ -166,10 +168,12 @@ func (jm *JobManager) StopJob(jobID string) error {
 		// Update worker status in registry
 		if err := jm.registry.UpdateWorkerStatus(assignment.WorkerID, "idle"); err != nil {
 			// Log error but continue with other workers
+			slog.Error("Failed to update worker status to idle", "worker_id", assignment.WorkerID, "error", err)
 			continue
 		}
 		if err := jm.registry.UpdateWorkerJob(assignment.WorkerID, ""); err != nil {
 			// Log error but continue with other workers
+			slog.Error("Failed to clear worker job", "worker_id", assignment.WorkerID, "error", err)
 			continue
 		}
 	}

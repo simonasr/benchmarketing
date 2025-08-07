@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -296,7 +297,7 @@ func verifyMetricsBehavior(t *testing.T, cycle int, initial, final map[string]fl
 	for name, finalValue := range final {
 		if initialValue, exists := initial[name]; exists {
 			// Check for operation-related metrics (histograms, counters)
-			if contains(name, []string{"duration", "request", "operation"}) {
+			if containsAnyOf(name, []string{"duration", "request", "operation"}) {
 				operationMetricsFound = true
 
 				if cycle == 1 {
@@ -327,15 +328,11 @@ func verifyMetricsBehavior(t *testing.T, cycle int, initial, final map[string]fl
 	}
 }
 
-// contains checks if a string contains any of the given substrings.
-func contains(s string, substrings []string) bool {
+// containsAnyOf checks if a string contains any of the given substrings using strings.Contains.
+func containsAnyOf(s string, substrings []string) bool {
 	for _, substr := range substrings {
-		if len(s) >= len(substr) {
-			for i := 0; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
-				}
-			}
+		if strings.Contains(s, substr) {
+			return true
 		}
 	}
 	return false
