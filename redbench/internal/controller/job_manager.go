@@ -67,10 +67,10 @@ func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 	// Assign workers to targets
 	workerIndex := 0
 	for _, target := range req.Targets {
-		// Parse Redis URL to create connection config
-		redisConfig, err := jm.parseRedisTarget(target.RedisURL)
+		// Parse Redis target (URL or Cluster URL) to create connection config
+		redisConfig, err := jm.parseRedisTarget(target)
 		if err != nil {
-			return nil, fmt.Errorf("invalid Redis URL %s: %w", target.RedisURL, err)
+			return nil, fmt.Errorf("invalid Redis target: %w", err)
 		}
 
 		// Assign workers to this target
@@ -82,7 +82,7 @@ func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 			worker := availableWorkers[workerIndex]
 			assignment := WorkerAssignment{
 				WorkerID:    worker.ID,
-				Target:      target.RedisURL,
+				Target:      jm.targetLabelFor(target),
 				Status:      "assigned",
 				RedisConfig: redisConfig,
 			}
@@ -240,21 +240,32 @@ func (jm *JobManager) ListJobs() []*Job {
 	return jobs
 }
 
-// parseRedisTarget parses a Redis URL and creates a RedisConnection config.
-func (jm *JobManager) parseRedisTarget(redisURL string) (*config.RedisConnection, error) {
-	// For now, create a simple connection config
-	// This can be enhanced to parse full Redis URLs with TLS settings
-	redisConfig := &config.RedisConnection{
-		URL:         redisURL,
-		TargetLabel: redisURL, // Use URL as label for now
+// parseRedisTarget creates a RedisConnection from a job target
+func (jm *JobManager) parseRedisTarget(target JobTarget) (*config.RedisConnection, error) {
+	if target.RedisClusterURL == "" && target.RedisURL == "" {
+		return nil, fmt.Errorf("either redisClusterUrl or redisUrl must be provided")
 	}
-
-	// Basic validation
-	if redisURL == "" {
-		return nil, fmt.Errorf("redis URL cannot be empty")
+	conn := &config.RedisConnection{}
+	if target.RedisClusterURL != "" {
+		conn.ClusterURL = target.RedisClusterURL
+		if err := conn.ParseClusterURL(); err != nil {
+			return nil, fmt.Errorf("parsing cluster URL: %w", err)
+		}
+	} else {
+		conn.URL = target.RedisURL
+		if err := conn.ParseURL(); err != nil {
+			return nil, fmt.Errorf("parsing URL: %w", err)
+		}
 	}
+	conn.SetTargetLabel()
+	return conn, nil
+}
 
-	return redisConfig, nil
+func (jm *JobManager) targetLabelFor(target JobTarget) string {
+	if target.RedisClusterURL != "" {
+		return target.RedisClusterURL
+	}
+	return target.RedisURL
 }
 
 // sendJobToWorker sends a job assignment to a specific worker.
@@ -266,10 +277,20 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 		return
 	}
 
-	// Create start request payload
+	// Create start request payload using service API override shape
+	redisOverrides := map[string]interface{}{}
+	if redisConfig != nil {
+		if redisConfig.URL != "" {
+			redisOverrides["url"] = redisConfig.URL
+		}
+		if redisConfig.ClusterURL != "" {
+			redisOverrides["clusterUrl"] = redisConfig.ClusterURL
+		}
+	}
+
 	startRequest := map[string]interface{}{
 		"config": jobConfig,
-		"redis":  redisConfig,
+		"redis":  redisOverrides,
 	}
 
 	// Marshal request

@@ -78,7 +78,7 @@ curl -X POST http://localhost:8081/job/start \
         "workerCount": 2
       },
       {
-        "redisUrl": "rediss://redis2.example.com:6380",
+        "redisClusterUrl": "rediss://redis-cluster.example.com:6380",
         "workerCount": 2
       }
     ],
@@ -92,6 +92,9 @@ curl -X POST http://localhost:8081/job/start \
     }
   }'
 ```
+
+- Use `redisUrl` for a single Redis instance.
+- Use `redisClusterUrl` for Redis Cluster; both `redis://` and `rediss://` schemes are accepted. When a full URL is provided, the controller extracts the host:port for cluster clients while preserving TLS intent.
 
 #### Stop Job
 ```bash
@@ -137,7 +140,7 @@ curl http://localhost:8081/job/status
       "workerCount": 3
     },
     {
-      "redisUrl": "rediss://redis-cluster-2.example.com:6380",
+      "redisClusterUrl": "rediss://redis-cluster-2.example.com:6380",
       "workerCount": 2
     }
   ],

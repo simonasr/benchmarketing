@@ -108,7 +108,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 
 	t.Logf("Successfully registered %v workers, %v available", total, available)
 
-	// Test job creation (this will fail due to Redis connection, but should validate the API)
+	// Test job creation (single-instance)
 	jobReq := map[string]interface{}{
 		"targets": []map[string]interface{}{
 			{
@@ -128,10 +128,30 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	// Job creation should succeed (worker assignment)
 	if resp.StatusCode != http.StatusCreated {
 		t.Logf("Job creation returned status %d (expected due to Redis connection)", resp.StatusCode)
 		// This is expected in test environment without Redis
+	}
+
+	// Test job creation (cluster target)
+	clusterReq := map[string]interface{}{
+		"targets": []map[string]interface{}{
+			{
+				"redisClusterUrl": "redis://localhost:6379",
+				"workerCount":     1,
+			},
+		},
+	}
+
+	clusterJSON, _ := json.Marshal(clusterReq)
+	resp, err = http.Post(fmt.Sprintf("%s/job/start", controllerURL), "application/json", bytes.NewBuffer(clusterJSON))
+	if err != nil {
+		t.Fatalf("Failed to start cluster job: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Logf("Cluster job creation returned status %d (expected due to Redis connection)", resp.StatusCode)
 	}
 
 	// Test job status
