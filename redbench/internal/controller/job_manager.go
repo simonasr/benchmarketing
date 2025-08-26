@@ -249,12 +249,12 @@ func (jm *JobManager) parseRedisTarget(target JobTarget) (*config.RedisConnectio
 	if target.RedisClusterURL != "" {
 		conn.ClusterURL = target.RedisClusterURL
 		if err := conn.ParseClusterURL(); err != nil {
-			return nil, fmt.Errorf("parsing cluster URL: %w", err)
+			return nil, fmt.Errorf("parsing cluster URL %s: %w", target.RedisClusterURL, err)
 		}
 	} else {
 		conn.URL = target.RedisURL
 		if err := conn.ParseURL(); err != nil {
-			return nil, fmt.Errorf("parsing URL: %w", err)
+			return nil, fmt.Errorf("parsing URL %s: %w", target.RedisURL, err)
 		}
 	}
 	conn.SetTargetLabel()
