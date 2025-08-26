@@ -42,11 +42,11 @@ func main() {
 
 	// Load Redis connection details
 	var redisConn *config.RedisConnection
-	if *serviceMode {
-		// In service mode, Redis config is optional (can be provided via API)
+	if *serviceMode || *mode == "controller" || *mode == "worker" {
+		// In service, controller, and worker modes, Redis config is optional (can be provided via API/job)
 		redisConn, err = config.LoadRedisConnectionForService()
 	} else {
-		// In CLI mode, Redis config is required
+		// In traditional CLI mode, Redis config is required
 		redisConn, err = config.LoadRedisConnection()
 	}
 	if err != nil {
