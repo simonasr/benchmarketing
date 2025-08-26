@@ -183,7 +183,6 @@ curl -X POST http://localhost:8080/start \
 {
   "status": "running",
   "configuration": {
-    "MetricsPort": 8080,
     "Debug": false,
     "Redis": { ... },
     "Test": { ... }

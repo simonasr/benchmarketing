@@ -1,5 +1,4 @@
 ---
-metricsPort: 8080
 debug: false
 redis:
   expirationS: 20
@@ -18,6 +17,8 @@ test:
   requestDelayMs: 1000
   keySize: 10
   valueSize: 10
+controller:
+  httpTimeoutMs: 10000
 
 # Example TLS configurations:
 #

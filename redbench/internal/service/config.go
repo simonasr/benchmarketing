@@ -52,10 +52,10 @@ type TestOverrides struct {
 func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.Config, error) {
 	// Start with a copy of the base configuration
 	mergedConfig := &config.Config{
-		MetricsPort: baseConfig.MetricsPort,
-		Debug:       baseConfig.Debug,
-		Redis:       baseConfig.Redis,
-		Test:        baseConfig.Test,
+		Debug:      baseConfig.Debug,
+		Redis:      baseConfig.Redis,
+		Test:       baseConfig.Test,
+		Controller: baseConfig.Controller,
 	}
 
 	// If no request body provided, return the base config as-is

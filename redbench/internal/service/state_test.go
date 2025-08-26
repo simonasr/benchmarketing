@@ -35,7 +35,6 @@ func TestGlobalState_InitialState(t *testing.T) {
 func TestGlobalState_StartBenchmark(t *testing.T) {
 	gs := NewGlobalState()
 	cfg := &config.Config{
-		MetricsPort: 8080,
 		Test: config.Test{
 			MinClients: 1,
 			MaxClients: 10,

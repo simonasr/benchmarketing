@@ -1,0 +1,344 @@
+package worker
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/simonasr/benchmarketing/redbench/internal/config"
+)
+
+func TestNewWorker(t *testing.T) {
+	cfg := &config.Config{
+		Test: config.Test{MinClients: 1, MaxClients: 10},
+	}
+	redisConn := &config.RedisConnection{
+		URL: "redis://localhost:6379",
+	}
+	reg := prometheus.NewRegistry()
+
+	worker, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
+	if err != nil {
+		t.Fatalf("Unexpected error creating worker: %v", err)
+	}
+
+	if worker == nil {
+		t.Fatal("Expected worker but got nil")
+	}
+	if worker.port != 8080 {
+		t.Errorf("Expected port 8080, got %d", worker.port)
+	}
+	if worker.server == nil {
+		t.Error("Worker server should be initialized")
+	}
+	if worker.regClient == nil {
+		t.Error("Worker registration client should be initialized")
+	}
+	if worker.workerID == "" {
+		t.Error("Worker ID should be generated")
+	}
+}
+
+func TestWorkerIDGeneration(t *testing.T) {
+	cfg := &config.Config{}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+	reg := prometheus.NewRegistry()
+
+	// Create multiple workers with same parameters
+	worker1, _ := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
+	worker2, _ := NewWorker(cfg, redisConn, 8081, "http://localhost:8081", "", reg)
+
+	// Worker IDs should be different (include port)
+	if worker1.workerID == worker2.workerID {
+		t.Error("Worker IDs should be unique")
+	}
+
+	// Worker IDs should include hostname and port
+	if !containsPort(worker1.workerID, "8080") {
+		t.Errorf("Worker ID should contain port 8080: %s", worker1.workerID)
+	}
+	if !containsPort(worker2.workerID, "8081") {
+		t.Errorf("Worker ID should contain port 8081: %s", worker2.workerID)
+	}
+}
+
+func TestWorkerStartRegistration(t *testing.T) {
+	// Create mock controller server
+	registrationCalled := false
+	unregistrationCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/workers/register":
+			registrationCalled = true
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"status": "registered"}`))
+		case r.Method == "DELETE" && r.URL.Path[:9] == "/workers/":
+			unregistrationCalled = true
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "unregistered"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Test: config.Test{MinClients: 1, MaxClients: 10},
+	}
+	redisConn := &config.RedisConnection{
+		URL: "redis://localhost:6379",
+	}
+	reg := prometheus.NewRegistry()
+
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	// Start worker with timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Start worker (should register and then stop due to context timeout)
+	err = worker.Start(ctx)
+
+	// Context cancellation is handled gracefully, so no error is expected
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify registration was called
+	if !registrationCalled {
+		t.Error("Worker should have registered with controller")
+	}
+
+	// Note: Unregistration happens in a goroutine, so we need to wait a bit
+	time.Sleep(50 * time.Millisecond)
+	if !unregistrationCalled {
+		t.Error("Worker should have unregistered from controller")
+	}
+}
+
+func TestWorkerBindAddressOption(t *testing.T) {
+	cfg := &config.Config{
+		Test: config.Test{MinClients: 1, MaxClients: 10},
+	}
+	redisConn := &config.RedisConnection{
+		URL: "redis://localhost:6379",
+	}
+	reg := prometheus.NewRegistry()
+
+	// Test 1: Auto-detection with localhost controller
+	worker1, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	// Should use localhost for local development
+	if worker1.regClient.workerAddress != "localhost" {
+		t.Errorf("Expected localhost address in local development, got %s", worker1.regClient.workerAddress)
+	}
+
+	// Test 2: Explicit bind address overrides auto-detection
+	worker2, err := NewWorker(cfg, redisConn, 8080, "http://localhost:8081", "10.1.2.3", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with explicit bind address: %v", err)
+	}
+
+	// Should use explicit bind address
+	if worker2.regClient.workerAddress != "10.1.2.3" {
+		t.Errorf("Expected explicit bind address 10.1.2.3, got %s", worker2.regClient.workerAddress)
+	}
+
+	// Test 3: Auto-detection with remote controller
+	worker3, err := NewWorker(cfg, redisConn, 8080, "http://redbench-controller:8081", "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with remote controller URL: %v", err)
+	}
+
+	// Should use actual hostname for remote controller
+	hostname, _ := os.Hostname()
+	if worker3.regClient.workerAddress != hostname {
+		t.Errorf("Expected hostname %s with remote controller, got %s", hostname, worker3.regClient.workerAddress)
+	}
+
+	// Test 4: Explicit bind address with remote controller
+	worker4, err := NewWorker(cfg, redisConn, 8080, "http://redbench-controller:8081", "192.168.1.100", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker with explicit bind address and remote controller: %v", err)
+	}
+
+	// Should use explicit bind address regardless of controller URL
+	if worker4.regClient.workerAddress != "192.168.1.100" {
+		t.Errorf("Expected explicit bind address 192.168.1.100, got %s", worker4.regClient.workerAddress)
+	}
+}
+
+func TestWorkerStartRegistrationFailure(t *testing.T) {
+	// Create mock controller that rejects registration
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/workers/register" {
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(`{"error": "worker already exists"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+	reg := prometheus.NewRegistry()
+
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	// Start worker - should fail due to registration failure
+	ctx := context.Background()
+	err = worker.Start(ctx)
+
+	if err == nil {
+		t.Error("Expected error due to registration failure")
+	}
+	if err.Error() != "failed to register with controller: registration failed with status 409" {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestWorkerStartControllerUnavailable(t *testing.T) {
+	cfg := &config.Config{}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+	reg := prometheus.NewRegistry()
+
+	// Use invalid controller URL
+	worker, err := NewWorker(cfg, redisConn, 8080, "http://invalid-url:99999", "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	// Start worker - should fail due to controller unavailability
+	ctx := context.Background()
+	err = worker.Start(ctx)
+
+	if err == nil {
+		t.Error("Expected error due to controller unavailability")
+	}
+	if !strings.Contains(err.Error(), "failed to register with controller") {
+		t.Errorf("Expected registration error, got: %v", err)
+	}
+}
+
+func TestWorkerConfiguration(t *testing.T) {
+	tests := []struct {
+		name           string
+		port           int
+		controllerURL  string
+		expectedWorker bool
+	}{
+		{
+			name:           "valid configuration",
+			port:           8080,
+			controllerURL:  "http://localhost:8081",
+			expectedWorker: true,
+		},
+		{
+			name:           "zero port",
+			port:           0,
+			controllerURL:  "http://localhost:8081",
+			expectedWorker: true, // Should use default port
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+			reg := prometheus.NewRegistry()
+
+			worker, err := NewWorker(cfg, redisConn, tt.port, tt.controllerURL, "", reg)
+
+			if tt.expectedWorker {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if worker == nil {
+					t.Error("Expected worker but got nil")
+				}
+			} else {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			}
+		})
+	}
+}
+
+// Helper function to check if worker ID contains port
+func containsPort(workerID, port string) bool {
+	return len(workerID) > len(port) &&
+		(workerID[len(workerID)-len(port):] == port ||
+			strings.Contains(workerID, "-"+port))
+}
+
+// TestResolveWorkerAddress tests the address resolution logic in isolation.
+func TestResolveWorkerAddress(t *testing.T) {
+	tests := []struct {
+		name          string
+		bindAddress   string
+		hostname      string
+		controllerURL string
+		expectedAddr  string
+	}{
+		{
+			name:          "explicit bind address takes precedence",
+			bindAddress:   "10.1.2.3",
+			hostname:      "worker-host",
+			controllerURL: "http://controller:8080",
+			expectedAddr:  "10.1.2.3",
+		},
+		{
+			name:          "localhost controller uses localhost",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://localhost:8081",
+			expectedAddr:  "localhost",
+		},
+		{
+			name:          "127.0.0.1 controller uses localhost",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://127.0.0.1:8081",
+			expectedAddr:  "localhost",
+		},
+		{
+			name:          "remote controller uses hostname",
+			bindAddress:   "",
+			hostname:      "worker-host",
+			controllerURL: "http://controller.example.com:8081",
+			expectedAddr:  "worker-host",
+		},
+		{
+			name:          "bind address overrides localhost detection",
+			bindAddress:   "192.168.1.100",
+			hostname:      "worker-host",
+			controllerURL: "http://localhost:8081",
+			expectedAddr:  "192.168.1.100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveWorkerAddress(tt.bindAddress, tt.hostname, tt.controllerURL)
+			if result != tt.expectedAddr {
+				t.Errorf("resolveWorkerAddress() = %v, want %v", result, tt.expectedAddr)
+			}
+		})
+	}
+}

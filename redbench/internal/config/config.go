@@ -10,16 +10,17 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
 // Config represents the application configuration.
 type Config struct {
-	MetricsPort int         `yaml:"metricsPort" json:"metricsPort"`
-	Debug       bool        `yaml:"debug" json:"debug"`
-	Redis       RedisConfig `yaml:"redis" json:"redis"`
-	Test        Test        `yaml:"test" json:"test"`
+	Debug      bool             `yaml:"debug" json:"debug"`
+	Redis      RedisConfig      `yaml:"redis" json:"redis"`
+	Test       Test             `yaml:"test" json:"test"`
+	Controller ControllerConfig `yaml:"controller" json:"controller"`
 }
 
 // RedisConfig contains Redis-specific configuration.
@@ -64,6 +65,16 @@ type Test struct {
 	RequestDelayMs  int `yaml:"requestDelayMs" json:"requestDelayMs"`
 	KeySize         int `yaml:"keySize" json:"keySize"`
 	ValueSize       int `yaml:"valueSize" json:"valueSize"`
+}
+
+// ControllerConfig contains controller-specific configuration.
+type ControllerConfig struct {
+	HTTPTimeoutMs int `yaml:"httpTimeoutMs" json:"httpTimeoutMs"` // HTTP timeout for worker communication in milliseconds
+}
+
+// HTTPTimeout returns the HTTP timeout as a time.Duration.
+func (c ControllerConfig) HTTPTimeout() time.Duration {
+	return time.Duration(c.HTTPTimeoutMs) * time.Millisecond
 }
 
 // RedisConnection holds Redis connection information.
@@ -203,6 +214,9 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 
+	// Load Controller configuration with defaults and environment overrides
+	cfg.Controller = LoadControllerConfig()
+
 	return cfg, nil
 }
 
@@ -339,6 +353,13 @@ func getIntEnv(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// LoadControllerConfig loads controller configuration from environment variables with defaults.
+func LoadControllerConfig() ControllerConfig {
+	return ControllerConfig{
+		HTTPTimeoutMs: getIntEnv("CONTROLLER_HTTP_TIMEOUT_MS", 10000), // Default 10 seconds
+	}
 }
 
 // toEnvName converts CamelCase to upper snake case (e.g., MinClients -> MINCLIENTS)
