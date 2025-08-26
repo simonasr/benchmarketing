@@ -81,14 +81,14 @@ func TestCreateJob(t *testing.T) {
 			errMsg:  "worker count must be positive for target redis://localhost:6379",
 		},
 		{
-			name: "invalid Redis URL",
+			name: "invalid Redis target (empty)",
 			req: JobRequest{
 				Targets: []JobTarget{
 					{RedisURL: "", WorkerCount: 1},
 				},
 			},
 			wantErr: true,
-			errMsg:  "invalid Redis URL : redis URL cannot be empty",
+			errMsg:  "invalid Redis target: either redisClusterUrl or redisUrl must be provided",
 		},
 	}
 
@@ -377,30 +377,45 @@ func TestParseRedisTarget(t *testing.T) {
 	jobManager := NewJobManager(registry, cfg)
 
 	tests := []struct {
-		name     string
-		redisURL string
-		wantErr  bool
+		name       string
+		target     JobTarget
+		wantErr    bool
+		expectURL  string
+		expectCURL string
 	}{
 		{
-			name:     "valid redis URL",
-			redisURL: "redis://localhost:6379",
-			wantErr:  false,
+			name:       "valid redis URL",
+			target:     JobTarget{RedisURL: "redis://localhost:6379"},
+			wantErr:    false,
+			expectURL:  "redis://localhost:6379",
+			expectCURL: "",
 		},
 		{
-			name:     "valid rediss URL",
-			redisURL: "rediss://localhost:6380",
-			wantErr:  false,
+			name:       "valid rediss URL",
+			target:     JobTarget{RedisURL: "rediss://localhost:6380"},
+			wantErr:    false,
+			expectURL:  "rediss://localhost:6380",
+			expectCURL: "",
 		},
 		{
-			name:     "empty URL",
-			redisURL: "",
-			wantErr:  true,
+			name:       "valid cluster URL",
+			target:     JobTarget{RedisClusterURL: "redis://cluster.example.com:6379"},
+			wantErr:    false,
+			expectURL:  "",
+			expectCURL: "cluster.example.com:6379", // ParseClusterURL strips scheme to host:port
+		},
+		{
+			name:       "empty target",
+			target:     JobTarget{},
+			wantErr:    true,
+			expectURL:  "",
+			expectCURL: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			redisConfig, err := jobManager.parseRedisTarget(tt.redisURL)
+			redisConfig, err := jobManager.parseRedisTarget(tt.target)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error but got none")
@@ -412,11 +427,11 @@ func TestParseRedisTarget(t *testing.T) {
 				if redisConfig == nil {
 					t.Error("Expected redis config but got nil")
 				} else {
-					if redisConfig.URL != tt.redisURL {
-						t.Errorf("Expected URL %s, got %s", tt.redisURL, redisConfig.URL)
+					if redisConfig.URL != tt.expectURL {
+						t.Errorf("Expected URL %s, got %s", tt.expectURL, redisConfig.URL)
 					}
-					if redisConfig.TargetLabel != tt.redisURL {
-						t.Errorf("Expected target label %s, got %s", tt.redisURL, redisConfig.TargetLabel)
+					if redisConfig.ClusterURL != tt.expectCURL {
+						t.Errorf("Expected ClusterURL %s, got %s", tt.expectCURL, redisConfig.ClusterURL)
 					}
 				}
 			}

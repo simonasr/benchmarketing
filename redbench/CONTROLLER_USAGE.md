@@ -78,7 +78,7 @@ curl -X POST http://localhost:8081/job/start \
         "workerCount": 2
       },
       {
-        "redisUrl": "rediss://redis2.example.com:6380",
+        "redisClusterUrl": "rediss://redis-cluster.example.com:6380",
         "workerCount": 2
       }
     ],
@@ -88,10 +88,21 @@ curl -X POST http://localhost:8081/job/start \
       "stageIntervalMs": 1000,
       "requestDelayMs": 10,
       "keySize": 16,
-      "valueSize": 1024
+      "valueSize": 1024,
+      "redis": {
+        "operationTimeoutMs": 250,
+        "expiration": 45
+      }
     }
   }'
 ```
+
+- Use `redisUrl` for a single Redis instance.
+- Use `redisClusterUrl` for Redis Cluster; both `redis://` and `rediss://` schemes are accepted. When a full URL is provided, the controller extracts the host:port for cluster clients while preserving TLS intent.
+- Redis behavior overrides can be provided under `config.redis`:
+  - `operationTimeoutMs`: per-operation timeout in milliseconds
+  - `expiration`: TTL for generated keys in seconds
+  - Note: YAML file uses `expirationS`, but JSON API uses `expiration`.
 
 #### Stop Job
 ```bash
@@ -137,7 +148,7 @@ curl http://localhost:8081/job/status
       "workerCount": 3
     },
     {
-      "redisUrl": "rediss://redis-cluster-2.example.com:6380",
+      "redisClusterUrl": "rediss://redis-cluster-2.example.com:6380",
       "workerCount": 2
     }
   ],
@@ -147,7 +158,11 @@ curl http://localhost:8081/job/status
     "stageIntervalMs": 2000,
     "requestDelayMs": 50,
     "keySize": 20,
-    "valueSize": 2048
+    "valueSize": 2048,
+    "redis": {
+      "operationTimeoutMs": 200,
+      "expiration": 30
+    }
   }
 }
 ```
