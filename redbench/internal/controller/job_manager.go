@@ -287,6 +287,15 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 			redisOverrides["clusterUrl"] = redisConfig.ClusterURL
 		}
 	}
+	// Propagate Redis behavior overrides from job config if provided
+	if jobConfig != nil {
+		if jobConfig.Redis.OperationTimeoutMs != 0 {
+			redisOverrides["operationTimeoutMs"] = jobConfig.Redis.OperationTimeoutMs
+		}
+		if jobConfig.Redis.Expiration != 0 {
+			redisOverrides["expiration"] = int(jobConfig.Redis.Expiration)
+		}
+	}
 
 	startRequest := map[string]interface{}{
 		"config": jobConfig,
