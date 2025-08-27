@@ -1,7 +1,12 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
@@ -531,5 +536,142 @@ func TestJobWorkflow(t *testing.T) {
 	// Verify all workers are available again
 	if registry.CountAvailable() != 4 {
 		t.Errorf("Expected 4 available workers, got %d", registry.CountAvailable())
+	}
+}
+
+func TestSendJobToWorker_ForwardsTestOverrides(t *testing.T) {
+	registry := NewRegistry()
+	cfg := &config.Config{
+		Controller: config.LoadControllerConfig(),
+	}
+	jobManager := NewJobManager(registry, cfg)
+
+	// Create a test HTTP server to act as the worker's /start endpoint
+	receivedCh := make(chan map[string]interface{}, 1)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/start" {
+			http.NotFound(w, r)
+			return
+		}
+		defer r.Body.Close()
+		var payload map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("failed to decode payload: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		receivedCh <- payload
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	// Extract address and port from the test server URL
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("failed to parse test server URL: %v", err)
+	}
+	host := u.Hostname()
+	portStr := u.Port()
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("failed to parse port: %v", err)
+	}
+
+	// Register a single worker pointing to the test server
+	req := RegistrationRequest{WorkerID: "worker-1", Address: host, Port: port}
+	if err := registry.RegisterWorker(req); err != nil {
+		t.Fatalf("failed to register worker: %v", err)
+	}
+
+	// Prepare job with Test overrides and a simple Redis URL target
+	jobReq := JobRequest{
+		Targets: []JobTarget{{RedisURL: "redis://localhost:6379", WorkerCount: 1}},
+		Config: &config.Config{
+			Test: config.Test{
+				MinClients:      1,
+				MaxClients:      10,
+				StageIntervalMs: 1000,
+				RequestDelayMs:  10,
+				KeySize:         16,
+				ValueSize:       124,
+			},
+			Redis: config.RedisConfig{
+				OperationTimeoutMs: 1000,
+				Expiration:         10,
+			},
+		},
+	}
+
+	job, err := jobManager.CreateJob(jobReq)
+	if err != nil {
+		t.Fatalf("failed to create job: %v", err)
+	}
+
+	// Start the job which will trigger a POST to the worker /start endpoint
+	if err := jobManager.StartJob(job.ID); err != nil {
+		t.Fatalf("failed to start job: %v", err)
+	}
+
+	// Assert payload contains top-level "test" overrides and "redis" overrides
+	select {
+	case payload := <-receivedCh:
+		// test overrides
+		testObj, ok := payload["test"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected top-level 'test' object in payload, got: %v", payload)
+		}
+		// Basic fields
+		if intFrom(testObj, "minClients") != 1 {
+			t.Errorf("expected test.minClients=1, got %v", testObj["minClients"])
+		}
+		if intFrom(testObj, "maxClients") != 10 {
+			t.Errorf("expected test.maxClients=10, got %v", testObj["maxClients"])
+		}
+		if intFrom(testObj, "stageIntervalMs") != 1000 {
+			t.Errorf("expected test.stageIntervalMs=1000, got %v", testObj["stageIntervalMs"])
+		}
+		if intFrom(testObj, "requestDelayMs") != 10 {
+			t.Errorf("expected test.requestDelayMs=10, got %v", testObj["requestDelayMs"])
+		}
+		if intFrom(testObj, "keySize") != 16 {
+			t.Errorf("expected test.keySize=16, got %v", testObj["keySize"])
+		}
+		if intFrom(testObj, "valueSize") != 124 {
+			t.Errorf("expected test.valueSize=124, got %v", testObj["valueSize"])
+		}
+
+		// redis overrides
+		redisObj, ok := payload["redis"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected top-level 'redis' object in payload, got: %v", payload)
+		}
+		if intFrom(redisObj, "operationTimeoutMs") != 1000 {
+			t.Errorf("expected redis.operationTimeoutMs=1000, got %v", redisObj["operationTimeoutMs"])
+		}
+		if intFrom(redisObj, "expiration") != 10 {
+			t.Errorf("expected redis.expiration=10, got %v", redisObj["expiration"])
+		}
+
+		// ensure old 'config' passthrough isn't required
+		// It's fine if present, but not necessary for correctness. No assertion.
+	default:
+		t.Fatal("did not receive worker start payload")
+	}
+}
+
+// helper to coerce numeric JSON values to int deterministically
+func intFrom(m map[string]interface{}, key string) int {
+	v, ok := m[key]
+	if !ok {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	default:
+		return 0
 	}
 }

@@ -287,7 +287,8 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 			redisOverrides["clusterUrl"] = redisConfig.ClusterURL
 		}
 	}
-	// Propagate Redis behavior overrides from job config if provided
+	// Propagate Redis behavior overrides and map test overrides from job config if provided
+	var testOverrides map[string]interface{}
 	if jobConfig != nil {
 		if jobConfig.Redis.OperationTimeoutMs != 0 {
 			redisOverrides["operationTimeoutMs"] = jobConfig.Redis.OperationTimeoutMs
@@ -295,11 +296,36 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 		if jobConfig.Redis.Expiration != 0 {
 			redisOverrides["expiration"] = int(jobConfig.Redis.Expiration)
 		}
+
+		to := map[string]interface{}{}
+		if jobConfig.Test.MinClients != 0 {
+			to["minClients"] = jobConfig.Test.MinClients
+		}
+		if jobConfig.Test.MaxClients != 0 {
+			to["maxClients"] = jobConfig.Test.MaxClients
+		}
+		if jobConfig.Test.StageIntervalMs != 0 {
+			to["stageIntervalMs"] = jobConfig.Test.StageIntervalMs
+		}
+		if jobConfig.Test.RequestDelayMs != 0 {
+			to["requestDelayMs"] = jobConfig.Test.RequestDelayMs
+		}
+		if jobConfig.Test.KeySize != 0 {
+			to["keySize"] = jobConfig.Test.KeySize
+		}
+		if jobConfig.Test.ValueSize != 0 {
+			to["valueSize"] = jobConfig.Test.ValueSize
+		}
+		if len(to) > 0 {
+			testOverrides = to
+		}
 	}
 
 	startRequest := map[string]interface{}{
-		"config": jobConfig,
-		"redis":  redisOverrides,
+		"redis": redisOverrides,
+	}
+	if testOverrides != nil {
+		startRequest["test"] = testOverrides
 	}
 
 	// Marshal request
