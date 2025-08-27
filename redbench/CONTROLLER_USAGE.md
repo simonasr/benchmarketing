@@ -83,12 +83,14 @@ curl -X POST http://localhost:8081/job/start \
       }
     ],
     "config": {
-      "minClients": 10,
-      "maxClients": 100,
-      "stageIntervalMs": 1000,
-      "requestDelayMs": 10,
-      "keySize": 16,
-      "valueSize": 1024,
+      "test": {
+        "minClients": 10,
+        "maxClients": 100,
+        "stageIntervalMs": 1000,
+        "requestDelayMs": 10,
+        "keySize": 16,
+        "valueSize": 1024
+      },
       "redis": {
         "operationTimeoutMs": 250,
         "expiration": 45
@@ -153,12 +155,14 @@ curl http://localhost:8081/job/status
     }
   ],
   "config": {
-    "minClients": 1,
-    "maxClients": 200,
-    "stageIntervalMs": 2000,
-    "requestDelayMs": 50,
-    "keySize": 20,
-    "valueSize": 2048,
+    "test": {
+      "minClients": 1,
+      "maxClients": 200,
+      "stageIntervalMs": 2000,
+      "requestDelayMs": 50,
+      "keySize": 20,
+      "valueSize": 2048
+    },
     "redis": {
       "operationTimeoutMs": 200,
       "expiration": 30

@@ -67,12 +67,14 @@ curl -s -X POST http://localhost:8081/job/start \
       }
     ],
     "config": {
-      "minClients": 1,
-      "maxClients": 10,
-      "stageIntervalMs": 1000,
-      "requestDelayMs": 100,
-      "keySize": 10,
-      "valueSize": 100
+      "test": {
+        "minClients": 1,
+        "maxClients": 10,
+        "stageIntervalMs": 1000,
+        "requestDelayMs": 100,
+        "keySize": 10,
+        "valueSize": 100
+      }
     }
   }' | jq '.' || echo "Job creation failed (expected without Redis)"
 
