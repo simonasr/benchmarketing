@@ -122,6 +122,8 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 		t.Fatalf("did not find set count metric for target %s", target)
 	}
 	var n int
-	fmt.Sscanf(string(m[1]), "%d", &n)
+	if _, err := fmt.Sscanf(string(m[1]), "%d", &n); err != nil {
+		t.Fatalf("parse metric value: %v", err)
+	}
 	return n
 }
