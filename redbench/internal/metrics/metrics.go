@@ -28,10 +28,10 @@ type Metrics struct {
 }
 
 // registerGauge registers a Gauge or reuses the existing collector if already registered.
-// Returns the registered (or reused) Gauge, or nil on failure.
+// Always returns a non-nil Gauge, falling back to the provided one on errors.
 func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus.Gauge {
 	if gauge == nil {
-		return nil
+		return prometheus.NewGauge(prometheus.GaugeOpts{Name: "noop_gauge"})
 	}
 	if err := reg.Register(gauge); err != nil {
 		var are prometheus.AlreadyRegisteredError
@@ -43,18 +43,19 @@ func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus
 				"expected", "prometheus.Gauge",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
-			return nil
+			return gauge
 		}
 		slog.Error("Failed to register metric", "error", err)
-		return nil
+		return gauge
 	}
 	return gauge
 }
 
-// registerHistogram registers a HistogramVec or reuses the existing one. Returns nil on failure.
+// registerHistogram registers a HistogramVec or reuses the existing one.
+// Always returns a non-nil HistogramVec, falling back to the provided one on errors.
 func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *prometheus.HistogramVec {
 	if hv == nil {
-		return nil
+		return prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "noop_histogram"}, []string{"noop"})
 	}
 	if err := reg.Register(hv); err != nil {
 		var are prometheus.AlreadyRegisteredError
@@ -66,18 +67,19 @@ func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *
 				"expected", "*prometheus.HistogramVec",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
-			return nil
+			return hv
 		}
 		slog.Error("Failed to register metric", "error", err)
-		return nil
+		return hv
 	}
 	return hv
 }
 
-// registerCounter registers a CounterVec or reuses the existing one. Returns nil on failure.
+// registerCounter registers a CounterVec or reuses the existing one.
+// Always returns a non-nil CounterVec, falling back to the provided one on errors.
 func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prometheus.CounterVec {
 	if cv == nil {
-		return nil
+		return prometheus.NewCounterVec(prometheus.CounterOpts{Name: "noop_counter"}, []string{"noop"})
 	}
 	if err := reg.Register(cv); err != nil {
 		var are prometheus.AlreadyRegisteredError
@@ -89,10 +91,10 @@ func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prom
 				"expected", "*prometheus.CounterVec",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
-			return nil
+			return cv
 		}
 		slog.Error("Failed to register metric", "error", err)
-		return nil
+		return cv
 	}
 	return cv
 }
