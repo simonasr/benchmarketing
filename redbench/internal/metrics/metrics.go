@@ -29,7 +29,7 @@ type Metrics struct {
 
 // registerGauge registers a Gauge or reuses the existing collector if already registered.
 // Always returns a non-nil Gauge, panicking on a nil input.
-func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus.Gauge {
+func registerGauge(reg prometheus.Registerer, metricName string, gauge prometheus.Gauge) prometheus.Gauge {
 	if gauge == nil {
 		panic("registerGauge: nil gauge provided")
 	}
@@ -40,12 +40,13 @@ func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus
 				return g
 			}
 			slog.Error("Existing collector is not expected type",
+				"metric", metricName,
 				"expected", "prometheus.Gauge",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
 			return gauge
 		}
-		slog.Error("Failed to register metric", "error", err)
+		slog.Error("Failed to register metric", "metric", metricName, "error", err)
 		return gauge
 	}
 	return gauge
@@ -53,7 +54,7 @@ func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus
 
 // registerHistogram registers a HistogramVec or reuses the existing one.
 // Always returns a non-nil HistogramVec, panicking on a nil input.
-func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *prometheus.HistogramVec {
+func registerHistogram(reg prometheus.Registerer, metricName string, hv *prometheus.HistogramVec) *prometheus.HistogramVec {
 	if hv == nil {
 		panic("registerHistogram: nil HistogramVec provided")
 	}
@@ -64,12 +65,13 @@ func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *
 				return existing
 			}
 			slog.Error("Existing collector is not expected type",
+				"metric", metricName,
 				"expected", "*prometheus.HistogramVec",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
 			return hv
 		}
-		slog.Error("Failed to register metric", "error", err)
+		slog.Error("Failed to register metric", "metric", metricName, "error", err)
 		return hv
 	}
 	return hv
@@ -77,7 +79,7 @@ func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *
 
 // registerCounter registers a CounterVec or reuses the existing one.
 // Always returns a non-nil CounterVec, panicking on a nil input.
-func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prometheus.CounterVec {
+func registerCounter(reg prometheus.Registerer, metricName string, cv *prometheus.CounterVec) *prometheus.CounterVec {
 	if cv == nil {
 		panic("registerCounter: nil CounterVec provided")
 	}
@@ -88,12 +90,13 @@ func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prom
 				return existing
 			}
 			slog.Error("Existing collector is not expected type",
+				"metric", metricName,
 				"expected", "*prometheus.CounterVec",
 				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
 			)
 			return cv
 		}
-		slog.Error("Failed to register metric", "error", err)
+		slog.Error("Failed to register metric", "metric", metricName, "error", err)
 		return cv
 	}
 	return cv
@@ -160,16 +163,16 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	}
 
 	// Register or reuse collectors
-	m.stage = registerGauge(reg, m.stage)
-	m.duration = registerHistogram(reg, m.duration)
-	m.requestFailed = registerCounter(reg, m.requestFailed)
+	m.stage = registerGauge(reg, "stage", m.stage)
+	m.duration = registerHistogram(reg, "request_duration_seconds", m.duration)
+	m.requestFailed = registerCounter(reg, "request_failed_total", m.requestFailed)
 
-	m.redisPoolTotalConns = registerGauge(reg, m.redisPoolTotalConns)
-	m.redisPoolIdleConns = registerGauge(reg, m.redisPoolIdleConns)
-	m.redisPoolStaleConns = registerGauge(reg, m.redisPoolStaleConns)
-	m.redisPoolHits = registerGauge(reg, m.redisPoolHits)
-	m.redisPoolMisses = registerGauge(reg, m.redisPoolMisses)
-	m.redisPoolTimeouts = registerGauge(reg, m.redisPoolTimeouts)
+	m.redisPoolTotalConns = registerGauge(reg, "redis_pool_total_conns", m.redisPoolTotalConns)
+	m.redisPoolIdleConns = registerGauge(reg, "redis_pool_idle_conns", m.redisPoolIdleConns)
+	m.redisPoolStaleConns = registerGauge(reg, "redis_pool_stale_conns", m.redisPoolStaleConns)
+	m.redisPoolHits = registerGauge(reg, "redis_pool_hits", m.redisPoolHits)
+	m.redisPoolMisses = registerGauge(reg, "redis_pool_misses", m.redisPoolMisses)
+	m.redisPoolTimeouts = registerGauge(reg, "redis_pool_timeouts", m.redisPoolTimeouts)
 
 	return m
 }

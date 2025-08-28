@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -120,8 +121,8 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 	if len(m) < 2 {
 		t.Fatalf("did not find set count metric for target %s", target)
 	}
-	var n int
-	if _, err := fmt.Sscanf(string(m[1]), "%d", &n); err != nil {
+	n, err := strconv.Atoi(string(m[1]))
+	if err != nil {
 		t.Fatalf("parse metric value: %v", err)
 	}
 	return n
