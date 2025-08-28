@@ -103,8 +103,7 @@ func stopIfRunning(t *testing.T, baseURL string) error {
 	if err != nil {
 		return err
 	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	defer resp.Body.Close()
 	return nil
 }
 
