@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,7 +117,7 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	// Match redbench_request_duration_seconds_count with command="set" and target label
-	re := regexp.MustCompile(`redbench_request_duration_seconds_count\{[^}]*command="set"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+(\d+)`)
+	re := getSetCountRegex(target)
 	m := re.FindSubmatch(b)
 	if len(m) < 2 {
 		t.Fatalf("did not find set count metric for target %s", target)
@@ -126,4 +127,16 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 		t.Fatalf("parse metric value: %v", err)
 	}
 	return n
+}
+
+var setCountReCache sync.Map // map[string]*regexp.Regexp
+
+func getSetCountRegex(target string) *regexp.Regexp {
+	if v, ok := setCountReCache.Load(target); ok {
+		return v.(*regexp.Regexp)
+	}
+	pattern := `redbench_request_duration_seconds_count\{[^}]*command="set"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+(\d+)`
+	re := regexp.MustCompile(pattern)
+	setCountReCache.Store(target, re)
+	return re
 }
