@@ -87,21 +87,28 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	}
 
 	// Register metrics, handling duplicates gracefully
-	collectors := []prometheus.Collector{
-		m.duration, m.stage, m.requestFailed,
-		m.redisPoolTotalConns, m.redisPoolIdleConns, m.redisPoolStaleConns,
-		m.redisPoolHits, m.redisPoolMisses, m.redisPoolTimeouts,
-	}
-
-	for _, collector := range collectors {
-		if err := reg.Register(collector); err != nil {
-			// Check if it's already registered - this is expected for subsequent benchmarks
-			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+	assignOrReuse := func(c prometheus.Collector, assign func(prometheus.Collector)) {
+		if err := reg.Register(c); err != nil {
+			if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+				assign(are.ExistingCollector)
+			} else {
 				slog.Error("Failed to register metric", "error", err)
-				// Continue with other metrics even if one fails
 			}
+		} else {
+			assign(c)
 		}
 	}
+
+	assignOrReuse(m.stage, func(ec prometheus.Collector) { m.stage = ec.(prometheus.Gauge) })
+	assignOrReuse(m.duration, func(ec prometheus.Collector) { m.duration = ec.(*prometheus.HistogramVec) })
+	assignOrReuse(m.requestFailed, func(ec prometheus.Collector) { m.requestFailed = ec.(*prometheus.CounterVec) })
+
+	assignOrReuse(m.redisPoolTotalConns, func(ec prometheus.Collector) { m.redisPoolTotalConns = ec.(prometheus.Gauge) })
+	assignOrReuse(m.redisPoolIdleConns, func(ec prometheus.Collector) { m.redisPoolIdleConns = ec.(prometheus.Gauge) })
+	assignOrReuse(m.redisPoolStaleConns, func(ec prometheus.Collector) { m.redisPoolStaleConns = ec.(prometheus.Gauge) })
+	assignOrReuse(m.redisPoolHits, func(ec prometheus.Collector) { m.redisPoolHits = ec.(prometheus.Gauge) })
+	assignOrReuse(m.redisPoolMisses, func(ec prometheus.Collector) { m.redisPoolMisses = ec.(prometheus.Gauge) })
+	assignOrReuse(m.redisPoolTimeouts, func(ec prometheus.Collector) { m.redisPoolTimeouts = ec.(prometheus.Gauge) })
 
 	return m
 }
