@@ -1,13 +1,17 @@
 package worker
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -37,6 +41,26 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 
 	// Create the service server (reusing existing service logic)
 	server := service.NewServer(port, cfg, redisConn, reg)
+
+	// Inject completion notifier that posts to controller
+	server.Service().SetCompletionNotifier(func(jobID string, status string, errMsg string) {
+		// Best-effort notify
+		url := fmt.Sprintf("%s/workers/%s/completed", controllerURL, workerID)
+		payload := map[string]any{"jobId": jobID, "status": status}
+		if errMsg != "" {
+			payload["errorMessage"] = errMsg
+		}
+		b, _ := json.Marshal(payload)
+		client := &http.Client{Timeout: 5 * time.Second}
+		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(b))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			slog.Error("Failed to notify controller of completion", "error", err)
+			return
+		}
+		resp.Body.Close()
+	})
 
 	// Create registration client
 	regClient := NewRegistrationClient(controllerURL, workerID, address, port)

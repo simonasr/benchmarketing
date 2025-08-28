@@ -137,10 +137,10 @@ func (jm *JobManager) StartJob(jobID string) error {
 
 		// Send job assignment to worker using properly managed goroutine
 		wg.Add(1)
-		go func(workerID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
+		go func(workerID string, jobID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
 			defer wg.Done()
-			jm.sendJobToWorker(workerID, jobConfig, redisConfig)
-		}(assignment.WorkerID, job.Config, assignment.RedisConfig)
+			jm.sendJobToWorker(workerID, jobID, jobConfig, redisConfig)
+		}(assignment.WorkerID, job.ID, job.Config, assignment.RedisConfig)
 	}
 
 	// Wait for all job assignments to be sent before returning
@@ -200,6 +200,97 @@ func (jm *JobManager) StopJob(jobID string) error {
 			// Log error but continue with other workers
 			slog.Error("Failed to clear worker job", "worker_id", assignment.WorkerID, "error", err)
 			continue
+		}
+	}
+
+	return nil
+}
+
+// MarkJobStopped force-marks a job as stopped (used when it already completed but a stop is requested).
+func (jm *JobManager) MarkJobStopped(jobID string) error {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	job, exists := jm.jobs[jobID]
+	if !exists {
+		return fmt.Errorf("job %s not found", jobID)
+	}
+	if job.Status == JobStatusStopped {
+		return nil
+	}
+	// Allow converting completed or failed to stopped to satisfy idempotent semantics
+	if job.Status == JobStatusCompleted || job.Status == JobStatusFailed {
+		now := time.Now()
+		job.Status = JobStatusStopped
+		job.EndTime = &now
+		return nil
+	}
+	return fmt.Errorf("cannot mark job %s as stopped from status %s", jobID, job.Status)
+}
+
+// HandleWorkerCompletion updates state when a worker reports completion or failure.
+func (jm *JobManager) HandleWorkerCompletion(workerID string, req WorkerCompletionRequest) error {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	job, exists := jm.jobs[req.JobID]
+	if !exists {
+		return fmt.Errorf("job %s not found", req.JobID)
+	}
+
+	// Update the assignment for this worker
+	updated := false
+	for i := range job.Assignments {
+		if job.Assignments[i].WorkerID == workerID {
+			job.Assignments[i].Status = req.Status
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		return fmt.Errorf("worker %s not assigned to job %s", workerID, req.JobID)
+	}
+
+	// Mark worker as idle and clear job
+	if err := jm.registry.UpdateWorkerStatus(workerID, "idle"); err != nil {
+		slog.Error("Failed to update worker status to idle on completion", "worker_id", workerID, "error", err)
+	}
+	if err := jm.registry.UpdateWorkerJob(workerID, ""); err != nil {
+		slog.Error("Failed to clear worker job on completion", "worker_id", workerID, "error", err)
+	}
+
+	// Determine overall job status if applicable
+	allCompleted := true
+	anyFailed := false
+	for i := range job.Assignments {
+		switch job.Assignments[i].Status {
+		case "completed":
+			// ok
+		case "failed":
+			anyFailed = true
+			allCompleted = false
+		default:
+			allCompleted = false
+		}
+	}
+	if allCompleted {
+		now := time.Now()
+		job.Status = JobStatusCompleted
+		job.EndTime = &now
+	} else if anyFailed {
+		// Only mark failed if no assignments are still running/assigned
+		noneRunning := true
+		for i := range job.Assignments {
+			if job.Assignments[i].Status == "running" || job.Assignments[i].Status == "assigned" {
+				noneRunning = false
+				break
+			}
+		}
+		if noneRunning {
+			now := time.Now()
+			job.Status = JobStatusFailed
+			job.EndTime = &now
+			job.ErrorMessage = req.ErrorMessage
 		}
 	}
 
@@ -269,7 +360,7 @@ func (jm *JobManager) targetLabelFor(target JobTarget) string {
 }
 
 // sendJobToWorker sends a job assignment to a specific worker.
-func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
+func (jm *JobManager) sendJobToWorker(workerID string, jobID string, jobConfig *config.Config, redisConfig *config.RedisConnection) {
 	// Get worker details from registry
 	worker, exists := jm.registry.GetWorker(workerID)
 	if !exists {
@@ -323,6 +414,7 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobConfig *config.Config,
 
 	startRequest := map[string]interface{}{
 		"redis": redisOverrides,
+		"jobId": jobID,
 	}
 	if testOverrides != nil {
 		startRequest["test"] = testOverrides

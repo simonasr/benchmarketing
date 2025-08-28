@@ -20,6 +20,11 @@ type Server struct {
 	port       int
 }
 
+// Service returns the underlying Service instance for wiring callbacks.
+func (s *Server) Service() *Service {
+	return s.service
+}
+
 // NewServer creates a new HTTP server for service mode.
 func NewServer(port int, baseConfig *config.Config, redisConn *config.RedisConnection, metricsRegistry *prometheus.Registry) *Server {
 	service := NewService(baseConfig, redisConn, metricsRegistry)

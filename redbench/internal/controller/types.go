@@ -59,6 +59,13 @@ type Job struct {
 	ErrorMessage string             `json:"errorMessage,omitempty"`
 }
 
+// WorkerCompletionRequest represents a worker's completion callback payload.
+type WorkerCompletionRequest struct {
+	JobID        string `json:"jobId"`
+	Status       string `json:"status"` // expected: "completed" or "failed"
+	ErrorMessage string `json:"errorMessage,omitempty"`
+}
+
 // RegistrationRequest represents a worker registration request.
 type RegistrationRequest struct {
 	WorkerID string `json:"workerId"`
