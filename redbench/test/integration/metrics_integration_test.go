@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"sync"
 	"testing"
 	"time"
 
@@ -128,14 +127,7 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 	return n
 }
 
-var setCountReCache sync.Map // map[string]*regexp.Regexp
-
 func getSetCountRegex(target string) *regexp.Regexp {
-	if v, ok := setCountReCache.Load(target); ok {
-		return v.(*regexp.Regexp)
-	}
 	pattern := `redbench_request_duration_seconds_count\{[^}]*command="set"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+(\d+)`
-	re := regexp.MustCompile(pattern)
-	setCountReCache.Store(target, re)
-	return re
+	return regexp.MustCompile(pattern)
 }

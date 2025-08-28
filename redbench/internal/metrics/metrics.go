@@ -39,7 +39,10 @@ func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus
 			if g, ok := are.ExistingCollector.(prometheus.Gauge); ok {
 				return g
 			}
-			slog.Error("Existing collector is not a prometheus.Gauge")
+			slog.Error("Existing collector is not expected type",
+				"expected", "prometheus.Gauge",
+				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
+			)
 			return nil
 		}
 		slog.Error("Failed to register metric", "error", err)
@@ -59,7 +62,10 @@ func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *
 			if existing, ok := are.ExistingCollector.(*prometheus.HistogramVec); ok {
 				return existing
 			}
-			slog.Error("Existing collector is not a *prometheus.HistogramVec")
+			slog.Error("Existing collector is not expected type",
+				"expected", "*prometheus.HistogramVec",
+				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
+			)
 			return nil
 		}
 		slog.Error("Failed to register metric", "error", err)
@@ -79,7 +85,10 @@ func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prom
 			if existing, ok := are.ExistingCollector.(*prometheus.CounterVec); ok {
 				return existing
 			}
-			slog.Error("Existing collector is not a *prometheus.CounterVec")
+			slog.Error("Existing collector is not expected type",
+				"expected", "*prometheus.CounterVec",
+				"got_type", fmt.Sprintf("%T", are.ExistingCollector),
+			)
 			return nil
 		}
 		slog.Error("Failed to register metric", "error", err)
