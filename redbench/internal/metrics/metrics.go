@@ -28,10 +28,10 @@ type Metrics struct {
 }
 
 // registerGauge registers a Gauge or reuses the existing collector if already registered.
-// Always returns a non-nil Gauge, falling back to the provided one on errors.
+// Always returns a non-nil Gauge, panicking on a nil input.
 func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus.Gauge {
 	if gauge == nil {
-		return prometheus.NewGauge(prometheus.GaugeOpts{Name: "noop_gauge"})
+		panic("registerGauge: nil gauge provided")
 	}
 	if err := reg.Register(gauge); err != nil {
 		var are prometheus.AlreadyRegisteredError
@@ -52,10 +52,10 @@ func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus
 }
 
 // registerHistogram registers a HistogramVec or reuses the existing one.
-// Always returns a non-nil HistogramVec, falling back to the provided one on errors.
+// Always returns a non-nil HistogramVec, panicking on a nil input.
 func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *prometheus.HistogramVec {
 	if hv == nil {
-		return prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "noop_histogram"}, []string{"noop"})
+		panic("registerHistogram: nil HistogramVec provided")
 	}
 	if err := reg.Register(hv); err != nil {
 		var are prometheus.AlreadyRegisteredError
@@ -76,10 +76,10 @@ func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *
 }
 
 // registerCounter registers a CounterVec or reuses the existing one.
-// Always returns a non-nil CounterVec, falling back to the provided one on errors.
+// Always returns a non-nil CounterVec, panicking on a nil input.
 func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prometheus.CounterVec {
 	if cv == nil {
-		return prometheus.NewCounterVec(prometheus.CounterOpts{Name: "noop_counter"}, []string{"noop"})
+		panic("registerCounter: nil CounterVec provided")
 	}
 	if err := reg.Register(cv); err != nil {
 		var are prometheus.AlreadyRegisteredError
