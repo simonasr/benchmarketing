@@ -27,6 +27,67 @@ type Metrics struct {
 	target string
 }
 
+// registerGauge registers a Gauge or reuses the existing collector if already registered.
+// Returns the registered (or reused) Gauge, or nil on failure.
+func registerGauge(reg prometheus.Registerer, gauge prometheus.Gauge) prometheus.Gauge {
+	if gauge == nil {
+		return nil
+	}
+	if err := reg.Register(gauge); err != nil {
+		var are prometheus.AlreadyRegisteredError
+		if errors.As(err, &are) {
+			if g, ok := are.ExistingCollector.(prometheus.Gauge); ok {
+				return g
+			}
+			slog.Error("Existing collector is not a prometheus.Gauge")
+			return nil
+		}
+		slog.Error("Failed to register metric", "error", err)
+		return nil
+	}
+	return gauge
+}
+
+// registerHistogram registers a HistogramVec or reuses the existing one. Returns nil on failure.
+func registerHistogram(reg prometheus.Registerer, hv *prometheus.HistogramVec) *prometheus.HistogramVec {
+	if hv == nil {
+		return nil
+	}
+	if err := reg.Register(hv); err != nil {
+		var are prometheus.AlreadyRegisteredError
+		if errors.As(err, &are) {
+			if existing, ok := are.ExistingCollector.(*prometheus.HistogramVec); ok {
+				return existing
+			}
+			slog.Error("Existing collector is not a *prometheus.HistogramVec")
+			return nil
+		}
+		slog.Error("Failed to register metric", "error", err)
+		return nil
+	}
+	return hv
+}
+
+// registerCounter registers a CounterVec or reuses the existing one. Returns nil on failure.
+func registerCounter(reg prometheus.Registerer, cv *prometheus.CounterVec) *prometheus.CounterVec {
+	if cv == nil {
+		return nil
+	}
+	if err := reg.Register(cv); err != nil {
+		var are prometheus.AlreadyRegisteredError
+		if errors.As(err, &are) {
+			if existing, ok := are.ExistingCollector.(*prometheus.CounterVec); ok {
+				return existing
+			}
+			slog.Error("Existing collector is not a *prometheus.CounterVec")
+			return nil
+		}
+		slog.Error("Failed to register metric", "error", err)
+		return nil
+	}
+	return cv
+}
+
 // New creates a new Metrics instance with the provided registry and target label.
 func New(reg prometheus.Registerer, target string) *Metrics {
 	m := &Metrics{
@@ -87,84 +148,17 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 		}),
 	}
 
-	// Register metrics, handling duplicates gracefully (supporting wrapped errors)
-	assignOrReuse := func(c prometheus.Collector, assign func(prometheus.Collector)) {
-		if err := reg.Register(c); err != nil {
-			var are prometheus.AlreadyRegisteredError
-			if errors.As(err, &are) {
-				assign(are.ExistingCollector)
-			} else {
-				slog.Error("Failed to register metric", "error", err)
-			}
-		} else {
-			assign(c)
-		}
-	}
+	// Register or reuse collectors
+	m.stage = registerGauge(reg, m.stage)
+	m.duration = registerHistogram(reg, m.duration)
+	m.requestFailed = registerCounter(reg, m.requestFailed)
 
-	assignOrReuse(m.stage, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.stage = g
-		} else {
-			slog.Error("Existing collector for stage is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.duration, func(ec prometheus.Collector) {
-		if hv, ok := ec.(*prometheus.HistogramVec); ok {
-			m.duration = hv
-		} else {
-			slog.Error("Existing collector for duration is not a *prometheus.HistogramVec")
-		}
-	})
-	assignOrReuse(m.requestFailed, func(ec prometheus.Collector) {
-		if cv, ok := ec.(*prometheus.CounterVec); ok {
-			m.requestFailed = cv
-		} else {
-			slog.Error("Existing collector for requestFailed is not a *prometheus.CounterVec")
-		}
-	})
-
-	assignOrReuse(m.redisPoolTotalConns, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolTotalConns = g
-		} else {
-			slog.Error("Existing collector for redisPoolTotalConns is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.redisPoolIdleConns, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolIdleConns = g
-		} else {
-			slog.Error("Existing collector for redisPoolIdleConns is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.redisPoolStaleConns, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolStaleConns = g
-		} else {
-			slog.Error("Existing collector for redisPoolStaleConns is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.redisPoolHits, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolHits = g
-		} else {
-			slog.Error("Existing collector for redisPoolHits is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.redisPoolMisses, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolMisses = g
-		} else {
-			slog.Error("Existing collector for redisPoolMisses is not a prometheus.Gauge")
-		}
-	})
-	assignOrReuse(m.redisPoolTimeouts, func(ec prometheus.Collector) {
-		if g, ok := ec.(prometheus.Gauge); ok {
-			m.redisPoolTimeouts = g
-		} else {
-			slog.Error("Existing collector for redisPoolTimeouts is not a prometheus.Gauge")
-		}
-	})
+	m.redisPoolTotalConns = registerGauge(reg, m.redisPoolTotalConns)
+	m.redisPoolIdleConns = registerGauge(reg, m.redisPoolIdleConns)
+	m.redisPoolStaleConns = registerGauge(reg, m.redisPoolStaleConns)
+	m.redisPoolHits = registerGauge(reg, m.redisPoolHits)
+	m.redisPoolMisses = registerGauge(reg, m.redisPoolMisses)
+	m.redisPoolTimeouts = registerGauge(reg, m.redisPoolTimeouts)
 
 	return m
 }
