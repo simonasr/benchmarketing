@@ -171,15 +171,9 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 			slog.Warn("Registration failed, retrying", "attempt", attempt, "max_attempts", registrationMaxAttempts, "error", err)
 			// Context-aware wait for backoff
 			timer := time.NewTimer(backoff)
+			defer timer.Stop()
 			select {
 			case <-ctx.Done():
-				if !timer.Stop() {
-					// Non-blocking drain to avoid potential blocking if already fired
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
 				return fmt.Errorf("registration cancelled due to context: %w", ctx.Err())
 			case <-timer.C:
 			}
@@ -193,7 +187,7 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 			}
 			continue
 		}
-		break
+		return nil
 	}
 	return nil
 }
