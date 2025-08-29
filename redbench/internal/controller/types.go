@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
@@ -25,6 +26,15 @@ const (
 	JobStatusCompleted JobStatus = "completed"
 	JobStatusStopped   JobStatus = "stopped"
 	JobStatusFailed    JobStatus = "failed"
+)
+
+// Assignment status values for worker-job assignments.
+const (
+	AssignmentStatusAssigned  = "assigned"
+	AssignmentStatusRunning   = "running"
+	AssignmentStatusStopped   = "stopped"
+	AssignmentStatusFailed    = WorkerCompletionFailed
+	AssignmentStatusCompleted = WorkerCompletionCompleted
 )
 
 // JobTarget represents a Redis target assignment for workers.
@@ -71,6 +81,19 @@ const (
 	WorkerCompletionCompleted = "completed"
 	WorkerCompletionFailed    = "failed"
 )
+
+// Validate validates the WorkerCompletionRequest payload.
+func (r WorkerCompletionRequest) Validate() error {
+	if r.JobID == "" {
+		return fmt.Errorf("jobId is required")
+	}
+	switch r.Status {
+	case WorkerCompletionCompleted, WorkerCompletionFailed:
+		return nil
+	default:
+		return fmt.Errorf("invalid status: %s", r.Status)
+	}
+}
 
 // RegistrationRequest represents a worker registration request.
 type RegistrationRequest struct {

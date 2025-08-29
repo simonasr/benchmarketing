@@ -110,7 +110,7 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 			logAndRespond(w, "Failed to parse completion request", err, "Invalid JSON in request body")
 			return
 		}
-		if req.JobID == "" || (req.Status != WorkerCompletionCompleted && req.Status != WorkerCompletionFailed) {
+		if err := req.Validate(); err != nil {
 			http.Error(w, "Invalid completion payload", http.StatusBadRequest)
 			return
 		}

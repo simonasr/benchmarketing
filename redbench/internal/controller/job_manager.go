@@ -120,7 +120,7 @@ func (jm *JobManager) StartJob(jobID string) error {
 	var wg sync.WaitGroup
 	for i := range job.Assignments {
 		assignment := &job.Assignments[i]
-		assignment.Status = "running"
+		assignment.Status = AssignmentStatusRunning
 
 		// Update worker status in registry
 		if err := jm.registry.UpdateWorkerStatus(assignment.WorkerID, "busy"); err != nil {
@@ -173,7 +173,7 @@ func (jm *JobManager) StopJob(jobID string) error {
 	var wg sync.WaitGroup
 	for i := range job.Assignments {
 		assignment := &job.Assignments[i]
-		assignment.Status = "stopped"
+		assignment.Status = AssignmentStatusStopped
 
 		// Send stop request to worker using properly managed goroutine
 		wg.Add(1)
@@ -281,7 +281,7 @@ func (jm *JobManager) HandleWorkerCompletion(workerID string, req WorkerCompleti
 		// Only mark failed if no assignments are still running/assigned
 		noneRunning := true
 		for i := range job.Assignments {
-			if job.Assignments[i].Status == "running" || job.Assignments[i].Status == "assigned" {
+			if job.Assignments[i].Status == AssignmentStatusRunning || job.Assignments[i].Status == AssignmentStatusAssigned {
 				noneRunning = false
 				break
 			}
