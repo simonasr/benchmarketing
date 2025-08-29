@@ -161,7 +161,7 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 			// Abort if context is done
 			select {
 			case <-ctx.Done():
-				return fmt.Errorf("failed to register with controller: %w", err)
+				return fmt.Errorf("registration cancelled due to context: %w", ctx.Err())
 			default:
 			}
 
@@ -174,9 +174,13 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				if !timer.Stop() {
-					<-timer.C
+					// Non-blocking drain to avoid potential blocking if already fired
+					select {
+					case <-timer.C:
+					default:
+					}
 				}
-				return fmt.Errorf("failed to register with controller: %w", err)
+				return fmt.Errorf("registration cancelled due to context: %w", ctx.Err())
 			case <-timer.C:
 			}
 			if backoff < registrationMaxBackoff {
