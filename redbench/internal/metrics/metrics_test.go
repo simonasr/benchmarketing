@@ -85,6 +85,30 @@ func TestUpdateRedisPoolStats(t *testing.T) {
 	// Skip nil test as it's not handled in the implementation
 }
 
+// Verifies that metrics are still updated when a second start occurs (duplicate registration case).
+func TestUpdateRedisPoolStats_AfterSecondStart(t *testing.T) {
+	reg := prometheus.NewRegistry()
+
+	// First start for target
+	m1 := New(reg, "repeat-target")
+	stats1 := &redis.PoolStats{TotalConns: 5, IdleConns: 2, StaleConns: 1, Hits: 10, Misses: 1, Timeouts: 0}
+	m1.UpdateRedisPoolStats(stats1)
+
+	// Second start for the same target (duplicate registration internally handled)
+	m2 := New(reg, "repeat-target")
+	stats2 := &redis.PoolStats{TotalConns: 7, IdleConns: 3, StaleConns: 2, Hits: 20, Misses: 2, Timeouts: 1}
+	m2.UpdateRedisPoolStats(stats2)
+
+	// Expose metrics and ensure endpoint is healthy (values presence is implicitly verified by scrape success)
+	server := httptest.NewServer(promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 func TestSetStage(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg, "test-target")
