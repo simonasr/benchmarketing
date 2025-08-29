@@ -10,6 +10,7 @@ import (
 // BenchmarkRequest represents the request body for starting a benchmark.
 // It allows overriding specific benchmark parameters for a single run.
 type BenchmarkRequest struct {
+	JobID string          `json:"jobId,omitempty"`
 	Redis *RedisOverrides `json:"redis,omitempty"`
 	Test  *TestOverrides  `json:"test,omitempty"`
 }
@@ -46,6 +47,18 @@ type TestOverrides struct {
 	ValueSize       *int `json:"valueSize,omitempty"`
 }
 
+// ParseBenchmarkRequest parses the raw request body into a BenchmarkRequest.
+func ParseBenchmarkRequest(requestBody []byte) (*BenchmarkRequest, error) {
+	if len(requestBody) == 0 {
+		return &BenchmarkRequest{}, nil
+	}
+	var req BenchmarkRequest
+	if err := json.Unmarshal(requestBody, &req); err != nil {
+		return nil, err
+	}
+	return &req, nil
+}
+
 // MergeConfiguration creates a new configuration by merging base config with API request overrides.
 // Priority: API Request Body (highest) > Environment Variables (medium) > config.yaml (lowest)
 // Note: Environment variables are already processed in config.LoadConfig()
@@ -69,16 +82,28 @@ func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.
 		return nil, err
 	}
 
+	return MergeConfigurationFromRequest(baseConfig, &req)
+}
+
+// MergeConfigurationFromRequest merges using an already parsed request to avoid duplicate unmarshalling.
+func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequest) (*config.Config, error) {
+	mergedConfig := &config.Config{
+		Debug:      baseConfig.Debug,
+		Redis:      baseConfig.Redis,
+		Test:       baseConfig.Test,
+		Controller: baseConfig.Controller,
+	}
+	if req == nil {
+		return mergedConfig, nil
+	}
 	// Apply test configuration overrides if provided
 	if req.Test != nil {
 		applyTestOverrides(&mergedConfig.Test, req.Test)
 	}
-
 	// Apply Redis configuration overrides if provided
 	if req.Redis != nil {
 		applyRedisConfigOverrides(&mergedConfig.Redis, req.Redis)
 	}
-
 	return mergedConfig, nil
 }
 
@@ -96,8 +121,13 @@ func CreateRedisConnection(baseRedisConn *config.RedisConnection, requestBody []
 		return nil, fmt.Errorf("parsing request body: %w", err)
 	}
 
+	return CreateRedisConnectionFromRequest(baseRedisConn, &req)
+}
+
+// CreateRedisConnectionFromRequest creates a Redis connection using an already parsed request.
+func CreateRedisConnectionFromRequest(baseRedisConn *config.RedisConnection, req *BenchmarkRequest) (*config.RedisConnection, error) {
 	// If no Redis overrides provided, return nil to use default connection
-	if req.Redis == nil {
+	if req == nil || req.Redis == nil {
 		return nil, nil
 	}
 

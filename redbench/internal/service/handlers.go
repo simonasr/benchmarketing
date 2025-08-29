@@ -136,15 +136,22 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// Merge configuration with request overrides
-	mergedConfig, err := MergeConfiguration(s.baseConfig, body)
+	// Parse once for reuse (jobId extraction and config/redis overrides)
+	req, err := ParseBenchmarkRequest(body)
+	if err != nil {
+		logAndRespond(w, "Failed to parse request body", err, fmt.Sprintf("Invalid request body: %v", err))
+		return
+	}
+
+	// Merge configuration with request overrides (use parsed request)
+	mergedConfig, err := MergeConfigurationFromRequest(s.baseConfig, req)
 	if err != nil {
 		logAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
 	// Create Redis connection from request overrides or use base connection
-	redisConn, err := CreateRedisConnection(s.baseRedisConn, body)
+	redisConn, err := CreateRedisConnectionFromRequest(s.baseRedisConn, req)
 	if err != nil {
 		logAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err))
 		return
@@ -161,11 +168,8 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Optional: extract jobId for controller correlation
-	var payload map[string]any
-	if err := json.Unmarshal(body, &payload); err != nil {
-		slog.Warn("Failed to unmarshal request body for jobId extraction", "error", err)
-	}
+	// Extract jobId directly from parsed request (if present)
+	jobID := req.JobID
 
 	// Try to start the benchmark
 	if !s.globalState.StartBenchmark(mergedConfig, redisConn) {
@@ -173,13 +177,10 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If jobId present, store it in state
-	if payload != nil {
-		if id, ok := payload["jobId"].(string); ok {
-			s.globalState.mu.Lock()
-			s.globalState.state.JobID = id
-			s.globalState.mu.Unlock()
-		}
+	if jobID != "" {
+		s.globalState.mu.Lock()
+		s.globalState.state.JobID = jobID
+		s.globalState.mu.Unlock()
 	}
 
 	// Start the benchmark in a goroutine
