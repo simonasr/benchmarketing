@@ -171,12 +171,13 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 			slog.Warn("Registration failed, retrying", "attempt", attempt, "max_attempts", registrationMaxAttempts, "error", err)
 			// Context-aware wait for backoff
 			timer := time.NewTimer(backoff)
-			defer timer.Stop()
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return fmt.Errorf("registration cancelled due to context: %w", ctx.Err())
 			case <-timer.C:
 			}
+			timer.Stop()
 			if backoff < registrationMaxBackoff {
 				next := backoff * registrationBackoffMultiplier
 				if next > registrationMaxBackoff {
@@ -189,7 +190,8 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 		}
 		return nil
 	}
-	return nil
+	// Defensive return: linter cannot prove all paths return
+	return fmt.Errorf("failed to register with controller: exceeded max attempts")
 }
 
 // resolveWorkerAddress determines the appropriate address for worker registration.
