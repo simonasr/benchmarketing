@@ -63,10 +63,13 @@ func ParseBenchmarkRequest(requestBody []byte) (*BenchmarkRequest, error) {
 // Priority: API Request Body (highest) > Environment Variables (medium) > config.yaml (lowest)
 // Note: Environment variables are already processed in config.LoadConfig()
 func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.Config, error) {
-	// If no request body provided, return a shallow copy of base config as-is
+	// If no request body provided, return a shallow copy of base config as-is.
+	// Safe: all fields in config.Config and nested structs are value types or strings
+	// (no slices/maps/pointers). If pointer/slice/map fields are added in the future,
+	// replace this with an explicit deep copy.
 	if len(requestBody) == 0 {
 		mergedConfig := &config.Config{}
-		*mergedConfig = *baseConfig // copy all fields
+		*mergedConfig = *baseConfig // copy all fields by value
 		return mergedConfig, nil
 	}
 
@@ -82,7 +85,9 @@ func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.
 // MergeConfigurationFromRequest merges using an already parsed request to avoid duplicate unmarshalling.
 func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequest) (*config.Config, error) {
 	mergedConfig := &config.Config{}
-	*mergedConfig = *baseConfig // copy all fields
+	// Safe shallow copy (see rationale above). Update to deep copy if mutable reference
+	// types are introduced into config.Config in the future.
+	*mergedConfig = *baseConfig
 	if req == nil {
 		return mergedConfig, nil
 	}
