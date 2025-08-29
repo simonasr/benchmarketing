@@ -91,8 +91,10 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 	// Completion callback
 	if strings.HasSuffix(path, "/completed") && r.Method == http.MethodPost {
 		workerID := strings.TrimSuffix(path, "/completed")
-		if workerID == "" || strings.HasSuffix(workerID, "/") {
-			workerID = strings.TrimSuffix(workerID, "/")
+		workerID = strings.TrimSuffix(workerID, "/")
+		if workerID == "" {
+			http.Error(w, "Worker ID required in URL path", http.StatusBadRequest)
+			return
 		}
 
 		// Read body

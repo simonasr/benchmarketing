@@ -50,9 +50,17 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 		if errMsg != "" {
 			payload["errorMessage"] = errMsg
 		}
-		b, _ := json.Marshal(payload)
+		b, err := json.Marshal(payload)
+		if err != nil {
+			slog.Error("Failed to marshal completion payload", "error", err)
+			return
+		}
 		client := &http.Client{Timeout: 5 * time.Second}
-		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(b))
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(b))
+		if err != nil {
+			slog.Error("Failed to create HTTP request for completion notification", "error", err)
+			return
+		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
