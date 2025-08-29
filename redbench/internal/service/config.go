@@ -63,16 +63,10 @@ func ParseBenchmarkRequest(requestBody []byte) (*BenchmarkRequest, error) {
 // Priority: API Request Body (highest) > Environment Variables (medium) > config.yaml (lowest)
 // Note: Environment variables are already processed in config.LoadConfig()
 func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.Config, error) {
-	// Start with a copy of the base configuration
-	mergedConfig := &config.Config{
-		Debug:      baseConfig.Debug,
-		Redis:      baseConfig.Redis,
-		Test:       baseConfig.Test,
-		Controller: baseConfig.Controller,
-	}
-
-	// If no request body provided, return the base config as-is
+	// If no request body provided, return a shallow copy of base config as-is
 	if len(requestBody) == 0 {
+		mergedConfig := &config.Config{}
+		*mergedConfig = *baseConfig // copy all fields
 		return mergedConfig, nil
 	}
 
@@ -87,12 +81,8 @@ func MergeConfiguration(baseConfig *config.Config, requestBody []byte) (*config.
 
 // MergeConfigurationFromRequest merges using an already parsed request to avoid duplicate unmarshalling.
 func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequest) (*config.Config, error) {
-	mergedConfig := &config.Config{
-		Debug:      baseConfig.Debug,
-		Redis:      baseConfig.Redis,
-		Test:       baseConfig.Test,
-		Controller: baseConfig.Controller,
-	}
+	mergedConfig := &config.Config{}
+	*mergedConfig = *baseConfig // copy all fields
 	if req == nil {
 		return mergedConfig, nil
 	}

@@ -64,11 +64,13 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
+		if resp != nil {
+			resp.Body.Close()
+		}
 		if err != nil {
 			slog.Error("Failed to notify controller of completion", "error", err)
 			return
 		}
-		resp.Body.Close()
 	})
 
 	// Create registration client
