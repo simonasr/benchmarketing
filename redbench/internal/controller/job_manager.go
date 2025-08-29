@@ -290,7 +290,11 @@ func (jm *JobManager) HandleWorkerCompletion(workerID string, req WorkerCompleti
 			now := time.Now()
 			job.Status = JobStatusFailed
 			job.EndTime = &now
-			job.ErrorMessage = req.ErrorMessage
+			if job.ErrorMessage == "" {
+				job.ErrorMessage = req.ErrorMessage
+			} else if req.ErrorMessage != "" {
+				job.ErrorMessage = job.ErrorMessage + "; " + req.ErrorMessage
+			}
 		}
 	}
 

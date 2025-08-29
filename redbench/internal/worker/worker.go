@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -42,6 +41,9 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 	// Create the service server (reusing existing service logic)
 	server := service.NewServer(port, cfg, redisConn, reg)
 
+	// Reuse a single HTTP client for completion notifications (config-driven)
+	client := &http.Client{Timeout: cfg.Controller.HTTPTimeout()}
+
 	// Inject completion notifier that posts to controller
 	server.Service().SetCompletionNotifier(func(jobID string, status string, errMsg string) {
 		// Best-effort notify
@@ -55,7 +57,6 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 			slog.Error("Failed to marshal completion payload", "error", err)
 			return
 		}
-		client := &http.Client{Timeout: 5 * time.Second}
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(b))
 		if err != nil {
 			slog.Error("Failed to create HTTP request for completion notification", "error", err)

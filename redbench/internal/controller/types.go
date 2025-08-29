@@ -83,7 +83,7 @@ const (
 )
 
 // Validate validates the WorkerCompletionRequest payload.
-func (r WorkerCompletionRequest) Validate() error {
+func (r *WorkerCompletionRequest) Validate() error {
 	if r.JobID == "" {
 		return fmt.Errorf("jobId is required")
 	}
