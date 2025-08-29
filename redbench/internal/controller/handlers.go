@@ -99,11 +99,11 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Read body
 		body, err := io.ReadAll(r.Body)
+		defer r.Body.Close()
 		if err != nil {
 			logAndRespond(w, "Failed to read completion request", err, "Failed to read request body")
 			return
 		}
-		defer r.Body.Close()
 
 		var req WorkerCompletionRequest
 		if err := json.Unmarshal(body, &req); err != nil {
@@ -111,7 +111,7 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := req.Validate(); err != nil {
-			http.Error(w, "Invalid completion payload", http.StatusBadRequest)
+			logAndRespond(w, "Invalid completion payload", err, "Invalid completion payload")
 			return
 		}
 
