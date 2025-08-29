@@ -169,9 +169,23 @@ func (w *Worker) registerWithRetry(ctx context.Context) error {
 				return fmt.Errorf("failed to register with controller: %w", err)
 			}
 			slog.Warn("Registration failed, retrying", "attempt", attempt, "max_attempts", registrationMaxAttempts, "error", err)
-			time.Sleep(backoff)
+			// Context-aware wait for backoff
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return fmt.Errorf("failed to register with controller: %w", err)
+			case <-timer.C:
+			}
 			if backoff < registrationMaxBackoff {
-				backoff = backoff * registrationBackoffMultiplier
+				next := backoff * registrationBackoffMultiplier
+				if next > registrationMaxBackoff {
+					backoff = registrationMaxBackoff
+				} else {
+					backoff = next
+				}
 			}
 			continue
 		}
