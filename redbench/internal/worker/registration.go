@@ -62,7 +62,6 @@ func (rc *RegistrationClient) Register() error {
 		return fmt.Errorf("registration failed with status %d", resp.StatusCode)
 	}
 
-	slog.Info("Worker registered successfully", "worker_id", rc.workerID, "controller", rc.controllerURL)
 	return nil
 }
 
