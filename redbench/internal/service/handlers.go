@@ -163,7 +163,9 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Optional: extract jobId for controller correlation
 	var payload map[string]any
-	_ = json.Unmarshal(body, &payload)
+	if err := json.Unmarshal(body, &payload); err != nil {
+		slog.Warn("Failed to unmarshal request body for jobId extraction", "error", err)
+	}
 
 	// Try to start the benchmark
 	if !s.globalState.StartBenchmark(mergedConfig, redisConn) {

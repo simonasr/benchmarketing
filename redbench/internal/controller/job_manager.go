@@ -264,9 +264,9 @@ func (jm *JobManager) HandleWorkerCompletion(workerID string, req WorkerCompleti
 	anyFailed := false
 	for i := range job.Assignments {
 		switch job.Assignments[i].Status {
-		case "completed":
+		case WorkerCompletionCompleted:
 			// ok
-		case "failed":
+		case WorkerCompletionFailed:
 			anyFailed = true
 			allCompleted = false
 		default:

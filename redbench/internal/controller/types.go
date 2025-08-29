@@ -62,9 +62,15 @@ type Job struct {
 // WorkerCompletionRequest represents a worker's completion callback payload.
 type WorkerCompletionRequest struct {
 	JobID        string `json:"jobId"`
-	Status       string `json:"status"` // expected: "completed" or "failed"
+	Status       string `json:"status"` // expected: one of worker completion status constants
 	ErrorMessage string `json:"errorMessage,omitempty"`
 }
+
+// Worker completion status values used in callbacks from workers.
+const (
+	WorkerCompletionCompleted = "completed"
+	WorkerCompletionFailed    = "failed"
+)
 
 // RegistrationRequest represents a worker registration request.
 type RegistrationRequest struct {
