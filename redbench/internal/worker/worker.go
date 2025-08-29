@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,6 +26,17 @@ type Worker struct {
 	workerID  string
 	port      int
 }
+
+// Retry configuration for worker registration
+const (
+	registrationMaxAttempts       = 5
+	registrationInitialBackoff    = 200 * time.Millisecond
+	registrationMaxBackoff        = 1600 * time.Millisecond
+	registrationBackoffMultiplier = 2
+)
+
+// Periodic re-registration interval (variable to allow test override)
+var registrationRefreshInterval = 10 * time.Second
 
 // NewWorker creates a new worker instance.
 func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, controllerURL string, bindAddress string, reg *prometheus.Registry) (*Worker, error) {
@@ -88,9 +100,9 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 func (w *Worker) Start(ctx context.Context) error {
 	slog.Info("Starting worker", "worker_id", w.workerID, "port", w.port)
 
-	// Register with controller
-	if err := w.regClient.Register(); err != nil {
-		return fmt.Errorf("failed to register with controller: %w", err)
+	// Register with controller (simple retry with exponential backoff)
+	if err := w.registerWithRetry(ctx); err != nil {
+		return err
 	}
 
 	// Set up graceful shutdown with unregistration
@@ -116,12 +128,55 @@ func (w *Worker) Start(ctx context.Context) error {
 		cancel()
 	}()
 
+	// Periodic re-registration loop to survive controller restarts
+	go func(parentCtx context.Context) {
+		ticker := time.NewTicker(registrationRefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-parentCtx.Done():
+				return
+			case <-ticker.C:
+				if err := w.registerWithRetry(parentCtx); err != nil {
+					slog.Warn("Periodic re-registration failed", "error", err)
+				}
+			}
+		}
+	}(ctx)
+
 	// Start the service server (this will block until shutdown)
 	if err := w.server.Start(ctx); err != nil {
 		return fmt.Errorf("worker server failed: %w", err)
 	}
 
 	slog.Info("Worker shutdown complete", "worker_id", w.workerID)
+	return nil
+}
+
+// registerWithRetry performs registration with retry/backoff respecting the context.
+func (w *Worker) registerWithRetry(ctx context.Context) error {
+	backoff := registrationInitialBackoff
+	for attempt := 1; attempt <= registrationMaxAttempts; attempt++ {
+		if err := w.regClient.Register(); err != nil {
+			// Abort if context is done
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("failed to register with controller: %w", err)
+			default:
+			}
+
+			if attempt == registrationMaxAttempts {
+				return fmt.Errorf("failed to register with controller: %w", err)
+			}
+			slog.Warn("Registration failed, retrying", "attempt", attempt, "max_attempts", registrationMaxAttempts, "error", err)
+			time.Sleep(backoff)
+			if backoff < registrationMaxBackoff {
+				backoff = backoff * registrationBackoffMultiplier
+			}
+			continue
+		}
+		break
+	}
 	return nil
 }
 

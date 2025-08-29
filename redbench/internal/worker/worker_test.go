@@ -212,6 +212,87 @@ func TestWorkerStartRegistrationFailure(t *testing.T) {
 	}
 }
 
+func TestWorkerStartRegistrationRetryThenSuccess(t *testing.T) {
+	// Controller returns 500 twice, then 201
+	attempt := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/workers/register" {
+			attempt++
+			if attempt < 3 {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"temporary"}`))
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"status":"registered"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Controller: config.ControllerConfig{HTTPTimeoutMs: 1000}}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+	reg := prometheus.NewRegistry()
+
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err = worker.Start(ctx)
+	if err != nil {
+		t.Fatalf("Expected success after retries, got error: %v", err)
+	}
+
+	if attempt != 3 {
+		t.Fatalf("Expected 3 registration attempts, got %d", attempt)
+	}
+}
+
+func TestPeriodicReregistration(t *testing.T) {
+	// Speed up the ticker for test
+	old := registrationRefreshInterval
+	registrationRefreshInterval = 100 * time.Millisecond
+	defer func() { registrationRefreshInterval = old }()
+
+	regCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/workers/register" {
+			regCount++
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"status":"registered"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Controller: config.ControllerConfig{HTTPTimeoutMs: 500}}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+	reg := prometheus.NewRegistry()
+
+	worker, err := NewWorker(cfg, redisConn, 8080, server.URL, "", reg)
+	if err != nil {
+		t.Fatalf("Failed to create worker: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
+	defer cancel()
+
+	if err := worker.Start(ctx); err != nil {
+		t.Fatalf("worker.Start error: %v", err)
+	}
+
+	// On start, it registers once, plus ~3 ticks
+	if regCount < 3 {
+		t.Fatalf("expected multiple registrations, got %d", regCount)
+	}
+}
+
 func TestWorkerStartControllerUnavailable(t *testing.T) {
 	cfg := &config.Config{}
 	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
