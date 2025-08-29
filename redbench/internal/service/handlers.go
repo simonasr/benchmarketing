@@ -176,11 +176,8 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	// If jobId present, store it in state
 	if payload != nil {
 		if id, ok := payload["jobId"].(string); ok {
-			st := s.globalState.GetState()
-			st.JobID = id
-			// write back
 			s.globalState.mu.Lock()
-			s.globalState.state.JobID = st.JobID
+			s.globalState.state.JobID = id
 			s.globalState.mu.Unlock()
 		}
 	}
