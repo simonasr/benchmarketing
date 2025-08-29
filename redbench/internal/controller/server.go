@@ -47,7 +47,7 @@ func NewServer(port int, cfg *config.Config, metricsRegistry *prometheus.Registr
 
 	// Worker management endpoints
 	mux.HandleFunc("/workers/register", controller.RegisterWorkerHandler)
-	mux.HandleFunc("/workers/", controller.WorkerHandler) // For DELETE /workers/{id}
+	mux.HandleFunc("/workers/", controller.WorkerHandler) // DELETE /workers/{id}, POST /workers/{id}/completed
 	mux.HandleFunc("/workers", controller.ListWorkersHandler)
 
 	// Job management endpoints

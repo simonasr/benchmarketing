@@ -23,6 +23,7 @@ type BenchmarkState struct {
 	Status        BenchmarkStatus         `json:"status"`
 	Configuration *config.Config          `json:"configuration,omitempty"`
 	RedisTarget   *config.RedisConnection `json:"redisTarget,omitempty"`
+	JobID         string                  `json:"jobId,omitempty"`
 	StartTime     *time.Time              `json:"startTime,omitempty"`
 	EndTime       *time.Time              `json:"endTime,omitempty"`
 	ErrorMessage  string                  `json:"errorMessage,omitempty"`

@@ -76,16 +76,58 @@ func (c *Controller) RegisterWorkerHandler(w http.ResponseWriter, r *http.Reques
 	writeJSONResponse(w, response, http.StatusCreated)
 }
 
-// WorkerHandler handles DELETE requests to unregister a worker.
+// WorkerHandler handles worker-related requests.
+// Supported:
+// - DELETE /workers/{id}: unregister worker
+// - POST /workers/{id}/completed: worker completion callback
 func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodDelete) {
-		return
-	}
-
-	// Extract worker ID from URL path
+	// Extract path after /workers/
 	path := strings.TrimPrefix(r.URL.Path, "/workers/")
 	if path == "" || path == r.URL.Path {
 		http.Error(w, "Worker ID required in URL path", http.StatusBadRequest)
+		return
+	}
+
+	// Completion callback
+	if strings.HasSuffix(path, "/completed") && r.Method == http.MethodPost {
+		workerID := strings.TrimSuffix(path, "/completed")
+		workerID = strings.TrimSuffix(workerID, "/")
+		if workerID == "" {
+			http.Error(w, "Worker ID required in URL path", http.StatusBadRequest)
+			return
+		}
+
+		// Read body
+		body, err := io.ReadAll(r.Body)
+		defer r.Body.Close()
+		if err != nil {
+			logAndRespond(w, "Failed to read completion request", err, "Failed to read request body")
+			return
+		}
+
+		var req WorkerCompletionRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			logAndRespond(w, "Failed to parse completion request", err, "Invalid JSON in request body")
+			return
+		}
+		if err := req.Validate(); err != nil {
+			logAndRespond(w, "Invalid completion payload", err, "Invalid completion payload")
+			return
+		}
+
+		if err := c.jobManager.HandleWorkerCompletion(workerID, req); err != nil {
+			logAndRespond(w, "Failed to handle worker completion", err, "Failed to handle worker completion")
+			return
+		}
+
+		slog.Info("Worker reported completion", "worker_id", workerID, "job_id", req.JobID, "status", req.Status)
+		writeJSONResponse(w, map[string]any{"status": "ok"}, http.StatusOK)
+		return
+	}
+
+	// Unregister handler
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -189,6 +231,16 @@ func (c *Controller) StopJobHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if activeJob == nil {
+		// If latest job exists and is already completed, make stop idempotent
+		if len(jobs) > 0 {
+			latest := jobs[len(jobs)-1]
+			if latest.Status == JobStatusCompleted || latest.Status == JobStatusFailed {
+				_ = c.jobManager.MarkJobStopped(latest.ID)
+				updated, _ := c.jobManager.GetJob(latest.ID)
+				writeJSONResponse(w, updated, http.StatusOK)
+				return
+			}
+		}
 		http.Error(w, "No active job found", http.StatusNotFound)
 		return
 	}

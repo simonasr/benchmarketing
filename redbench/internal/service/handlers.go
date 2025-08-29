@@ -56,6 +56,10 @@ type Service struct {
 	// Synchronize access to cancelFunc to prevent race conditions
 	cancelMu   sync.Mutex
 	cancelFunc context.CancelFunc // To cancel running benchmark
+
+	// Completion notifier wiring
+	completionMu       sync.RWMutex
+	completionNotifier func(jobID string, status string, errMsg string)
 }
 
 // NewService creates a new Service instance.
@@ -65,6 +69,22 @@ func NewService(baseConfig *config.Config, baseRedisConn *config.RedisConnection
 		baseConfig:      baseConfig,
 		baseRedisConn:   baseRedisConn,
 		metricsRegistry: metricsRegistry,
+	}
+}
+
+// SetCompletionNotifier sets a callback invoked when a run completes or fails.
+func (s *Service) SetCompletionNotifier(fn func(jobID string, status string, errMsg string)) {
+	s.completionMu.Lock()
+	s.completionNotifier = fn
+	s.completionMu.Unlock()
+}
+
+func (s *Service) notifyCompletion(jobID string, status string, errMsg string) {
+	s.completionMu.RLock()
+	fn := s.completionNotifier
+	s.completionMu.RUnlock()
+	if fn != nil {
+		fn(jobID, status, errMsg)
 	}
 }
 
@@ -116,15 +136,22 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// Merge configuration with request overrides
-	mergedConfig, err := MergeConfiguration(s.baseConfig, body)
+	// Parse once for reuse (jobId extraction and config/redis overrides)
+	req, err := ParseBenchmarkRequest(body)
+	if err != nil {
+		logAndRespond(w, "Failed to parse request body", err, fmt.Sprintf("Invalid request body: %v", err))
+		return
+	}
+
+	// Merge configuration with request overrides (use parsed request)
+	mergedConfig, err := MergeConfigurationFromRequest(s.baseConfig, req)
 	if err != nil {
 		logAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
 	// Create Redis connection from request overrides or use base connection
-	redisConn, err := CreateRedisConnection(s.baseRedisConn, body)
+	redisConn, err := CreateRedisConnectionFromRequest(s.baseRedisConn, req)
 	if err != nil {
 		logAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err))
 		return
@@ -141,10 +168,19 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract jobId directly from parsed request (if present)
+	jobID := req.JobID
+
 	// Try to start the benchmark
 	if !s.globalState.StartBenchmark(mergedConfig, redisConn) {
 		http.Error(w, "Benchmark is already running", http.StatusConflict)
 		return
+	}
+
+	if jobID != "" {
+		s.globalState.mu.Lock()
+		s.globalState.state.JobID = jobID
+		s.globalState.mu.Unlock()
 	}
 
 	// Start the benchmark in a goroutine
@@ -189,6 +225,11 @@ func (s *Service) runBenchmark(ctx context.Context, cfg *config.Config, redisCon
 	if err != nil {
 		slog.Error("Failed to create Redis client", "error", err)
 		s.globalState.FailBenchmark(fmt.Sprintf("Failed to create Redis client: %v", err))
+		// notify controller of failure if jobId set
+		st := s.globalState.GetState()
+		if st.JobID != "" {
+			s.notifyCompletion(st.JobID, "failed", fmt.Sprintf("Failed to create Redis client: %v", err))
+		}
 		return
 	}
 
@@ -205,10 +246,18 @@ func (s *Service) runBenchmark(ctx context.Context, cfg *config.Config, redisCon
 		} else {
 			slog.Error("Benchmark failed", "error", err)
 			s.globalState.FailBenchmark(err.Error())
+			st := s.globalState.GetState()
+			if st.JobID != "" {
+				s.notifyCompletion(st.JobID, "failed", err.Error())
+			}
 		}
 		return
 	}
 
 	s.globalState.CompleteBenchmark()
 	slog.Info("Benchmark completed successfully")
+	st := s.globalState.GetState()
+	if st.JobID != "" {
+		s.notifyCompletion(st.JobID, "completed", "")
+	}
 }
