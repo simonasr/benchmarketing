@@ -36,6 +36,15 @@ func (r *Registry) RegisterWorker(req RegistrationRequest) error {
 		return fmt.Errorf("worker port must be positive")
 	}
 
+	// Preserve existing status/job on re-registration to avoid flipping busy -> idle
+	if existing, ok := r.workers[req.WorkerID]; ok {
+		existing.Address = req.Address
+		existing.Port = req.Port
+		existing.LastSeen = time.Now()
+		r.workers[req.WorkerID] = existing
+		return nil
+	}
+
 	worker := &Worker{
 		ID:       req.WorkerID,
 		Address:  req.Address,

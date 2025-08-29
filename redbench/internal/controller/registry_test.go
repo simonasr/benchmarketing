@@ -206,6 +206,37 @@ func TestGetAvailableWorkers(t *testing.T) {
 	}
 }
 
+func TestReregistrationPreservesBusyStatus(t *testing.T) {
+	registry := NewRegistry()
+
+	// Register and mark busy
+	req := RegistrationRequest{WorkerID: "worker-1", Address: "localhost", Port: 8081}
+	if err := registry.RegisterWorker(req); err != nil {
+		t.Fatalf("register error: %v", err)
+	}
+	if err := registry.UpdateWorkerStatus("worker-1", "busy"); err != nil {
+		t.Fatalf("update status error: %v", err)
+	}
+
+	// Re-register (e.g., controller restart or periodic refresh)
+	req.Address = "127.0.0.1"
+	if err := registry.RegisterWorker(req); err != nil {
+		t.Fatalf("re-register error: %v", err)
+	}
+
+	// Worker should remain busy and not counted as available
+	worker, ok := registry.GetWorker("worker-1")
+	if !ok {
+		t.Fatalf("worker not found after re-registration")
+	}
+	if worker.Status != "busy" {
+		t.Fatalf("expected status busy after re-registration, got %s", worker.Status)
+	}
+	if registry.CountAvailable() != 0 {
+		t.Fatalf("expected 0 available workers when busy, got %d", registry.CountAvailable())
+	}
+}
+
 func TestUpdateWorkerStatus(t *testing.T) {
 	registry := NewRegistry()
 
