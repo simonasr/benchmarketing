@@ -1,0 +1,76 @@
+name: bench-compare
+
+on:
+  pull_request:
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/bench.yml'
+  workflow_dispatch: {}
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+
+      - name: Checkout BASE (merge-base)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          fetch-depth: 0
+
+      - name: Checkout HEAD
+        uses: actions/checkout@v4
+        with:
+          path: head
+          fetch-depth: 0
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Sync benchmark tests from HEAD to BASE
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          # Copy only *_bench_test.go files from head/redbench to base/redbench
+          find head/redbench -type f -name '*_bench_test.go' -print0 | while IFS= read -r -d '' f; do
+            rel="${f#head/redbench/}"
+            mkdir -p "base/redbench/$(dirname "$rel")"
+            cp "$f" "base/redbench/$rel"
+          done
+
+      - name: Run benchmarks (BASE)
+        working-directory: base/redbench/internal/redis
+        env:
+          GOMAXPROCS: '1'
+        run: |
+          go test ./ -run=^$ -bench='Benchmark(SaveRandomData|GetData)$' -benchtime=0.5s -count=6 > /tmp/base.txt
+
+      - name: Run benchmarks (HEAD)
+        working-directory: head/redbench/internal/redis
+        env:
+          GOMAXPROCS: '1'
+        run: |
+          go test ./ -run=^$ -bench='Benchmark(SaveRandomData|GetData)$' -benchtime=0.5s -count=6 > /tmp/new.txt
+
+      - name: Compare
+        run: |
+          benchstat /tmp/base.txt /tmp/new.txt | tee /tmp/diff.txt
+          ! grep -qi 'regress' /tmp/diff.txt
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benches-${{ github.sha }}
+          path: |
+            /tmp/base.txt
+            /tmp/new.txt
+            /tmp/diff.txt
+
+
