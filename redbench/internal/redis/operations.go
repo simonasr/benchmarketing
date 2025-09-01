@@ -56,11 +56,8 @@ func (o *Operations) SaveRandomData(ctx context.Context, expiration int32, keySi
 // GetData fetches the value for the given key from Redis.
 func (o *Operations) GetData(ctx context.Context, key string) error {
 	now := time.Now()
-	defer func() {
-		o.metrics.ObserveGetDuration(time.Since(now).Seconds())
-	}()
-
 	val, err := o.client.Get(ctx, key)
+	o.metrics.ObserveGetDuration(time.Since(now).Seconds())
 	if err != nil {
 		o.metrics.IncrementGetFailures()
 		return fmt.Errorf("failed to get key from Redis: %w", err)

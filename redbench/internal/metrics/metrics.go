@@ -17,6 +17,12 @@ type Metrics struct {
 	duration      *prometheus.HistogramVec
 	requestFailed *prometheus.CounterVec
 
+	// Precomputed label handles to avoid per-call map allocations
+	durationSet      prometheus.Observer
+	durationGet      prometheus.Observer
+	requestFailedSet prometheus.Counter
+	requestFailedGet prometheus.Counter
+
 	redisPoolTotalConns prometheus.Gauge
 	redisPoolIdleConns  prometheus.Gauge
 	redisPoolStaleConns prometheus.Gauge
@@ -174,6 +180,12 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.redisPoolMisses = registerGauge(reg, "redis_pool_misses", m.redisPoolMisses)
 	m.redisPoolTimeouts = registerGauge(reg, "redis_pool_timeouts", m.redisPoolTimeouts)
 
+	// Precompute child metrics with fixed labels to reduce per-call overhead
+	m.durationSet = m.duration.WithLabelValues("set", "redis", target)
+	m.durationGet = m.duration.WithLabelValues("get", "redis", target)
+	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
+	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
+
 	return m
 }
 
@@ -194,22 +206,22 @@ func (m *Metrics) SetStage(clients float64) {
 
 // ObserveSetDuration records the duration of a SET operation.
 func (m *Metrics) ObserveSetDuration(duration float64) {
-	m.duration.With(prometheus.Labels{"command": "set", "db": "redis", "target": m.target}).Observe(duration)
+	m.durationSet.Observe(duration)
 }
 
 // ObserveGetDuration records the duration of a GET operation.
 func (m *Metrics) ObserveGetDuration(duration float64) {
-	m.duration.With(prometheus.Labels{"command": "get", "db": "redis", "target": m.target}).Observe(duration)
+	m.durationGet.Observe(duration)
 }
 
 // IncrementSetFailures increments the counter for failed SET operations.
 func (m *Metrics) IncrementSetFailures() {
-	m.requestFailed.With(prometheus.Labels{"command": "set", "db": "redis", "target": m.target}).Inc()
+	m.requestFailedSet.Inc()
 }
 
 // IncrementGetFailures increments the counter for failed GET operations.
 func (m *Metrics) IncrementGetFailures() {
-	m.requestFailed.With(prometheus.Labels{"command": "get", "db": "redis", "target": m.target}).Inc()
+	m.requestFailedGet.Inc()
 }
 
 // StartPrometheusServer starts an HTTP server to expose Prometheus metrics.
