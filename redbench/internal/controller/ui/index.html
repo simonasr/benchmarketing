@@ -42,7 +42,13 @@
       </section>
 
       <section id="job" class="panel">
-        <h2>Job Control</h2>
+        <div class="panel-head">
+          <h2>Job Control</h2>
+          <div class="controls">
+            <button type="button" id="distributeWorkers">Distribute workers</button>
+            <span id="availableInfo" class="muted"></span>
+          </div>
+        </div>
         <form id="jobForm">
           <fieldset>
             <legend>Targets</legend>

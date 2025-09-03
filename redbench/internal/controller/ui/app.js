@@ -63,6 +63,12 @@ async function loadWorkers() {
       ]);
       tbody.appendChild(row);
     });
+    // Update available workers info for distribution aid
+    const info = document.getElementById('availableInfo');
+    if (info && typeof data.available === 'number') {
+      info.textContent = `Available workers: ${data.available}`;
+      info.dataset.available = String(data.available);
+    }
   } catch (e) {
     console.error(e);
     setStatus(`Failed to load workers: ${e.message}`, 'error', e.details);
@@ -167,6 +173,7 @@ document.addEventListener('click', (e) => {
   if (e.target && e.target.classList.contains('removeTarget')) { removeTargetRow(e.target); }
   if (e.target && e.target.id === 'refreshWorkers') { loadWorkers(); }
   if (e.target && e.target.id === 'stopJob') { stopJob(); }
+  if (e.target && e.target.id === 'distributeWorkers') { distributeWorkers(); }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -323,6 +330,35 @@ function initReset() {
     first.querySelector('input[name="workerCount"]').value = '1';
     setStatus('Form reset to defaults.', 'success');
   });
+}
+
+// --- Worker distribution helper ---
+function distributeWorkers() {
+  const info = document.getElementById('availableInfo');
+  const available = info && info.dataset && info.dataset.available ? parseInt(info.dataset.available, 10) : NaN;
+  const targets = Array.from(document.querySelectorAll('#targets .target'));
+  const T = targets.length;
+  if (!Number.isFinite(available)) {
+    setStatus('Available worker count unknown. Click Refresh first.', 'error');
+    return;
+  }
+  if (available < T) {
+    // Assign 1 to as many targets as possible, 0 to the rest; user can adjust
+    targets.forEach((row, i) => {
+      row.querySelector('input[name="workerCount"]').value = i < available ? '1' : '0';
+    });
+    saveFormDebounced();
+    setStatus(`Not enough workers (${available}) for ${T} targets. Assigned 1 to first ${available}.`, 'error');
+    return;
+  }
+  const base = Math.floor(available / T);
+  const rem = available % T;
+  targets.forEach((row, i) => {
+    const v = base + (i < rem ? 1 : 0);
+    row.querySelector('input[name="workerCount"]').value = String(v);
+  });
+  saveFormDebounced();
+  setStatus(`Distributed ${available} workers across ${T} targets.`, 'success');
 }
 
 
