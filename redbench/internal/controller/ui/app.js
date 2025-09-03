@@ -173,6 +173,40 @@ document.addEventListener('DOMContentLoaded', () => {
   loadWorkers();
   refreshJobStatus();
   document.getElementById('jobForm').addEventListener('submit', startJob);
+  initAutoRefresh();
 });
+
+// --- Auto-refresh every 1s with visibility pause and simple backoff ---
+const REFRESH_MS = 1000;
+let refreshTimer = null;
+let failureCount = 0;
+
+async function tickRefresh() {
+  try {
+    await Promise.all([loadWorkers(), refreshJobStatus()]);
+    failureCount = 0;
+  } catch (_) {
+    failureCount += 1;
+  }
+}
+
+function startAutoRefresh(intervalMs = REFRESH_MS) {
+  stopAutoRefresh();
+  refreshTimer = setInterval(tickRefresh, intervalMs);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function initAutoRefresh() {
+  startAutoRefresh(REFRESH_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopAutoRefresh(); else startAutoRefresh(REFRESH_MS);
+  });
+}
 
 
