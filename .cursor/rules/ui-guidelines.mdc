@@ -1,0 +1,48 @@
+---
+globs: redbench/internal/controller/ui/**/*.html,redbench/internal/controller/ui/**/*.css,redbench/internal/controller/ui/**/*.js
+---
+# RedBench Controller UI Guidelines
+
+These rules guide UI implementation for the controller dashboard.
+
+## Architecture
+- Prefer vanilla HTML/CSS/JS; do not introduce frameworks or CDNs.
+- UI consumes controller REST only; keep business logic on the server.
+- UI state is transient and stored client-side (localStorage) only.
+
+## File Structure
+- UI lives under [redbench/internal/controller/ui/](mdc:redbench/internal/controller/ui/).
+- Use a single entry point: [index.html](mdc:redbench/internal/controller/ui/index.html), script [app.js](mdc:redbench/internal/controller/ui/app.js), styles [style.css](mdc:redbench/internal/controller/ui/style.css).
+- Add future assets within `ui/` and keep embed patterns compatible.
+
+## Styling
+- Use CSS variables defined in `:root`; avoid hardcoded hex where possible.
+- Reuse existing utility classes: `panel`, `panel-head`, `controls`, `status`, `muted`.
+- Status/state classes: `info`, `success`, `error`, and worker states `ok`, `idle`, `running`, `failed`, `stopped`.
+- Maintain responsive layout with the existing grid/breakpoints.
+
+## JavaScript
+- Keep functions short and focused; reuse helpers like `fetchJSON`, `setStatus`, `loadWorkers`, `refreshJobStatus`.
+- Parse error bodies and surface actionable messages via `fetchJSON` → `parseErrorResponse`.
+- Persist form values and UI prefs via localStorage using versioned keys (`rb_ui_v1_*`).
+- When mutating lists, rebuild DOM rows; use the `el()` helper for node creation.
+- Polling defaults to 1s; pause on tab hide and resume on focus. Keep manual refresh and toggle.
+
+## Accessibility
+- Ensure interactive elements are focusable; visible focus outline.
+- Use descriptive button text. Prefer `aria-live="polite"` on status containers for dynamic updates.
+
+## Validation & UX
+- Validate required fields and numeric ranges client-side before POST.
+- Keep “Reset to defaults” idempotent (clear localStorage + restore initial HTML defaults).
+- Show clear success/error messages in the status box with details when available.
+
+## Extractability
+- Avoid hardcoding controller host; when introduced, read API base from a small config surface (e.g., `window.__RB_CONFIG__`).
+- Do not depend on controller internals beyond public endpoints.
+
+## Conventions
+- LocalStorage keys: `rb_ui_v1_jobForm`, `rb_ui_v1_autoRefresh` (bump version when schema changes).
+- Class naming: lowercase, hyphenated; represent states as additional classes (e.g., `status error`).
+- Keep all UI logic in [app.js](mdc:redbench/internal/controller/ui/app.js) unless file size becomes unwieldy.
+
