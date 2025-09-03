@@ -262,18 +262,16 @@ function restoreForm(data) {
   const container = document.getElementById('targets');
   const rows = container.querySelectorAll('.target');
   rows.forEach((row, i) => { if (i) row.remove(); });
-  const first = container.querySelector('.target');
-  function ensureRow() {
-    const r = container.querySelectorAll('.target');
-    if (r.length === 0) {
+  function getOrCreateRow(index) {
+    // Ensure there are (index+1) rows by clicking Add Target as needed
+    while (container.querySelectorAll('.target').length <= index) {
       const btn = document.getElementById('addTarget');
-      if (btn) btn.click();
+      if (btn) btn.click(); else break;
     }
-    const all = container.querySelectorAll('.target');
-    return all[all.length - 1];
+    return container.querySelectorAll('.target')[index] || container.querySelector('.target');
   }
   data.targets.forEach((t, i) => {
-    const row = i === 0 ? first : ensureRow();
+    const row = getOrCreateRow(i);
     row.querySelector('input[name="redisUrl"]').value = t.redisUrl || '';
     row.querySelector('input[name="redisClusterUrl"]').value = t.redisClusterUrl || '';
     row.querySelector('input[name="workerCount"]').value = t.workerCount || '1';
