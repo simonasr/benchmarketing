@@ -7,7 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -214,6 +216,30 @@ func (s *Service) StopHandler(w http.ResponseWriter, r *http.Request) {
 	// Return the updated state
 	state := s.globalState.GetState()
 	writeJSONResponse(w, state, http.StatusOK)
+}
+
+// ExitHandler handles POST requests to gracefully exit the worker service process.
+func (s *Service) ExitHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Attempt to stop any running benchmark first
+	if s.globalState.StopBenchmark() {
+		if cancel := s.getCancelFunc(); cancel != nil {
+			cancel()
+		}
+	}
+
+	// Respond before terminating to let the client get an acknowledgment
+	writeJSONResponse(w, map[string]interface{}{"status": "exiting"}, http.StatusOK)
+
+	// Shutdown the process after a short delay to allow response to flush
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		slog.Info("Exiting worker service on API request")
+		os.Exit(0)
+	}()
 }
 
 // runBenchmark executes the benchmark and updates state accordingly.

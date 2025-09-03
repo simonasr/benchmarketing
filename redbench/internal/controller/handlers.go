@@ -125,6 +125,25 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Exit worker request: POST /workers/{id}/exit
+	if strings.HasSuffix(path, "/exit") && r.Method == http.MethodPost {
+		workerID := strings.TrimSuffix(path, "/exit")
+		workerID = strings.TrimSuffix(workerID, "/")
+		if workerID == "" {
+			http.Error(w, "Worker ID required in URL path", http.StatusBadRequest)
+			return
+		}
+
+		if err := c.jobManager.ExitWorker(workerID); err != nil {
+			logAndRespond(w, "Failed to exit worker", err, "Failed to exit worker")
+			return
+		}
+
+		_ = c.registry.UnregisterWorker(workerID)
+		writeJSONResponse(w, map[string]any{"status": "exiting", "workerId": workerID}, http.StatusOK)
+		return
+	}
+
 	// Unregister handler
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

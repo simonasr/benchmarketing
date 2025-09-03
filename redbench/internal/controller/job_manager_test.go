@@ -660,6 +660,71 @@ func TestSendJobToWorker_ForwardsTestOverrides(t *testing.T) {
 	}
 }
 
+func TestExitWorker_Success(t *testing.T) {
+	registry := NewRegistry()
+	cfg := &config.Config{Controller: config.LoadControllerConfig()}
+	jm := NewJobManager(registry, cfg)
+
+	// Fake worker /exit endpoint
+	workerSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/exit" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer workerSrv.Close()
+
+	u, err := url.Parse(workerSrv.URL)
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	host := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+
+	workerID := "w-1"
+	if err := registry.RegisterWorker(RegistrationRequest{WorkerID: workerID, Address: host, Port: port}); err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
+
+	if err := jm.ExitWorker(workerID); err != nil {
+		t.Fatalf("ExitWorker returned error: %v", err)
+	}
+}
+
+func TestExitWorker_ErrorOnNon200(t *testing.T) {
+	registry := NewRegistry()
+	cfg := &config.Config{Controller: config.LoadControllerConfig()}
+	jm := NewJobManager(registry, cfg)
+
+	workerSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer workerSrv.Close()
+
+	u, err := url.Parse(workerSrv.URL)
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	host := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+
+	workerID := "w-err"
+	if err := registry.RegisterWorker(RegistrationRequest{WorkerID: workerID, Address: host, Port: port}); err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
+
+	if err := jm.ExitWorker(workerID); err == nil {
+		t.Fatal("expected error from ExitWorker when worker returns non-200")
+	}
+}
+
 // helper to coerce numeric JSON values to int deterministically
 func intFrom(m map[string]interface{}, key string) int {
 	v, ok := m[key]

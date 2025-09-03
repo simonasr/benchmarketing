@@ -483,3 +483,29 @@ func (jm *JobManager) stopJobOnWorker(workerID string) {
 
 	slog.Info("Stop signal sent to worker", "worker_id", workerID, "url", workerURL)
 }
+
+// ExitWorker sends a request to a worker to exit its process.
+func (jm *JobManager) ExitWorker(workerID string) error {
+	// Get worker details from registry
+	worker, exists := jm.registry.GetWorker(workerID)
+	if !exists {
+		return fmt.Errorf("worker %s not found", workerID)
+	}
+
+	// Send POST request to worker's /exit endpoint
+	workerURL := fmt.Sprintf("http://%s:%d/exit", worker.Address, worker.Port)
+	client := &http.Client{Timeout: jm.config.Controller.HTTPTimeout()}
+
+	resp, err := client.Post(workerURL, "application/json", nil)
+	if err != nil {
+		return fmt.Errorf("sending exit to worker %s: %w", workerID, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("worker %s exit returned status %d", workerID, resp.StatusCode)
+	}
+
+	slog.Info("Exit signal sent to worker", "worker_id", workerID, "url", workerURL)
+	return nil
+}

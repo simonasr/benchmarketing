@@ -33,6 +33,7 @@ func NewServer(port int, baseConfig *config.Config, redisConn *config.RedisConne
 	mux.HandleFunc("/status", service.StatusHandler)
 	mux.HandleFunc("/start", service.StartHandler)
 	mux.HandleFunc("/stop", service.StopHandler)
+	mux.HandleFunc("/exit", service.ExitHandler)
 
 	// Add metrics endpoint to the same server
 	promHandler := promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{})
