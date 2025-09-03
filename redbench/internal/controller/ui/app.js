@@ -174,6 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshJobStatus();
   document.getElementById('jobForm').addEventListener('submit', startJob);
   initAutoRefresh();
+  initPersistence();
+  initReset();
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
@@ -211,8 +213,116 @@ function initAutoRefresh() {
   if (toggle) {
     toggle.addEventListener('change', () => {
       if (toggle.checked) startAutoRefresh(REFRESH_MS); else stopAutoRefresh();
+      try { localStorage.setItem(TOGGLE_KEY, toggle.checked ? '1' : '0'); } catch {}
     });
+    try { const v = localStorage.getItem(TOGGLE_KEY); if (v !== null) toggle.checked = v === '1'; } catch {}
+    if (!toggle.checked) stopAutoRefresh();
   }
+}
+
+// --- Persistence of form values & toggle ---
+const STORAGE_KEY = 'rb_ui_v1_jobForm';
+const TOGGLE_KEY = 'rb_ui_v1_autoRefresh';
+
+function snapshotForm() {
+  const targets = [];
+  document.querySelectorAll('#targets .target').forEach(t => {
+    targets.push({
+      redisUrl: t.querySelector('input[name="redisUrl"]').value.trim(),
+      redisClusterUrl: t.querySelector('input[name="redisClusterUrl"]').value.trim(),
+      workerCount: t.querySelector('input[name="workerCount"]').value.trim(),
+    });
+  });
+  return {
+    targets,
+    test: {
+      minClients: document.getElementById('minClients').value,
+      maxClients: document.getElementById('maxClients').value,
+      stageIntervalMs: document.getElementById('stageIntervalMs').value,
+      requestDelayMs: document.getElementById('requestDelayMs').value,
+      keySize: document.getElementById('keySize').value,
+      valueSize: document.getElementById('valueSize').value,
+    },
+    redis: {
+      operationTimeoutMs: document.getElementById('operationTimeoutMs').value,
+      expiration: document.getElementById('expiration').value,
+    }
+  };
+}
+
+function restoreForm(data) {
+  if (!data || !Array.isArray(data.targets)) return;
+  const container = document.getElementById('targets');
+  const rows = container.querySelectorAll('.target');
+  rows.forEach((row, i) => { if (i) row.remove(); });
+  const first = container.querySelector('.target');
+  function ensureRow() {
+    const r = container.querySelectorAll('.target');
+    if (r.length === 0) {
+      const btn = document.getElementById('addTarget');
+      if (btn) btn.click();
+    }
+    const all = container.querySelectorAll('.target');
+    return all[all.length - 1];
+  }
+  data.targets.forEach((t, i) => {
+    const row = i === 0 ? first : ensureRow();
+    row.querySelector('input[name="redisUrl"]').value = t.redisUrl || '';
+    row.querySelector('input[name="redisClusterUrl"]').value = t.redisClusterUrl || '';
+    row.querySelector('input[name="workerCount"]').value = t.workerCount || '1';
+  });
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  set('minClients', data.test?.minClients);
+  set('maxClients', data.test?.maxClients);
+  set('stageIntervalMs', data.test?.stageIntervalMs);
+  set('requestDelayMs', data.test?.requestDelayMs);
+  set('keySize', data.test?.keySize);
+  set('valueSize', data.test?.valueSize);
+  set('operationTimeoutMs', data.redis?.operationTimeoutMs);
+  set('expiration', data.redis?.expiration);
+}
+
+const saveFormDebounced = (() => {
+  let t; return () => { clearTimeout(t); t = setTimeout(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+  }, 200); };
+})();
+
+function initPersistence() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) restoreForm(JSON.parse(raw)); } catch {}
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.closest('#jobForm')) saveFormDebounced();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target && (e.target.id === 'addTarget' || e.target.classList.contains('removeTarget'))) {
+      saveFormDebounced();
+    }
+  });
+}
+
+function initReset() {
+  const btn = document.getElementById('resetDefaults');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    // Reset to hard-coded defaults from the HTML
+    document.getElementById('minClients').value = '10';
+    document.getElementById('maxClients').value = '100';
+    document.getElementById('stageIntervalMs').value = '1000';
+    document.getElementById('requestDelayMs').value = '10';
+    document.getElementById('keySize').value = '16';
+    document.getElementById('valueSize').value = '1024';
+    document.getElementById('operationTimeoutMs').value = '250';
+    document.getElementById('expiration').value = '45';
+    const container = document.getElementById('targets');
+    const rows = container.querySelectorAll('.target');
+    rows.forEach((row, i) => { if (i) row.remove(); });
+    const first = container.querySelector('.target');
+    first.querySelector('input[name="redisUrl"]').value = '';
+    first.querySelector('input[name="redisClusterUrl"]').value = '';
+    first.querySelector('input[name="workerCount"]').value = '1';
+    setStatus('Form reset to defaults.', 'success');
+  });
 }
 
 
