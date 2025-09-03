@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RedBench Controller UI</title>
+    <link rel="stylesheet" href="/ui/style.css">
+  </head>
+  <body>
+    <header>
+      <h1>RedBench Controller</h1>
+      <nav>
+        <a href="#workers">Workers</a>
+        <a href="#job">Job</a>
+      </nav>
+    </header>
+    <main>
+      <section id="workers" class="panel">
+        <h2>Workers</h2>
+        <button id="refreshWorkers">Refresh</button>
+        <table id="workersTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Address</th>
+              <th>Port</th>
+              <th>Status</th>
+              <th>Last Seen</th>
+              <th>Current Job</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section id="job" class="panel">
+        <h2>Job Control</h2>
+        <form id="jobForm">
+          <fieldset>
+            <legend>Targets</legend>
+            <div id="targets">
+              <div class="target">
+                <label>Redis URL
+                  <input type="text" name="redisUrl" placeholder="redis://host:6379 or rediss://...">
+                </label>
+                <label>Cluster URL
+                  <input type="text" name="redisClusterUrl" placeholder="rediss://cluster:6380 or host:port">
+                </label>
+                <label>Worker Count
+                  <input type="number" name="workerCount" value="1" min="1">
+                </label>
+                <button type="button" class="removeTarget">Remove</button>
+              </div>
+            </div>
+            <button type="button" id="addTarget">Add Target</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Test Config</legend>
+            <div class="grid">
+              <label>Min Clients<input type="number" id="minClients" value="10" min="1"></label>
+              <label>Max Clients<input type="number" id="maxClients" value="100" min="1"></label>
+              <label>Stage Interval (ms)<input type="number" id="stageIntervalMs" value="1000" min="1"></label>
+              <label>Request Delay (ms)<input type="number" id="requestDelayMs" value="10" min="0"></label>
+              <label>Key Size<input type="number" id="keySize" value="16" min="1"></label>
+              <label>Value Size<input type="number" id="valueSize" value="1024" min="1"></label>
+              <label>Op Timeout (ms)<input type="number" id="operationTimeoutMs" value="250" min="1"></label>
+              <label>Expiration (s)<input type="number" id="expiration" value="45" min="1"></label>
+            </div>
+          </fieldset>
+
+          <div class="actions">
+            <button type="submit" id="startJob">Start Job</button>
+            <button type="button" id="stopJob">Stop Job</button>
+          </div>
+        </form>
+
+        <div id="jobStatus" class="status"></div>
+      </section>
+    </main>
+
+    <script src="/ui/app.js"></script>
+  </body>
+  </html>
+
+

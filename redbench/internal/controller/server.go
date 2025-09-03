@@ -62,6 +62,17 @@ func NewServer(port int, cfg *config.Config, metricsRegistry *prometheus.Registr
 	promHandler := promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{})
 	mux.Handle("/metrics", promHandler)
 
+	// UI static assets served under /ui/
+	if uiSubFS, err := getUIFS(); err == nil {
+		fileServer := http.FileServer(http.FS(uiSubFS))
+		mux.Handle("/ui/", http.StripPrefix("/ui/", fileServer))
+		mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
+		})
+	} else {
+		slog.Warn("UI assets not available", "error", err)
+	}
+
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      mux,
