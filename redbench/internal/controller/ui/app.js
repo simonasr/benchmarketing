@@ -207,6 +207,12 @@ function initAutoRefresh() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopAutoRefresh(); else startAutoRefresh(REFRESH_MS);
   });
+  const toggle = document.getElementById('autoRefreshToggle');
+  if (toggle) {
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) startAutoRefresh(REFRESH_MS); else stopAutoRefresh();
+    });
+  }
 }
 
 

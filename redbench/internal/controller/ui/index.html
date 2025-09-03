@@ -16,8 +16,16 @@
     </header>
     <main>
       <section id="workers" class="panel">
-        <h2>Workers</h2>
-        <button id="refreshWorkers">Refresh</button>
+        <div class="panel-head">
+          <h2>Workers</h2>
+          <div class="controls">
+            <label class="toggle">
+              <input type="checkbox" id="autoRefreshToggle" checked>
+              <span>Auto-refresh (1s)</span>
+            </label>
+            <button id="refreshWorkers">Refresh</button>
+          </div>
+        </div>
         <table id="workersTable">
           <thead>
             <tr>
