@@ -16,8 +16,16 @@
     </header>
     <main>
       <section id="workers" class="panel">
-        <h2>Workers</h2>
-        <button id="refreshWorkers">Refresh</button>
+        <div class="panel-head">
+          <h2>Workers</h2>
+          <div class="controls">
+            <label class="toggle">
+              <input type="checkbox" id="autoRefreshToggle" checked>
+              <span>Auto-refresh (1s)</span>
+            </label>
+            <button id="refreshWorkers">Refresh</button>
+          </div>
+        </div>
         <table id="workersTable">
           <thead>
             <tr>
@@ -34,7 +42,13 @@
       </section>
 
       <section id="job" class="panel">
-        <h2>Job Control</h2>
+        <div class="panel-head">
+          <h2>Job Control</h2>
+          <div class="controls">
+            <button type="button" id="distributeWorkers">Distribute workers</button>
+            <span id="availableInfo" class="muted"></span>
+          </div>
+        </div>
         <form id="jobForm">
           <fieldset>
             <legend>Targets</legend>
@@ -72,6 +86,7 @@
           <div class="actions">
             <button type="submit" id="startJob">Start Job</button>
             <button type="button" id="stopJob">Stop Job</button>
+            <button type="button" id="resetDefaults">Reset to defaults</button>
           </div>
         </form>
 

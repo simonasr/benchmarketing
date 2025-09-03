@@ -1,0 +1,24 @@
+---
+description: Guidance for embedding and serving UI assets from the controller server
+---
+# Controller UI Embedding & Routing
+
+## Embedding
+- Embed UI assets from `redbench/internal/controller/ui/` using `embed.FS`.
+- Provide a helper that returns a sub-FS for `ui/`:
+  - `getUIFS() (fs.FS, error)` implemented via `fs.Sub(uiFS, "ui")`.
+- Keep the embed pattern compatible with nested assets; prefer `ui/*` now, expand to `ui/**` if subfolders are added.
+
+## Routing
+- Mount static handler under `/ui/` using `http.FileServer(http.FS(uiFS))` and `http.StripPrefix("/ui/", ...)`.
+- Add redirect from `/ui` → `/ui/` (301/308) for a clean base path.
+- Keep existing API routes unchanged and colocated with `/metrics` and `/health`.
+
+## Testability
+- Add a minimal route test that ensures `/ui/` serves an asset successfully.
+- Avoid coupling tests to specific content beyond status and content-type.
+
+## Future Extraction
+- Keep UI strictly consuming REST endpoints so it can move to a separate service.
+- When extracting, serve a small runtime config for API base (e.g., `/ui/config.js`).
+
