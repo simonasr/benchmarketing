@@ -1,7 +1,41 @@
 async function fetchJSON(path, options = {}) {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const err = await parseErrorResponse(res);
+    throw err;
+  }
   return res.json();
+}
+
+async function parseErrorResponse(res) {
+  let bodyText = '';
+  let bodyJson = null;
+  try {
+    const ct = res.headers.get('Content-Type') || '';
+    if (ct.includes('application/json')) {
+      bodyJson = await res.json();
+    } else {
+      bodyText = await res.text();
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  const details = bodyJson || (bodyText ? { message: bodyText } : null);
+  const message = deriveErrorMessage(details, res.status, res.statusText);
+  const error = new Error(message);
+  error.status = res.status;
+  error.statusText = res.statusText;
+  error.details = details;
+  return error;
+}
+
+function deriveErrorMessage(details, status, statusText) {
+  if (details && typeof details === 'object') {
+    if (typeof details.error === 'string' && details.error) return details.error;
+    if (typeof details.message === 'string' && details.message) return details.message;
+  }
+  return `${status} ${statusText}`;
 }
 
 function el(tag, attrs = {}, children = []) {
@@ -31,6 +65,7 @@ async function loadWorkers() {
     });
   } catch (e) {
     console.error(e);
+    setStatus(`Failed to load workers: ${e.message}`, 'error', e.details);
   }
 }
 
@@ -74,7 +109,7 @@ async function startJob(evt) {
     setStatus(`Job started: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to start job: ${e.message}`);
+    setStatus(`Failed to start job: ${e.message}`, 'error', e.details);
   }
 }
 
@@ -84,7 +119,7 @@ async function stopJob() {
     setStatus(`Job stopped: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to stop job: ${e.message}`);
+    setStatus(`Failed to stop job: ${e.message}`, 'error', e.details);
   }
 }
 
@@ -94,13 +129,24 @@ async function refreshJobStatus() {
     const box = document.getElementById('jobStatus');
     box.textContent = typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res);
   } catch (e) {
-    setStatus(`Failed to fetch job status: ${e.message}`);
+    setStatus(`Failed to fetch job status: ${e.message}`, 'error', e.details);
   }
 }
 
-function setStatus(msg) {
+function setStatus(msg, level = 'info', details) {
   const box = document.getElementById('jobStatus');
-  box.textContent = msg;
+  box.classList.remove('info', 'success', 'error');
+  box.classList.add(level || 'info');
+  let text = msg || '';
+  if (details && typeof details === 'object') {
+    try {
+      const pretty = JSON.stringify(details, null, 2);
+      if (pretty && pretty !== '""') {
+        text += `\n${pretty}`;
+      }
+    } catch (_) { /* ignore */ }
+  }
+  box.textContent = text;
 }
 
 function addTargetRow() {
