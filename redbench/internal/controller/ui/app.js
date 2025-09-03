@@ -60,6 +60,11 @@ async function loadWorkers() {
         el('td', {}, el('span', { class: w.status, text: w.status })),
         el('td', { text: new Date(w.lastSeen).toLocaleString() }),
         el('td', { text: w.currentJob || '' }),
+        el('td', {}, (() => {
+          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Exit');
+          btn.disabled = w.status === 'busy';
+          return btn;
+        })()),
       ]);
       tbody.appendChild(row);
     });
@@ -129,6 +134,17 @@ async function stopJob() {
   }
 }
 
+async function exitWorker(workerId) {
+  if (!workerId) return;
+  try {
+    await fetchJSON(`/workers/${encodeURIComponent(workerId)}/exit`, { method: 'POST' });
+    setStatus(`Exit signaled to worker ${workerId}`, 'success');
+    await loadWorkers();
+  } catch (e) {
+    setStatus(`Failed to exit worker ${workerId}: ${e.message}`, 'error', e.details);
+  }
+}
+
 async function refreshJobStatus() {
   try {
     const res = await fetchJSON('/job/status');
@@ -174,6 +190,7 @@ document.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'refreshWorkers') { loadWorkers(); }
   if (e.target && e.target.id === 'stopJob') { stopJob(); }
   if (e.target && e.target.id === 'distributeWorkers') { distributeWorkers(); }
+  if (e.target && e.target.classList.contains('exitWorker')) { exitWorker(e.target.dataset.workerId); }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
