@@ -15,33 +15,6 @@
       </nav>
     </header>
     <main>
-      <section id="workers" class="panel">
-        <div class="panel-head">
-          <h2>Workers</h2>
-          <div class="controls">
-            <label class="toggle">
-              <input type="checkbox" id="autoRefreshToggle" checked>
-              <span>Auto-refresh (1s)</span>
-            </label>
-            <button id="refreshWorkers">Refresh</button>
-          </div>
-        </div>
-        <table id="workersTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Address</th>
-              <th>Port</th>
-              <th>Status</th>
-              <th>Last Seen</th>
-              <th>Current Job</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
-
       <section id="job" class="panel">
         <div class="panel-head">
           <h2>Job Control</h2>
@@ -92,6 +65,33 @@
         </form>
 
         <div id="jobStatus" class="status"></div>
+      </section>
+
+      <section id="workers" class="panel">
+        <div class="panel-head">
+          <h2>Workers</h2>
+          <div class="controls">
+            <label class="toggle">
+              <input type="checkbox" id="autoRefreshToggle" checked>
+              <span>Auto-refresh (1s)</span>
+            </label>
+            <button id="refreshWorkers">Refresh</button>
+          </div>
+        </div>
+        <table id="workersTable">
+          <thead>
+            <tr>
+              <th data-key="id" class="sortable" tabindex="0" role="button" aria-sort="none">ID</th>
+              <th data-key="address" class="sortable" tabindex="0" role="button" aria-sort="none">Address</th>
+              <th data-key="port" class="sortable" tabindex="0" role="button" aria-sort="none">Port</th>
+              <th data-key="status" class="sortable" tabindex="0" role="button" aria-sort="none">Status</th>
+              <th data-key="lastSeen" class="sortable" tabindex="0" role="button" aria-sort="none">Last Seen</th>
+              <th data-key="currentJob" class="sortable" tabindex="0" role="button" aria-sort="none">Current Job</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </section>
     </main>
 

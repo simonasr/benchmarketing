@@ -47,12 +47,94 @@ function el(tag, attrs = {}, children = []) {
   return e;
 }
 
+// --- Sorting state for Workers table ---
+const SORT_STORAGE_KEY = 'rb_ui_v1_workersSort';
+let workersSort = { key: 'id', dir: 'asc' }; // dir: 'asc' | 'desc'
+
+function loadWorkersSort() {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj.key === 'string' && (obj.dir === 'asc' || obj.dir === 'desc')) {
+        workersSort = obj;
+      }
+    }
+  } catch {}
+}
+
+function saveWorkersSort() {
+  try { localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(workersSort)); } catch {}
+}
+
+function compareValues(a, b, key) {
+  const va = a?.[key];
+  const vb = b?.[key];
+  // Numeric compare when both are finite numbers
+  if (Number.isFinite(va) && Number.isFinite(vb)) return va - vb;
+  // Date compare for lastSeen if parseable
+  if (key === 'lastSeen') {
+    const da = new Date(va).getTime();
+    const db = new Date(vb).getTime();
+    if (Number.isFinite(da) && Number.isFinite(db)) return da - db;
+  }
+  // String compare fallback
+  return String(va || '').localeCompare(String(vb || ''));
+}
+
+function sortWorkersData(data) {
+  if (!workersSort?.key) return data;
+  const key = workersSort.key;
+  const dir = workersSort.dir === 'desc' ? -1 : 1;
+  const copy = data.slice();
+  copy.sort((a, b) => compareValues(a, b, key) * dir);
+  return copy;
+}
+
+function updateHeaderSortIndicators() {
+  const headers = document.querySelectorAll('#workersTable thead th.sortable');
+  headers.forEach(h => {
+    const k = h.getAttribute('data-key');
+    const isActive = k === workersSort.key;
+    h.setAttribute('aria-sort', isActive ? (workersSort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
+  });
+}
+
+function initWorkersHeaderSorting() {
+  const thead = document.querySelector('#workersTable thead');
+  if (!thead) return;
+  const onActivate = (th) => {
+    const key = th.getAttribute('data-key');
+    if (!key) return;
+    if (workersSort.key === key) {
+      workersSort.dir = workersSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      workersSort.key = key;
+      workersSort.dir = 'asc';
+    }
+    saveWorkersSort();
+    updateHeaderSortIndicators();
+    loadWorkers();
+  };
+  thead.addEventListener('click', (e) => {
+    const th = e.target && e.target.closest('th.sortable');
+    if (th) onActivate(th);
+  });
+  thead.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const th = e.target && e.target.closest('th.sortable');
+      if (th) { e.preventDefault(); onActivate(th); }
+    }
+  });
+}
+
 async function loadWorkers() {
   try {
     const data = await fetchJSON('/workers');
     const tbody = document.querySelector('#workersTable tbody');
     tbody.innerHTML = '';
-    data.workers.forEach(w => {
+    const workers = sortWorkersData(Array.isArray(data.workers) ? data.workers : []);
+    workers.forEach(w => {
       const row = el('tr', {}, [
         el('td', { text: w.id }),
         el('td', { text: w.address }),
@@ -61,7 +143,7 @@ async function loadWorkers() {
         el('td', { text: new Date(w.lastSeen).toLocaleString() }),
         el('td', { text: w.currentJob || '' }),
         el('td', {}, (() => {
-          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Exit');
+          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Restart');
           btn.disabled = w.status === 'busy';
           return btn;
         })()),
@@ -74,6 +156,7 @@ async function loadWorkers() {
       info.textContent = `Available workers: ${data.available}`;
       info.dataset.available = String(data.available);
     }
+    updateHeaderSortIndicators();
   } catch (e) {
     console.error(e);
     setStatus(`Failed to load workers: ${e.message}`, 'error', e.details);
@@ -194,12 +277,14 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  loadWorkersSort();
   loadWorkers();
   refreshJobStatus();
   document.getElementById('jobForm').addEventListener('submit', startJob);
   initAutoRefresh();
   initPersistence();
   initReset();
+  initWorkersHeaderSorting();
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
