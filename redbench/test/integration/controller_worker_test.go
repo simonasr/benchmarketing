@@ -137,8 +137,8 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	clusterReq := map[string]interface{}{
 		"targets": []map[string]interface{}{
 			{
-				"redisClusterUrl": "redis://localhost:6379",
-				"workerCount":     1,
+				"clusterUrl":  "redis://localhost:6379",
+				"workerCount": 1,
 			},
 		},
 	}

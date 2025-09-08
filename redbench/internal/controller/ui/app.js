@@ -167,10 +167,10 @@ function serializeJobForm() {
   const targets = [];
   document.querySelectorAll('#targets .target').forEach(t => {
     const redisUrl = t.querySelector('input[name="redisUrl"]').value.trim();
-    const redisClusterUrl = t.querySelector('input[name="redisClusterUrl"]').value.trim();
+    const clusterUrl = t.querySelector('input[name="clusterUrl"]').value.trim();
     const workerCount = parseInt(t.querySelector('input[name="workerCount"]').value, 10) || 1;
-    if (!redisUrl && !redisClusterUrl) return;
-    targets.push({ redisUrl, redisClusterUrl, workerCount });
+    if (!redisUrl && !clusterUrl) return;
+    targets.push({ redisUrl, clusterUrl, workerCount });
   });
 
   const config = {
@@ -338,7 +338,7 @@ function snapshotForm() {
   document.querySelectorAll('#targets .target').forEach(t => {
     targets.push({
       redisUrl: t.querySelector('input[name="redisUrl"]').value.trim(),
-      redisClusterUrl: t.querySelector('input[name="redisClusterUrl"]').value.trim(),
+      clusterUrl: t.querySelector('input[name="clusterUrl"]').value.trim(),
       workerCount: t.querySelector('input[name="workerCount"]').value.trim(),
     });
   });
@@ -375,7 +375,7 @@ function restoreForm(data) {
   data.targets.forEach((t, i) => {
     const row = getOrCreateRow(i);
     row.querySelector('input[name="redisUrl"]').value = t.redisUrl || '';
-    row.querySelector('input[name="redisClusterUrl"]').value = t.redisClusterUrl || '';
+    row.querySelector('input[name="clusterUrl"]').value = (t.clusterUrl || '') ;
     row.querySelector('input[name="workerCount"]').value = t.workerCount || '1';
   });
   const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
@@ -426,7 +426,7 @@ function initReset() {
     rows.forEach((row, i) => { if (i) row.remove(); });
     const first = container.querySelector('.target');
     first.querySelector('input[name="redisUrl"]').value = '';
-    first.querySelector('input[name="redisClusterUrl"]').value = '';
+    first.querySelector('input[name="clusterUrl"]').value = '';
     first.querySelector('input[name="workerCount"]').value = '1';
     setStatus('Form reset to defaults.', 'success');
   });

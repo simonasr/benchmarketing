@@ -337,14 +337,14 @@ func (jm *JobManager) ListJobs() []*Job {
 
 // parseRedisTarget creates a RedisConnection from a job target
 func (jm *JobManager) parseRedisTarget(target JobTarget) (*config.RedisConnection, error) {
-	if target.RedisClusterURL == "" && target.RedisURL == "" {
-		return nil, fmt.Errorf("either redisClusterUrl or redisUrl must be provided")
+	if target.ClusterURL == "" && target.RedisURL == "" {
+		return nil, fmt.Errorf("either clusterUrl or redisUrl must be provided")
 	}
 	conn := &config.RedisConnection{}
-	if target.RedisClusterURL != "" {
-		conn.ClusterURL = target.RedisClusterURL
+	if target.ClusterURL != "" {
+		conn.ClusterURL = target.ClusterURL
 		if err := conn.ParseClusterURL(); err != nil {
-			return nil, fmt.Errorf("parsing cluster URL %s: %w", target.RedisClusterURL, err)
+			return nil, fmt.Errorf("parsing cluster URL %s: %w", target.ClusterURL, err)
 		}
 	} else {
 		conn.URL = target.RedisURL
@@ -357,8 +357,8 @@ func (jm *JobManager) parseRedisTarget(target JobTarget) (*config.RedisConnectio
 }
 
 func (jm *JobManager) targetLabelFor(target JobTarget) string {
-	if target.RedisClusterURL != "" {
-		return target.RedisClusterURL
+	if target.ClusterURL != "" {
+		return target.ClusterURL
 	}
 	return target.RedisURL
 }
