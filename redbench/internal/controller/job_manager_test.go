@@ -93,7 +93,7 @@ func TestCreateJob(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "invalid Redis target: either redisClusterUrl or redisUrl must be provided",
+			errMsg:  "invalid Redis target: either clusterUrl or redisUrl must be provided",
 		},
 	}
 
@@ -404,7 +404,7 @@ func TestParseRedisTarget(t *testing.T) {
 		},
 		{
 			name:       "valid cluster URL",
-			target:     JobTarget{RedisClusterURL: "redis://cluster.example.com:6379"},
+			target:     JobTarget{ClusterURL: "redis://cluster.example.com:6379"},
 			wantErr:    false,
 			expectURL:  "",
 			expectCURL: "cluster.example.com:6379", // ParseClusterURL strips scheme to host:port

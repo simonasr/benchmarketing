@@ -39,9 +39,9 @@ const (
 
 // JobTarget represents a Redis target assignment for workers.
 type JobTarget struct {
-	RedisURL        string `json:"redisUrl"`
-	RedisClusterURL string `json:"redisClusterUrl,omitempty"`
-	WorkerCount     int    `json:"workerCount"`
+	RedisURL    string `json:"redisUrl"`
+	ClusterURL  string `json:"clusterUrl,omitempty"`
+	WorkerCount int    `json:"workerCount"`
 }
 
 // JobRequest represents a request to start a coordinated benchmark job.
