@@ -425,7 +425,7 @@ const saveFormDebounced = (() => {
 function initPersistence() {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) restoreForm(JSON.parse(raw)); } catch {}
   document.addEventListener('input', (e) => {
-    if (e.target && e.target.closest('#jobForm')) { saveFormDebounced(); }
+    if (e.target && e.target.closest('#jobForm')) saveFormDebounced();
   });
   document.addEventListener('click', (e) => {
     if (e.target && (e.target.id === 'addTarget' || e.target.classList.contains('removeTarget'))) {
@@ -513,7 +513,7 @@ function formatDuration(ms) {
   const sec = s % 60;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   if (m > 0) return `${m}m ${sec}s`;
-  if (s > 0) return `${s}.${String(msRem).padStart(MS_PADDING_LENGTH,'0')}s`;
+  if (s > 0) return `${s}.${String(msRem).padStart(MS_PADDING_LENGTH, '0')}s`;
   return `${ms}ms`;
 }
 
