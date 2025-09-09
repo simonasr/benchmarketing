@@ -500,6 +500,8 @@ const DEFAULT_ASSUMED_LATENCY_MS = 0.5; // Default avg Redis latency per op when
 const MIN_GOROUTINE_MS = 1;            // Floor for per-goroutine window (ms) to avoid zero
 const MIN_PER_ITERATION_MS = 0.000001; // Smallest allowed iteration window to prevent division by zero
 const MS_PADDING_LENGTH = 3;           // Zero-padding length for milliseconds in duration formatting
+const OPS_PER_GOROUTINE = 2;           // Number of Redis ops per goroutine window (save + get)
+const OPS_PER_ITERATION = 2;           // Number of Redis ops per iteration (save + get)
 function formatNumber(n) {
   try { return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'; } catch { return String(n); }
 }
@@ -546,9 +548,12 @@ function computePredictionsPerTarget() {
     if (!label) return; // skip rows without a target
     if (!Number.isFinite(wc) || wc <= 0) return; // skip non-positive worker counts
     const peakConcurrency = maxC * wc;
-    const peakRpsUpperBound = (2 * maxC / perGoroutineSec) * wc; // 2 ops per goroutine
+    const peakRpsUpperBound = (OPS_PER_GOROUTINE * maxC / perGoroutineSec) * wc;
     // RPS assuming average Redis latency per op (two ops/iteration)
-    const perIterationMs = Math.max(MIN_PER_ITERATION_MS, (assumedOpMs * 2) + (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
+    const perIterationMs = Math.max(
+      MIN_PER_ITERATION_MS,
+      (assumedOpMs * OPS_PER_ITERATION) + (Number.isFinite(reqDelayMs) ? reqDelayMs : 0)
+    );
     const rpsAt05ms = (1000 / perIterationMs) * maxC * wc;
     items.push({ label, workerCount: wc, peakConcurrency, peakRpsUpperBound, rpsAt05ms, assumedOpMs, index: idx + 1 });
   });
