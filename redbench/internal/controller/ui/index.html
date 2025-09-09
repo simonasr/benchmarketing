@@ -54,6 +54,7 @@
               <label>Value Size<input type="number" id="valueSize" value="1024" min="1"></label>
               <label>Op Timeout (ms)<input type="number" id="operationTimeoutMs" value="250" min="1"></label>
               <label>Expiration (s)<input type="number" id="expiration" value="45" min="1"></label>
+              <label>Assumed Redis Latency (ms)<input type="number" id="assumedLatencyMs" value="0.5" min="0" step="0.1"></label>
             </div>
           </fieldset>
 
@@ -63,6 +64,8 @@
             <button type="button" id="resetDefaults">Reset to defaults</button>
           </div>
         </form>
+
+        <div id="predictionInfo" class="status info" aria-live="polite"></div>
 
         <div id="jobStatus" class="status"></div>
       </section>
