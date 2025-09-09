@@ -36,6 +36,11 @@ func (m *MockRedisClient) PoolStats() *redis.PoolStats {
 	return args.Get(0).(*redis.PoolStats)
 }
 
+func (m *MockRedisClient) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 func TestNewRunner(t *testing.T) {
 	// Setup
 	cfg := &config.Config{

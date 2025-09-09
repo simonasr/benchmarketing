@@ -14,6 +14,7 @@ type noopClient struct{}
 func (n *noopClient) Set(ctx context.Context, k, v string, exp int32) error { return nil }
 func (n *noopClient) Get(ctx context.Context, k string) (string, error)     { return "", nil }
 func (n *noopClient) PoolStats() *redis.PoolStats                           { return &redis.PoolStats{} }
+func (n *noopClient) Close() error                                          { return nil }
 
 func BenchmarkSaveRandomData(b *testing.B) {
 	m := metrics.New(prometheus.NewRegistry(), "bench")

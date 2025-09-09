@@ -39,6 +39,10 @@ func NewRunner(cfg *config.Config, m *metrics.Metrics, client redis.Client, redi
 
 // Run executes the benchmark test.
 func (r *Runner) Run(ctx context.Context) error {
+	// Ensure any internal goroutines stop when Run exits and reset stage metric
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer r.metrics.SetStage(0)
 	currentClients := r.config.Test.MinClients
 	stageInterval := time.Duration(r.config.Test.StageIntervalMs) * time.Millisecond
 

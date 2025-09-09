@@ -259,6 +259,13 @@ func (s *Service) runBenchmark(ctx context.Context, cfg *config.Config, redisCon
 		return
 	}
 
+	// Ensure the Redis client is closed when the benchmark completes or is cancelled
+	defer func() {
+		if cerr := redisClient.Close(); cerr != nil {
+			slog.Warn("Failed to close Redis client", "error", cerr)
+		}
+	}()
+
 	// Create metrics instance for this benchmark
 	metricsInstance := metrics.New(s.metricsRegistry, redisConn.TargetLabel)
 
@@ -279,6 +286,9 @@ func (s *Service) runBenchmark(ctx context.Context, cfg *config.Config, redisCon
 		}
 		return
 	}
+
+	// Clear the cancel func after a successful completion to avoid stale reference
+	s.setCancelFunc(nil)
 
 	s.globalState.CompleteBenchmark()
 	slog.Info("Benchmark completed successfully")

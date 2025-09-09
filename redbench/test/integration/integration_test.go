@@ -35,6 +35,10 @@ func (t *testRedisClient) PoolStats() *redis.PoolStats {
 	return t.client.PoolStats()
 }
 
+func (t *testRedisClient) Close() error {
+	return t.client.Close()
+}
+
 func TestIntegrationWithRedis(t *testing.T) {
 	// Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
