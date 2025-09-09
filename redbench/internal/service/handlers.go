@@ -287,6 +287,9 @@ func (s *Service) runBenchmark(ctx context.Context, cfg *config.Config, redisCon
 		return
 	}
 
+	// Clear the cancel func after a successful completion to avoid stale reference
+	s.setCancelFunc(nil)
+
 	s.globalState.CompleteBenchmark()
 	slog.Info("Benchmark completed successfully")
 	st := s.globalState.GetState()
