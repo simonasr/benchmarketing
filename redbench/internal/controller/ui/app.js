@@ -47,6 +47,15 @@ function el(tag, attrs = {}, children = []) {
   return e;
 }
 
+// Simple debounce helper for readability
+function debounce(fn, delayMs) {
+  let timerId;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn.apply(null, args), delayMs);
+  };
+}
+
 // --- Sorting state for Workers table ---
 const SORT_STORAGE_KEY = 'rb_ui_v1_workersSort';
 let workersSort = { key: 'id', dir: 'asc' }; // dir: 'asc' | 'desc'
@@ -489,7 +498,7 @@ function distributeWorkers() {
 // Defaults and numeric floors to avoid magic numbers and division-by-zero
 const DEFAULT_ASSUMED_LATENCY_MS = 0.5; // Default avg Redis latency per op when input missing/invalid
 const MIN_GOROUTINE_MS = 1;            // Floor for per-goroutine window (ms) to avoid zero
-const MIN_PER_ITERATION_MS = 1e-6;     // Epsilon (0.000001 ms) prevents division by zero in rate calc
+const MIN_PER_ITERATION_MS = 0.000001;     // Epsilon (0.000001 ms) prevents division by zero in rate calc
 function formatNumber(n) {
   try { return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'; } catch { return String(n); }
 }
@@ -562,7 +571,14 @@ function updatePredictions() {
   }
   const lines = [ `Estimated duration: ${formatDuration(p.durationMs)}` ];
   p.items.forEach(item => {
-    lines.push(`${item.label} — workers: ${formatNumber(item.workerCount)} | peak concurrency: ${formatNumber(item.peakConcurrency)} | peak req/s (upper): ${formatNumber(item.peakRpsUpperBound)} | est req/s @${formatNumber(item.assumedOpMs)}ms: ${formatNumber(item.rpsAt05ms)}`);
+    const parts = [
+      `${item.label} —`,
+      `workers: ${formatNumber(item.workerCount)}`,
+      `peak concurrency: ${formatNumber(item.peakConcurrency)}`,
+      `peak req/s (upper): ${formatNumber(item.peakRpsUpperBound)}`,
+      `est req/s @${formatNumber(item.assumedOpMs)}ms: ${formatNumber(item.rpsAt05ms)}`,
+    ];
+    lines.push(parts.join(' | '));
   });
   box.classList.remove('error', 'info');
   box.classList.add('success');
