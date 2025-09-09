@@ -416,12 +416,11 @@ const saveFormDebounced = (() => {
 function initPersistence() {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) restoreForm(JSON.parse(raw)); } catch {}
   document.addEventListener('input', (e) => {
-    if (e.target && e.target.closest('#jobForm')) { saveFormDebounced(); updatePredictions(); }
+    if (e.target && e.target.closest('#jobForm')) { saveFormDebounced(); }
   });
   document.addEventListener('click', (e) => {
     if (e.target && (e.target.id === 'addTarget' || e.target.classList.contains('removeTarget'))) {
       saveFormDebounced();
-      updatePredictions();
     }
   });
 }
@@ -487,6 +486,10 @@ function distributeWorkers() {
 
 
 // --- Predictions (duration and theoretical request rates) ---
+// Defaults and numeric floors to avoid magic numbers and division-by-zero
+const DEFAULT_ASSUMED_LATENCY_MS = 0.5; // Default avg Redis latency per op when input missing/invalid
+const MIN_GOROUTINE_MS = 1;            // Floor for per-goroutine window (ms) to avoid zero
+const MIN_PER_ITERATION_MS = 1e-6;     // Epsilon (0.000001 ms) prevents division by zero in rate calc
 function formatNumber(n) {
   try { return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'; } catch { return String(n); }
 }
@@ -517,14 +520,14 @@ function computePredictionsPerTarget() {
   const durationMs = stages * stageMs;
 
   // Upper bound per goroutine time window: use requestDelay only (ignore op timeout)
-  const perGoroutineMs = Math.max(1, (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
+  const perGoroutineMs = Math.max(MIN_GOROUTINE_MS, (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
   const perGoroutineSec = perGoroutineMs / 1000;
 
   const items = [];
   const rows = document.querySelectorAll('#targets .target');
   const assumedLatencyEl = document.getElementById('assumedLatencyMs');
   let assumedOpMs = parseFloat(assumedLatencyEl && assumedLatencyEl.value);
-  if (!Number.isFinite(assumedOpMs) || assumedOpMs < 0) assumedOpMs = 0.5;
+  if (!Number.isFinite(assumedOpMs) || assumedOpMs < 0) assumedOpMs = DEFAULT_ASSUMED_LATENCY_MS;
   rows.forEach((t, idx) => {
     const redisUrl = t.querySelector('input[name="redisUrl"]').value.trim();
     const clusterUrl = t.querySelector('input[name="clusterUrl"]').value.trim();
@@ -535,7 +538,7 @@ function computePredictionsPerTarget() {
     const peakConcurrency = maxC * wc;
     const peakRpsUpperBound = (2 * maxC / perGoroutineSec) * wc; // 2 ops per goroutine
     // RPS assuming average Redis latency per op (two ops/iteration)
-    const perIterationMs = Math.max(1e-6, (assumedOpMs * 2) + (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
+    const perIterationMs = Math.max(MIN_PER_ITERATION_MS, (assumedOpMs * 2) + (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
     const rpsAt05ms = (1000 / perIterationMs) * maxC * wc;
     items.push({ label, workerCount: wc, peakConcurrency, peakRpsUpperBound, rpsAt05ms, assumedOpMs, index: idx + 1 });
   });
@@ -565,9 +568,4 @@ function updatePredictions() {
   box.classList.add('success');
   box.textContent = lines.join('\n');
 }
-
-// Initialize predictions on load
-document.addEventListener('DOMContentLoaded', () => {
-  updatePredictions();
-});
 
