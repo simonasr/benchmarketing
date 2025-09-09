@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReset();
   initWorkersHeaderSorting();
   // Live predictions on any change within the form
-  const updatePredictionsDebounced = (() => { let t; return () => { clearTimeout(t); t = setTimeout(updatePredictions, 150); }; })();
+  const updatePredictionsDebounced = debounce(updatePredictions, 150);
   document.getElementById('jobForm').addEventListener('input', (e) => {
     if (e && e.target) updatePredictionsDebounced();
   });
@@ -498,7 +498,8 @@ function distributeWorkers() {
 // Defaults and numeric floors to avoid magic numbers and division-by-zero
 const DEFAULT_ASSUMED_LATENCY_MS = 0.5; // Default avg Redis latency per op when input missing/invalid
 const MIN_GOROUTINE_MS = 1;            // Floor for per-goroutine window (ms) to avoid zero
-const MIN_PER_ITERATION_MS = 0.000001;     // Epsilon (0.000001 ms) prevents division by zero in rate calc
+const MIN_PER_ITERATION_MS = 0.000001; // Smallest allowed iteration window to prevent division by zero
+const MS_PADDING_LENGTH = 3;           // Zero-padding length for milliseconds in duration formatting
 function formatNumber(n) {
   try { return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'; } catch { return String(n); }
 }
@@ -512,7 +513,7 @@ function formatDuration(ms) {
   const sec = s % 60;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   if (m > 0) return `${m}m ${sec}s`;
-  if (s > 0) return `${s}.${String(msRem).padStart(3,'0')}s`;
+  if (s > 0) return `${s}.${String(msRem).padStart(MS_PADDING_LENGTH,'0')}s`;
   return `${ms}ms`;
 }
 
