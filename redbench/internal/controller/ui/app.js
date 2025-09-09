@@ -290,12 +290,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initReset();
   initWorkersHeaderSorting();
   // Live predictions on any change within the form
+  const updatePredictionsDebounced = (() => { let t; return () => { clearTimeout(t); t = setTimeout(updatePredictions, 150); }; })();
   document.getElementById('jobForm').addEventListener('input', (e) => {
-    if (e && e.target) updatePredictions();
+    if (e && e.target) updatePredictionsDebounced();
   });
   document.getElementById('jobForm').addEventListener('change', (e) => {
-    if (e && e.target) updatePredictions();
+    if (e && e.target) updatePredictionsDebounced();
   });
+  updatePredictions();
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
