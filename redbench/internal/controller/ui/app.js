@@ -152,7 +152,7 @@ async function loadWorkers() {
         el('td', { text: new Date(w.lastSeen).toLocaleString() }),
         el('td', { text: w.currentJob || '' }),
         el('td', {}, (() => {
-          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Restart');
+          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Exit');
           btn.disabled = w.status === 'busy';
           return btn;
         })()),
