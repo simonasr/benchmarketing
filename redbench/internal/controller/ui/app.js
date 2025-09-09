@@ -157,6 +157,8 @@ async function loadWorkers() {
       info.dataset.available = String(data.available);
     }
     updateHeaderSortIndicators();
+    // Predictions may depend on worker distribution inputs; refresh display
+    updatePredictions();
   } catch (e) {
     console.error(e);
     setStatus(`Failed to load workers: ${e.message}`, 'error', e.details);
@@ -259,12 +261,14 @@ function addTargetRow() {
   const clone = tpl.cloneNode(true);
   clone.querySelectorAll('input').forEach(i => i.value = i.name === 'workerCount' ? '1' : '');
   document.getElementById('targets').appendChild(clone);
+  updatePredictions();
 }
 
 function removeTargetRow(btn) {
   const rows = document.querySelectorAll('#targets .target');
   if (rows.length <= 1) return;
   btn.closest('.target').remove();
+  updatePredictions();
 }
 
 document.addEventListener('click', (e) => {
@@ -285,6 +289,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initPersistence();
   initReset();
   initWorkersHeaderSorting();
+  // Live predictions on any change within the form
+  document.getElementById('jobForm').addEventListener('input', (e) => {
+    if (e && e.target) updatePredictions();
+  });
+  document.getElementById('jobForm').addEventListener('change', (e) => {
+    if (e && e.target) updatePredictions();
+  });
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
@@ -355,6 +366,9 @@ function snapshotForm() {
     redis: {
       operationTimeoutMs: document.getElementById('operationTimeoutMs').value,
       expiration: document.getElementById('expiration').value,
+    },
+    assumptions: {
+      latencyMs: document.getElementById('assumedLatencyMs')?.value,
     }
   };
 }
@@ -387,6 +401,8 @@ function restoreForm(data) {
   set('valueSize', data.test?.valueSize);
   set('operationTimeoutMs', data.redis?.operationTimeoutMs);
   set('expiration', data.redis?.expiration);
+  set('assumedLatencyMs', data.assumptions?.latencyMs);
+  updatePredictions();
 }
 
 const saveFormDebounced = (() => {
@@ -398,11 +414,12 @@ const saveFormDebounced = (() => {
 function initPersistence() {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) restoreForm(JSON.parse(raw)); } catch {}
   document.addEventListener('input', (e) => {
-    if (e.target && e.target.closest('#jobForm')) saveFormDebounced();
+    if (e.target && e.target.closest('#jobForm')) { saveFormDebounced(); updatePredictions(); }
   });
   document.addEventListener('click', (e) => {
     if (e.target && (e.target.id === 'addTarget' || e.target.classList.contains('removeTarget'))) {
       saveFormDebounced();
+      updatePredictions();
     }
   });
 }
@@ -421,6 +438,8 @@ function initReset() {
     document.getElementById('valueSize').value = '1024';
     document.getElementById('operationTimeoutMs').value = '250';
     document.getElementById('expiration').value = '45';
+    const latencyEl = document.getElementById('assumedLatencyMs');
+    if (latencyEl) latencyEl.value = '0.5';
     const container = document.getElementById('targets');
     const rows = container.querySelectorAll('.target');
     rows.forEach((row, i) => { if (i) row.remove(); });
@@ -429,6 +448,7 @@ function initReset() {
     first.querySelector('input[name="clusterUrl"]').value = '';
     first.querySelector('input[name="workerCount"]').value = '1';
     setStatus('Form reset to defaults.', 'success');
+    updatePredictions();
   });
 }
 
@@ -449,6 +469,7 @@ function distributeWorkers() {
     });
     saveFormDebounced();
     setStatus(`Not enough workers (${available}) for ${T} targets. Assigned 1 to first ${available}.`, 'error');
+    updatePredictions();
     return;
   }
   const base = Math.floor(available / T);
@@ -459,6 +480,92 @@ function distributeWorkers() {
   });
   saveFormDebounced();
   setStatus(`Distributed ${available} workers across ${T} targets.`, 'success');
+  updatePredictions();
 }
 
+
+// --- Predictions (duration and theoretical request rates) ---
+function formatNumber(n) {
+  try { return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'; } catch { return String(n); }
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '-';
+  const s = Math.floor(ms / 1000);
+  const msRem = ms % 1000;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  if (s > 0) return `${s}.${String(msRem).padStart(3,'0')}s`;
+  return `${ms}ms`;
+}
+
+function computePredictionsPerTarget() {
+  const minC = parseInt(document.getElementById('minClients').value, 10);
+  const maxC = parseInt(document.getElementById('maxClients').value, 10);
+  const stageMs = parseInt(document.getElementById('stageIntervalMs').value, 10);
+  const reqDelayMs = parseInt(document.getElementById('requestDelayMs').value, 10);
+  if (!Number.isFinite(minC) || !Number.isFinite(maxC) || !Number.isFinite(stageMs) || minC < 1 || maxC < 1 || stageMs < 1 || maxC < minC) {
+    return { message: 'Provide valid test config to see predictions.' };
+  }
+
+  const stages = (maxC - minC + 1);
+  const durationMs = stages * stageMs;
+
+  // Upper bound per goroutine time window: use requestDelay only (ignore op timeout)
+  const perGoroutineMs = Math.max(1, (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
+  const perGoroutineSec = perGoroutineMs / 1000;
+
+  const items = [];
+  const rows = document.querySelectorAll('#targets .target');
+  const assumedLatencyEl = document.getElementById('assumedLatencyMs');
+  let assumedOpMs = parseFloat(assumedLatencyEl && assumedLatencyEl.value);
+  if (!Number.isFinite(assumedOpMs) || assumedOpMs < 0) assumedOpMs = 0.5;
+  rows.forEach((t, idx) => {
+    const redisUrl = t.querySelector('input[name="redisUrl"]').value.trim();
+    const clusterUrl = t.querySelector('input[name="clusterUrl"]').value.trim();
+    const label = clusterUrl || redisUrl;
+    const wc = parseInt(t.querySelector('input[name="workerCount"]').value, 10);
+    if (!label) return; // skip rows without a target
+    if (!Number.isFinite(wc) || wc <= 0) return; // skip non-positive worker counts
+    const peakConcurrency = maxC * wc;
+    const peakRpsUpperBound = (2 * maxC / perGoroutineSec) * wc; // 2 ops per goroutine
+    // RPS assuming average Redis latency per op (two ops/iteration)
+    const perIterationMs = Math.max(1e-6, (assumedOpMs * 2) + (Number.isFinite(reqDelayMs) ? reqDelayMs : 0));
+    const rpsAt05ms = (1000 / perIterationMs) * maxC * wc;
+    items.push({ label, workerCount: wc, peakConcurrency, peakRpsUpperBound, rpsAt05ms, assumedOpMs, index: idx + 1 });
+  });
+
+  if (!items.length) {
+    return { message: 'Add at least one valid target with worker count to see predictions.' };
+  }
+
+  return { durationMs, items };
+}
+
+function updatePredictions() {
+  const box = document.getElementById('predictionInfo');
+  if (!box) return;
+  const p = computePredictionsPerTarget();
+  if (p.message) {
+    box.classList.remove('success', 'error');
+    box.classList.add('info');
+    box.textContent = p.message;
+    return;
+  }
+  const lines = [ `Estimated duration: ${formatDuration(p.durationMs)}` ];
+  p.items.forEach(item => {
+    lines.push(`${item.label} — workers: ${formatNumber(item.workerCount)} | peak concurrency: ${formatNumber(item.peakConcurrency)} | peak req/s (upper): ${formatNumber(item.peakRpsUpperBound)} | est req/s @${formatNumber(item.assumedOpMs)}ms: ${formatNumber(item.rpsAt05ms)}`);
+  });
+  box.classList.remove('error', 'info');
+  box.classList.add('success');
+  box.textContent = lines.join('\n');
+}
+
+// Initialize predictions on load
+document.addEventListener('DOMContentLoaded', () => {
+  updatePredictions();
+});
 
