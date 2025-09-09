@@ -16,6 +16,7 @@ type Client interface {
 	Set(ctx context.Context, key string, value string, expiration int32) error
 	Get(ctx context.Context, key string) (string, error)
 	PoolStats() *redis.PoolStats
+	Close() error
 }
 
 // RedisClient implements the Client interface using go-redis.
@@ -128,4 +129,9 @@ func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 // PoolStats returns the connection pool statistics.
 func (r *RedisClient) PoolStats() *redis.PoolStats {
 	return r.client.PoolStats()
+}
+
+// Close closes the underlying Redis client and releases resources.
+func (r *RedisClient) Close() error {
+	return r.client.Close()
 }

@@ -30,6 +30,11 @@ func (m *MockClient) PoolStats() *redis.PoolStats {
 	return args.Get(0).(*redis.PoolStats)
 }
 
+func (m *MockClient) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 // MockMetrics is a mock implementation of the metrics functionality
 type MockMetrics struct {
 	mock.Mock
