@@ -152,8 +152,7 @@ async function loadWorkers() {
         el('td', { text: new Date(w.lastSeen).toLocaleString() }),
         el('td', { text: w.currentJob || '' }),
         el('td', {}, (() => {
-          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Exit');
-          btn.disabled = w.status === 'busy';
+          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id, 'data-worker-status': w.status }, 'Exit');
           return btn;
         })()),
       ]);
@@ -340,7 +339,16 @@ document.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'refreshWorkers') { loadWorkers(); }
   if (e.target && e.target.id === 'stopJob') { stopJob(); }
   if (e.target && e.target.id === 'distributeWorkers') { distributeWorkers(); }
-  if (e.target && e.target.classList.contains('exitWorker')) { exitWorker(e.target.dataset.workerId); }
+  if (e.target && e.target.classList.contains('exitWorker')) {
+    const workerId = e.target.dataset.workerId;
+    const status = e.target.dataset.workerStatus;
+    if (!workerId) return;
+    if (status === 'busy') {
+      const ok = window.confirm(`Worker ${workerId} is busy. Force-exit? This may interrupt the job.`);
+      if (!ok) return;
+    }
+    exitWorker(workerId);
+  }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
