@@ -35,16 +35,25 @@ func NewJobManager(registry *Registry, cfg *config.Config) *JobManager {
 	}
 }
 
+// hasRunningJob reports if there is a running job in the manager.
+// If excludeID is non-empty, that job ID will be ignored when checking.
+func (jm *JobManager) hasRunningJob(excludeID string) (bool, string) {
+	for id, j := range jm.jobs {
+		if id != excludeID && j.Status == JobStatusRunning {
+			return true, id
+		}
+	}
+	return false, ""
+}
+
 // CreateJob creates a new coordinated benchmark job.
 func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
 
 	// Enforce single running job at a time
-	for _, existing := range jm.jobs {
-		if existing.Status == JobStatusRunning {
-			return nil, fmt.Errorf("%w: %s", ErrJobAlreadyRunning, existing.ID)
-		}
+	if ok, runningID := jm.hasRunningJob(""); ok {
+		return nil, fmt.Errorf("%w: %s", ErrJobAlreadyRunning, runningID)
 	}
 
 	// Calculate total workers needed
@@ -113,16 +122,14 @@ func (jm *JobManager) StartJob(jobID string) error {
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
 
-	// Defensive single-job enforcement: prevent starting if another is running
-	for id, existing := range jm.jobs {
-		if id != jobID && existing.Status == JobStatusRunning {
-			return fmt.Errorf("%w: %s", ErrJobAlreadyRunning, existing.ID)
-		}
-	}
-
 	job, exists := jm.jobs[jobID]
 	if !exists {
 		return fmt.Errorf("job %s not found", jobID)
+	}
+
+	// Defensive single-job enforcement: prevent starting if another is running
+	if ok, runningID := jm.hasRunningJob(jobID); ok {
+		return fmt.Errorf("%w: %s", ErrJobAlreadyRunning, runningID)
 	}
 
 	if job.Status != JobStatusPending {
