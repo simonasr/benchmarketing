@@ -33,4 +33,9 @@ button:hover { border-color: #334155; }
 .stopped { color: var(--warn); }
 @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } .target { grid-template-columns: 1fr; } }
 
+/* Collapsible job status JSON */
+#jobStatusDetails { margin-top: 12px; }
+#jobStatusDetails summary { cursor: pointer; color: var(--muted); }
+#jobStatusDetails pre { margin: 8px 0 0 0; white-space: pre-wrap; }
+
 
