@@ -214,7 +214,12 @@ async function startJob(evt) {
     setStatus(`Job started: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to start job: ${e.message}`, 'error', e.details);
+    if (e && e.status === 409) {
+      setStatus('Another job is already running. Stop it before starting a new one.', 'error');
+      setJobControlsState(true);
+    } else {
+      setStatus(`Failed to start job: ${e.message}`, 'error', e.details);
+    }
   }
 }
 
@@ -224,7 +229,12 @@ async function stopJob() {
     setStatus(`Job stopped: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to stop job: ${e.message}`, 'error', e.details);
+    if (e && e.status === 404) {
+      setStatus('No active job to stop.', 'error');
+      setJobControlsState(false);
+    } else {
+      setStatus(`Failed to stop job: ${e.message}`, 'error', e.details);
+    }
   }
 }
 
@@ -250,6 +260,11 @@ async function refreshJobStatus() {
       const box = document.getElementById('jobStatus');
       if (box) box.textContent = text;
     }
+    // Toggle controls based on job running state
+    try {
+      const st = res && typeof res === 'object' ? res.status : undefined;
+      setJobControlsState(st === 'running');
+    } catch (_) { /* ignore */ }
   } catch (e) {
     const pre = document.getElementById('jobStatusJson');
     if (pre) pre.textContent = '';
@@ -271,6 +286,37 @@ function setStatus(msg, level = 'info', details) {
     } catch (_) { /* ignore */ }
   }
   box.textContent = text;
+}
+
+// Enable/disable Start/Stop depending on whether a job is running
+function setJobControlsState(isRunning) {
+  const startBtn = document.getElementById('startJob');
+  const stopBtn = document.getElementById('stopJob');
+  if (startBtn) {
+    startBtn.disabled = !!isRunning;
+    startBtn.classList.toggle('hidden', !!isRunning);
+  }
+  if (stopBtn) {
+    stopBtn.disabled = !isRunning;
+    stopBtn.classList.toggle('hidden', !isRunning);
+  }
+  // Optionally lock target inputs while running to avoid confusion
+  try {
+    const form = document.getElementById('jobForm');
+    if (form) {
+      const inputs = form.querySelectorAll('input, select, button');
+      inputs.forEach(el => {
+        if (el.id === 'stopJob' || el.id === 'resetDefaults') return; // keep stop/reset usable
+        if (el.id === 'startJob') { el.disabled = !!isRunning; return; }
+        // Keep other controls editable when not running; disable while running
+        el.disabled = !!isRunning;
+      });
+      // Re-enable non-start controls we want active while running
+      const resetBtn = document.getElementById('resetDefaults');
+      if (resetBtn) resetBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = !isRunning;
+    }
+  } catch (_) { /* ignore */ }
 }
 
 function addTargetRow() {

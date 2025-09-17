@@ -25,6 +25,7 @@ input[type="text"], input[type="number"] { margin-top: 6px; padding: 8px 10px; b
 button { background: #0a101b; color: var(--fg); border: 1px solid #1f2937; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
 button:hover { border-color: #334155; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
+.hidden { display: none; }
 .target { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 12px; margin-bottom: 8px; }
 .ok { color: var(--ok); }
 .idle { color: var(--muted); }
