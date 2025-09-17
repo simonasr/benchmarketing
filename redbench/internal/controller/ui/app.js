@@ -368,6 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPersistence();
   initReset();
   initWorkersHeaderSorting();
+  initRuntimeConfigImport();
   // Live predictions on any change within the form
   const updatePredictionsDebounced = debounce(updatePredictions, 150);
   document.getElementById('jobForm').addEventListener('input', (e) => {
@@ -661,3 +662,105 @@ function updatePredictions() {
   box.textContent = lines.join('\n');
 }
 
+// --- Runtime Config Import (single button flow) ---
+let cachedRuntimeConfig = null;
+
+async function checkRuntimeConfigAvailable() {
+  try {
+    const res = await fetch('/api/v1/runtime-config', { method: 'HEAD' });
+    return res.status === 204;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function fetchRuntimeConfig() {
+  const dto = await fetchJSON('/api/v1/runtime-config');
+  cachedRuntimeConfig = dto;
+  return dto;
+}
+
+function renderRuntimePreview(dto) {
+  const details = document.getElementById('runtimeConfigPreview');
+  const pre = document.getElementById('runtimeConfigJson');
+  if (!details || !pre) return;
+  const copy = { version: dto.version, updatedAt: dto.updatedAt, config: dto.config, targets: dto.targets };
+  pre.textContent = JSON.stringify(copy, null, 2);
+  details.classList.remove('hidden');
+}
+
+function applyRuntimeConfigToForm(dto, mode = 'merge') {
+  if (!dto || !dto.config) return;
+  const cfg = dto.config;
+  const setIfNumber = (id, val) => {
+    if (Number.isFinite(val)) {
+      const el = document.getElementById(id);
+      if (el) el.value = String(val);
+    }
+  };
+  setIfNumber('minClients', cfg.test?.minClients);
+  setIfNumber('maxClients', cfg.test?.maxClients);
+  setIfNumber('stageIntervalMs', cfg.test?.stageIntervalMs);
+  setIfNumber('requestDelayMs', cfg.test?.requestDelayMs);
+  setIfNumber('keySize', cfg.test?.keySize);
+  setIfNumber('valueSize', cfg.test?.valueSize);
+  setIfNumber('operationTimeoutMs', cfg.redis?.operationTimeoutMs);
+  if (Number.isFinite(cfg.redis?.expiration)) {
+    const el = document.getElementById('expiration');
+    if (el) el.value = String(cfg.redis.expiration);
+  }
+  updatePredictions();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+}
+
+function initRuntimeConfigImport() {
+  const importBtn = document.getElementById('importConfigBtn');
+  const applyBtn = document.getElementById('applyRuntimeConfigBtn');
+
+  (async () => {
+    const available = await checkRuntimeConfigAvailable();
+    if (importBtn) importBtn.disabled = !available;
+  })();
+
+  if (importBtn) {
+    importBtn.addEventListener('click', async () => {
+      try {
+        const dto = cachedRuntimeConfig || await fetchRuntimeConfig();
+        renderRuntimePreview(dto);
+        setStatus('Loaded runtime config preview.', 'success');
+      } catch (e) {
+        setStatus(`Failed to load runtime config: ${e.message}`, 'error', e.details);
+      }
+    });
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      try {
+        const dto = cachedRuntimeConfig || await fetchRuntimeConfig();
+        applyRuntimeConfigToForm(dto, 'merge');
+        if (Array.isArray(dto.targets) && dto.targets.length) {
+          const container = document.getElementById('targets');
+          const rows = container.querySelectorAll('.target');
+          rows.forEach((row, i) => { if (i) row.remove(); });
+          dto.targets.forEach((t, i) => {
+            if (i > 0) {
+              const addBtn = document.getElementById('addTarget');
+              if (addBtn) addBtn.click();
+            }
+            const row = container.querySelectorAll('.target')[i] || container.querySelector('.target');
+            if (row) {
+              row.querySelector('input[name="redisUrl"]').value = t.redisUrl || '';
+              row.querySelector('input[name="clusterUrl"]').value = t.clusterUrl || '';
+              row.querySelector('input[name="workerCount"]').value = String(Number.isFinite(t.workerCount) && t.workerCount > 0 ? t.workerCount : 1);
+            }
+          });
+        }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+        setStatus('Imported runtime config into form.', 'success');
+      } catch (e) {
+        setStatus(`Failed to import runtime config: ${e.message}`, 'error', e.details);
+      }
+    });
+  }
+}

@@ -20,6 +20,7 @@
           <h2>Job Control</h2>
           <div class="controls">
             <button type="button" id="distributeWorkers">Distribute workers</button>
+            <button type="button" id="importConfigBtn" disabled>Import Config</button>
             <span id="availableInfo" class="muted"></span>
           </div>
         </div>
@@ -66,6 +67,13 @@
         </form>
 
         <div id="predictionInfo" class="status info" aria-live="polite"></div>
+        <details id="runtimeConfigPreview" class="status info hidden">
+          <summary>Runtime Config Preview</summary>
+          <pre id="runtimeConfigJson"></pre>
+          <div class="actions">
+            <button type="button" id="applyRuntimeConfigBtn">Apply</button>
+          </div>
+        </details>
         <details id="jobStatusDetails" class="status info">
           <summary>Job Status JSON</summary>
           <pre id="jobStatusJson"></pre>
