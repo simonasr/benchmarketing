@@ -291,29 +291,37 @@ function setStatus(msg, level = 'info', details) {
 function setJobControlsState(isRunning) {
   const startBtn = document.getElementById('startJob');
   const stopBtn = document.getElementById('stopJob');
+  const resetBtn = document.getElementById('resetDefaults');
+
+  // Set start button state
   if (startBtn) {
     startBtn.disabled = !!isRunning;
     startBtn.classList.toggle('hidden', !!isRunning);
   }
+
+  // Set stop button state
   if (stopBtn) {
     stopBtn.disabled = !isRunning;
     stopBtn.classList.toggle('hidden', !isRunning);
   }
+
+  // Set reset button state (always enabled)
+  if (resetBtn) {
+    resetBtn.disabled = false;
+  }
+
   // Optionally lock target inputs while running to avoid confusion
   try {
     const form = document.getElementById('jobForm');
     if (form) {
       const inputs = form.querySelectorAll('input, select, button');
       inputs.forEach(el => {
-        if (el.id === 'stopJob' || el.id === 'resetDefaults') return; // keep stop/reset usable
-        if (el.id === 'startJob') { el.disabled = !!isRunning; return; }
-        // Keep other controls editable when not running; disable while running
+        // Only disable controls that are not start/stop/reset buttons
+        if (el.id === 'startJob' || el.id === 'stopJob' || el.id === 'resetDefaults') {
+          return; // Their state is managed above
+        }
         el.disabled = !!isRunning;
       });
-      // Re-enable non-start controls we want active while running
-      const resetBtn = document.getElementById('resetDefaults');
-      if (resetBtn) resetBtn.disabled = false;
-      if (stopBtn) stopBtn.disabled = !isRunning;
     }
   } catch (_) { /* ignore */ }
 }
