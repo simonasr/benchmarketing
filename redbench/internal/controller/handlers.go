@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -215,12 +216,22 @@ func (c *Controller) StartJobHandler(w http.ResponseWriter, r *http.Request) {
 	// Create the job
 	job, err := c.jobManager.CreateJob(req)
 	if err != nil {
+		if errors.Is(err, ErrJobAlreadyRunning) {
+			slog.Warn("Job creation rejected: another job is running", "error", err)
+			http.Error(w, "Another job is already running", http.StatusConflict)
+			return
+		}
 		logAndRespond(w, "Failed to create job", err, fmt.Sprintf("Job creation failed: %v", err))
 		return
 	}
 
 	// Start the job
 	if err := c.jobManager.StartJob(job.ID); err != nil {
+		if errors.Is(err, ErrJobAlreadyRunning) {
+			slog.Warn("Job start rejected: another job is running", "error", err)
+			http.Error(w, "Another job is already running", http.StatusConflict)
+			return
+		}
 		logAndRespond(w, "Failed to start job", err, fmt.Sprintf("Job start failed: %v", err))
 		return
 	}

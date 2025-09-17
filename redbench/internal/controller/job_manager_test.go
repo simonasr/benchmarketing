@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -539,6 +541,40 @@ func TestJobWorkflow(t *testing.T) {
 	}
 }
 
+func TestCreateJob_RejectsWhenJobAlreadyRunning(t *testing.T) {
+	registry := NewRegistry()
+	cfg := &config.Config{Controller: config.LoadControllerConfig()}
+	jm := NewJobManager(registry, cfg)
+
+	// Register a single worker
+	if err := registry.RegisterWorker(RegistrationRequest{WorkerID: "w-1", Address: "localhost", Port: 18081}); err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
+
+	// Create first job and start it
+	first, err := jm.CreateJob(JobRequest{Targets: []JobTarget{{RedisURL: "redis://localhost:6379", WorkerCount: 1}}})
+	if err != nil {
+		t.Fatalf("create first job: %v", err)
+	}
+	if err := jm.StartJob(first.ID); err != nil {
+		t.Fatalf("start first job: %v", err)
+	}
+
+	// Attempt to create a second job while the first is running
+	_, err = jm.CreateJob(JobRequest{Targets: []JobTarget{{RedisURL: "redis://localhost:6379", WorkerCount: 1}}})
+	if err == nil {
+		t.Fatal("expected error when creating job while another is running")
+	}
+	if !errors.Is(err, ErrJobAlreadyRunning) {
+		t.Fatalf("expected ErrJobAlreadyRunning, got %v", err)
+	}
+
+	// Ensure no extra jobs were added
+	if got := len(jm.ListJobs()); got != 1 {
+		t.Fatalf("expected exactly 1 job in manager, got %d", got)
+	}
+}
+
 func TestSendJobToWorker_ForwardsTestOverrides(t *testing.T) {
 	registry := NewRegistry()
 	cfg := &config.Config{
@@ -657,6 +693,54 @@ func TestSendJobToWorker_ForwardsTestOverrides(t *testing.T) {
 		// It's fine if present, but not necessary for correctness. No assertion.
 	default:
 		t.Fatal("did not receive worker start payload")
+	}
+}
+
+func TestStartJobHandler_Returns409WhenAnotherJobRunning(t *testing.T) {
+	cfg := &config.Config{Controller: config.LoadControllerConfig()}
+	c := NewController(cfg)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/workers/register", c.RegisterWorkerHandler)
+	mux.HandleFunc("/job/start", c.StartJobHandler)
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	// Register two workers to allow jobs to start
+	for i := 0; i < 2; i++ {
+		payload := map[string]any{"workerId": fmt.Sprintf("w-%d", i+1), "address": "localhost", "port": 19080 + i}
+		b, _ := json.Marshal(payload)
+		resp, err := http.Post(srv.URL+"/workers/register", "application/json", bytes.NewBuffer(b))
+		if err != nil {
+			t.Fatalf("register worker: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("unexpected register status: %d", resp.StatusCode)
+		}
+	}
+
+	// Start first job
+	startPayload := map[string]any{"targets": []map[string]any{{"redisUrl": "redis://localhost:6379", "workerCount": 1}}}
+	sb, _ := json.Marshal(startPayload)
+	resp, err := http.Post(srv.URL+"/job/start", "application/json", bytes.NewBuffer(sb))
+	if err != nil {
+		t.Fatalf("start first job: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected first start status: %d", resp.StatusCode)
+	}
+
+	// Attempt to start a second job while the first is running
+	resp, err = http.Post(srv.URL+"/job/start", "application/json", bytes.NewBuffer(sb))
+	if err != nil {
+		t.Fatalf("start second job: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 Conflict, got %d", resp.StatusCode)
 	}
 }
 

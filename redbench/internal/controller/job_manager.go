@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,6 +23,9 @@ type JobManager struct {
 	config     *config.Config
 }
 
+// ErrJobAlreadyRunning indicates an attempt to create/start a job while another is running.
+var ErrJobAlreadyRunning = errors.New("another job is already running")
+
 // NewJobManager creates a new job manager.
 func NewJobManager(registry *Registry, cfg *config.Config) *JobManager {
 	return &JobManager{
@@ -35,6 +39,13 @@ func NewJobManager(registry *Registry, cfg *config.Config) *JobManager {
 func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
+
+	// Enforce single running job at a time
+	for _, existing := range jm.jobs {
+		if existing.Status == JobStatusRunning {
+			return nil, fmt.Errorf("%w: %s", ErrJobAlreadyRunning, existing.ID)
+		}
+	}
 
 	// Calculate total workers needed
 	totalWorkersNeeded := 0
@@ -101,6 +112,13 @@ func (jm *JobManager) CreateJob(req JobRequest) (*Job, error) {
 func (jm *JobManager) StartJob(jobID string) error {
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
+
+	// Defensive single-job enforcement: prevent starting if another is running
+	for id, existing := range jm.jobs {
+		if id != jobID && existing.Status == JobStatusRunning {
+			return fmt.Errorf("%w: %s", ErrJobAlreadyRunning, existing.ID)
+		}
+	}
 
 	job, exists := jm.jobs[jobID]
 	if !exists {
