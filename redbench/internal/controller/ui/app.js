@@ -371,11 +371,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initRuntimeConfigImport();
   // Live predictions on any change within the form
   const updatePredictionsDebounced = debounce(updatePredictions, 150);
+  const updateImportBtnDebounced = debounce(updateImportConfigButtonState, 250);
   document.getElementById('jobForm').addEventListener('input', (e) => {
     if (e && e.target) updatePredictionsDebounced();
+    if (e && e.target) updateImportBtnDebounced();
   });
   document.getElementById('jobForm').addEventListener('change', (e) => {
     if (e && e.target) updatePredictionsDebounced();
+    if (e && e.target) updateImportBtnDebounced();
   });
   updatePredictions();
 });
@@ -459,7 +462,7 @@ function restoreForm(data) {
   if (!data || !Array.isArray(data.targets)) return;
   const container = document.getElementById('targets');
   const rows = container.querySelectorAll('.target');
-  rows.forEach((row, i) => { if (i) row.remove(); });
+  Array.from(rows).slice(1).forEach(row => row.remove());
   function getOrCreateRow(index) {
     // Ensure there are (index+1) rows by clicking Add Target as needed
     while (container.querySelectorAll('.target').length <= index) {
@@ -522,8 +525,8 @@ function initReset() {
     const latencyEl = document.getElementById('assumedLatencyMs');
     if (latencyEl) latencyEl.value = '0.5';
     const container = document.getElementById('targets');
-    const rows = container.querySelectorAll('.target');
-    rows.forEach((row, i) => { if (i) row.remove(); });
+  const rows = container.querySelectorAll('.target');
+  Array.from(rows).slice(1).forEach(row => row.remove());
     const first = container.querySelector('.target');
     first.querySelector('input[name="redisUrl"]').value = '';
     first.querySelector('input[name="clusterUrl"]').value = '';
@@ -663,7 +666,8 @@ function updatePredictions() {
 }
 
 // --- Runtime Config Import (single button flow) ---
-let cachedRuntimeConfig = null;
+const RUNTIME_CACHE_TTL_MS = 2000; // short TTL to avoid excessive calls while staying fresh
+let runtimeConfigCache = { dto: null, ts: 0 };
 
 async function checkRuntimeConfigAvailable() {
   try {
@@ -674,19 +678,42 @@ async function checkRuntimeConfigAvailable() {
   }
 }
 
-async function fetchRuntimeConfig() {
+async function fetchRuntimeConfig(opts) {
+  const force = !!(opts && opts.force);
+  const now = Date.now();
+  if (!force && runtimeConfigCache.dto && (now - runtimeConfigCache.ts) < RUNTIME_CACHE_TTL_MS) {
+    return runtimeConfigCache.dto;
+  }
   const dto = await fetchJSON('/api/v1/runtime-config');
-  cachedRuntimeConfig = dto;
+  runtimeConfigCache = { dto, ts: now };
   return dto;
 }
 
 function renderRuntimePreview(dto) {
+  const preInline = document.getElementById('runtimeConfigJson');
   const details = document.getElementById('runtimeConfigPreview');
-  const pre = document.getElementById('runtimeConfigJson');
-  if (!details || !pre) return;
+  const modal = document.getElementById('importModal');
+  const curPre = document.getElementById('importModalCurrent');
+  const incPre = document.getElementById('importModalIncoming');
+  const diffPre = document.getElementById('importModalDiff');
   const copy = { version: dto.version, updatedAt: dto.updatedAt, config: dto.config, targets: dto.targets };
-  pre.textContent = JSON.stringify(copy, null, 2);
-  details.classList.remove('hidden');
+  const incomingText = JSON.stringify(copy, null, 2);
+
+  // Build current snapshot from the form
+  const current = buildCurrentDtoFromForm();
+
+  const currentText = JSON.stringify(current, null, 2);
+  const diffText = prettyKeyDiff(current, copy);
+
+  if (modal && curPre && incPre && diffPre) {
+    curPre.textContent = currentText;
+    incPre.textContent = incomingText;
+    diffPre.textContent = diffText || 'No changes.';
+    openImportModal();
+  } else if (preInline && details) {
+    preInline.textContent = incomingText;
+    details.classList.remove('hidden');
+  }
 }
 
 function applyRuntimeConfigToForm(dto, mode = 'merge') {
@@ -716,16 +743,21 @@ function applyRuntimeConfigToForm(dto, mode = 'merge') {
 function initRuntimeConfigImport() {
   const importBtn = document.getElementById('importConfigBtn');
   const applyBtn = document.getElementById('applyRuntimeConfigBtn');
+  const confirmBtn = document.getElementById('confirmImportBtn');
+  const cancelBtn = document.getElementById('cancelImportBtn');
+  const closeBtn = document.getElementById('closeImportModal');
+  const backdrop = document.getElementById('importModalBackdrop');
 
   (async () => {
     const available = await checkRuntimeConfigAvailable();
     if (importBtn) importBtn.disabled = !available;
+    if (available) updateImportConfigButtonState();
   })();
 
   if (importBtn) {
     importBtn.addEventListener('click', async () => {
       try {
-        const dto = cachedRuntimeConfig || await fetchRuntimeConfig();
+        const dto = await fetchRuntimeConfig({ force: true });
         renderRuntimePreview(dto);
         setStatus('Loaded runtime config preview.', 'success');
       } catch (e) {
@@ -736,31 +768,164 @@ function initRuntimeConfigImport() {
 
   if (applyBtn) {
     applyBtn.addEventListener('click', async () => {
-      try {
-        const dto = cachedRuntimeConfig || await fetchRuntimeConfig();
-        applyRuntimeConfigToForm(dto, 'merge');
-        if (Array.isArray(dto.targets) && dto.targets.length) {
-          const container = document.getElementById('targets');
-          const rows = container.querySelectorAll('.target');
-          rows.forEach((row, i) => { if (i) row.remove(); });
-          dto.targets.forEach((t, i) => {
-            if (i > 0) {
-              const addBtn = document.getElementById('addTarget');
-              if (addBtn) addBtn.click();
-            }
-            const row = container.querySelectorAll('.target')[i] || container.querySelector('.target');
-            if (row) {
-              row.querySelector('input[name="redisUrl"]').value = t.redisUrl || '';
-              row.querySelector('input[name="clusterUrl"]').value = t.clusterUrl || '';
-              row.querySelector('input[name="workerCount"]').value = String(Number.isFinite(t.workerCount) && t.workerCount > 0 ? t.workerCount : 1);
-            }
-          });
-        }
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
-        setStatus('Imported runtime config into form.', 'success');
-      } catch (e) {
-        setStatus(`Failed to import runtime config: ${e.message}`, 'error', e.details);
-      }
+      try { await performImportAndClose(); } catch (_) {}
     });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      try { await performImportAndClose(); } catch (_) {}
+    });
+  }
+
+  if (cancelBtn) cancelBtn.addEventListener('click', closeImportModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeImportModal);
+  if (backdrop) backdrop.addEventListener('click', closeImportModal);
+}
+
+function openImportModal() {
+  const modal = document.getElementById('importModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  // Focus the dialog close for accessibility
+  const closeBtn = document.getElementById('closeImportModal');
+  if (closeBtn) { try { closeBtn.focus(); } catch(_) {} }
+}
+
+function closeImportModal() {
+  const modal = document.getElementById('importModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  const trigger = document.getElementById('importConfigBtn');
+  if (trigger) { try { trigger.focus(); } catch(_) {} }
+}
+
+// Compute a human-readable diff focusing on config.test, config.redis and targets workerCount
+function prettyKeyDiff(current, incoming) {
+  try {
+    const lines = [];
+    function cmp(path, a, b) {
+      if (a === b) return;
+      lines.push(`${path}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
+    }
+    const ct = current?.config?.test || {};
+    const it = incoming?.config?.test || {};
+    cmp('test.minClients', ct.minClients, it.minClients);
+    cmp('test.maxClients', ct.maxClients, it.maxClients);
+    cmp('test.stageIntervalMs', ct.stageIntervalMs, it.stageIntervalMs);
+    cmp('test.requestDelayMs', ct.requestDelayMs, it.requestDelayMs);
+    cmp('test.keySize', ct.keySize, it.keySize);
+    cmp('test.valueSize', ct.valueSize, it.valueSize);
+    const cr = current?.config?.redis || {};
+    const ir = incoming?.config?.redis || {};
+    cmp('redis.operationTimeoutMs', cr.operationTimeoutMs, ir.operationTimeoutMs);
+    cmp('redis.expiration', cr.expiration, ir.expiration);
+    const ctgs = Array.isArray(current?.targets) ? current.targets : [];
+    const itgs = Array.isArray(incoming?.targets) ? incoming.targets : [];
+    // Map by label for comparison
+    const mapT = (arr) => {
+      const m = {};
+      arr.forEach(t => {
+        const key = t.clusterUrl || t.redisUrl || '';
+        if (!key) return;
+        m[key] = (m[key] || 0) + (Number.isFinite(t.workerCount) ? t.workerCount : 0);
+      });
+      return m;
+    };
+    const mC = mapT(ctgs);
+    const mI = mapT(itgs);
+    const labels = new Set([...Object.keys(mC), ...Object.keys(mI)]);
+    labels.forEach(k => cmp(`targets[${k}].workerCount`, mC[k] || 0, mI[k] || 0));
+    return lines.join('\n');
+  } catch (_) {
+    return '';
+  }
+}
+
+// Determine if there are any meaningful changes between current form state and incoming DTO
+async function updateImportConfigButtonState() {
+  try {
+    const btn = document.getElementById('importConfigBtn');
+    if (!btn || btn.disabled) return; // disabled due to availability
+    const dto = await fetchRuntimeConfig();
+    const current = buildCurrentDtoFromForm();
+    const hasDiff = hasMeaningfulDiff(current, dto);
+    btn.disabled = !hasDiff;
+  } catch (_) {
+    // keep button state as-is on error
+  }
+}
+
+function buildCurrentDtoFromForm() {
+  const s = snapshotForm();
+  const cfg = {
+    test: {
+      minClients: parseInt(s.test.minClients, 10),
+      maxClients: parseInt(s.test.maxClients, 10),
+      stageIntervalMs: parseInt(s.test.stageIntervalMs, 10),
+      requestDelayMs: parseInt(s.test.requestDelayMs, 10),
+      keySize: parseInt(s.test.keySize, 10),
+      valueSize: parseInt(s.test.valueSize, 10),
+    },
+    redis: {
+      operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),
+      expiration: parseInt(s.redis.expiration, 10),
+    }
+  };
+  const targets = s.targets.map(t => {
+    const parsed = parseInt(t.workerCount, 10);
+    const wc = (Number.isFinite(parsed) && parsed > 0) ? parsed : 1;
+    return {
+      redisUrl: t.redisUrl || '',
+      clusterUrl: t.clusterUrl || '',
+      workerCount: wc,
+    };
+  }).filter(t => (t.redisUrl || t.clusterUrl));
+  return { version: 'v1', updatedAt: new Date().toISOString(), config: cfg, targets };
+}
+
+function hasMeaningfulDiff(current, incoming) {
+  const diff = prettyKeyDiff(current, incoming);
+  return !!(diff && diff.trim().length);
+}
+
+// Apply targets list to the form (clears extra rows, ensures count)
+function applyTargetsToForm(targets) {
+  if (!Array.isArray(targets) || !targets.length) return;
+  const container = document.getElementById('targets');
+  const rows = container.querySelectorAll('.target');
+  Array.from(rows).slice(1).forEach(row => row.remove());
+  targets.forEach((t, i) => {
+    if (i > 0) {
+      const addBtn = document.getElementById('addTarget');
+      if (addBtn) addBtn.click();
+    }
+    const row = container.querySelectorAll('.target')[i] || container.querySelector('.target');
+    if (row) {
+      const redisInput = row.querySelector('input[name="redisUrl"]');
+      const clusterInput = row.querySelector('input[name="clusterUrl"]');
+      const wcInput = row.querySelector('input[name="workerCount"]');
+      if (redisInput) redisInput.value = t.redisUrl || '';
+      if (clusterInput) clusterInput.value = t.clusterUrl || '';
+      if (wcInput) wcInput.value = String(Number.isFinite(t.workerCount) && t.workerCount > 0 ? t.workerCount : 1);
+    }
+  });
+}
+
+// Shared import handler for Apply/Confirm buttons
+async function performImportAndClose() {
+  try {
+    const dto = await fetchRuntimeConfig({ force: true });
+    applyRuntimeConfigToForm(dto, 'merge');
+    applyTargetsToForm(dto.targets);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+    setStatus('Imported runtime config into form.', 'success');
+    closeImportModal();
+    updateImportConfigButtonState();
+  } catch (e) {
+    setStatus(`Failed to import runtime config: ${e.message}`, 'error', e.details);
+    throw e;
   }
 }

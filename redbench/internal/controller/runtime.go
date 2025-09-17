@@ -1,9 +1,6 @@
 package controller
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -107,26 +104,14 @@ func (c *Controller) RuntimeConfigHandler(w http.ResponseWriter, r *http.Request
 			}
 			dto.Targets = []targetDTO{t}
 		}
-		// Compute a simple ETag for caching based on JSON of the DTO
-		etag := computeETag(dto)
-		if etag != "" {
-			w.Header().Set("ETag", etag)
-		}
+		// Disable HTTP caching to ensure preview reflects current job/config
+		w.Header().Set("Cache-Control", "no-store")
 		writeJSONResponse(w, dto, http.StatusOK)
 		return
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-}
-
-func computeETag(v interface{}) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	sum := sha256.Sum256(b)
-	return "W/\"" + hex.EncodeToString(sum[:]) + "\""
 }
 
 // findSelectedJob returns the currently running job if present, otherwise the most recent job.

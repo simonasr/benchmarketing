@@ -68,8 +68,8 @@ func TestRuntimeConfig_GET_NoJobs_UsesControllerConfig(t *testing.T) {
 	if _, ok := testCfg["stageIntervalMs"]; !ok {
 		t.Fatalf("expected stageIntervalMs present")
 	}
-	if etag := resp.Header.Get("ETag"); etag == "" {
-		t.Fatalf("expected ETag header")
+	if cc := resp.Header.Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("expected Cache-Control no-store, got %q", cc)
 	}
 }
 

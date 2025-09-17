@@ -19,8 +19,8 @@
         <div class="panel-head">
           <h2>Job Control</h2>
           <div class="controls">
-            <button type="button" id="distributeWorkers">Distribute workers</button>
             <button type="button" id="importConfigBtn" disabled>Import Config</button>
+            <button type="button" id="distributeWorkers">Distribute workers</button>
             <span id="availableInfo" class="muted"></span>
           </div>
         </div>
@@ -74,6 +74,37 @@
             <button type="button" id="applyRuntimeConfigBtn">Apply</button>
           </div>
         </details>
+
+        <!-- Modal for Import Config Preview -->
+        <div id="importModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+          <div class="modal-dialog">
+            <div class="modal-head">
+              <h3 id="importModalTitle">Import Config Preview</h3>
+              <button type="button" class="modal-close" id="closeImportModal" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="diff-grid">
+                <div>
+                  <div class="muted">Current</div>
+                  <pre id="importModalCurrent"></pre>
+                </div>
+                <div>
+                  <div class="muted">Incoming</div>
+                  <pre id="importModalIncoming"></pre>
+                </div>
+              </div>
+              <details class="status info" id="diffSummary" open>
+                <summary>Changes</summary>
+                <pre id="importModalDiff"></pre>
+              </details>
+            </div>
+            <div class="modal-actions">
+              <button type="button" id="confirmImportBtn">Apply</button>
+              <button type="button" id="cancelImportBtn" class="muted">Cancel</button>
+            </div>
+          </div>
+          <div class="modal-backdrop" id="importModalBackdrop"></div>
+        </div>
         <details id="jobStatusDetails" class="status info">
           <summary>Job Status JSON</summary>
           <pre id="jobStatusJson"></pre>

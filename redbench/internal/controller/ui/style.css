@@ -42,4 +42,21 @@ button:hover { border-color: #334155; }
 /* Import Config button spacing in controls */
 #importConfigBtn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
+/* Modal */
+.modal.hidden { display: none; }
+.modal { position: fixed; inset: 0; z-index: 50; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+.modal-dialog { position: relative; z-index: 51; width: min(900px, 90vw); max-height: 80vh; margin: 10vh auto 0; background: #0b1220; border: 1px solid #1f2937; border-radius: 12px; display: flex; flex-direction: column; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #1f2937; }
+.modal-head h3 { margin: 0; font-size: 14px; color: var(--fg); }
+.modal-close { background: transparent; border: none; color: var(--muted); font-size: 18px; padding: 4px 8px; cursor: pointer; }
+.modal-body { padding: 12px 16px; overflow: auto; }
+.modal-body pre { margin: 0; white-space: pre-wrap; font-size: 12px; }
+.diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.diff-grid pre { max-height: 50vh; overflow: auto; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid #1f2937; }
+
+/* Prevent background scroll when modal open */
+body.modal-open { overflow: hidden; }
+
 
