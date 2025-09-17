@@ -152,8 +152,7 @@ async function loadWorkers() {
         el('td', { text: new Date(w.lastSeen).toLocaleString() }),
         el('td', { text: w.currentJob || '' }),
         el('td', {}, (() => {
-          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id }, 'Exit');
-          btn.disabled = w.status === 'busy';
+          const btn = el('button', { class: 'exitWorker', 'data-worker-id': w.id, 'data-worker-status': w.status }, 'Exit');
           return btn;
         })()),
       ]);
@@ -214,7 +213,12 @@ async function startJob(evt) {
     setStatus(`Job started: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to start job: ${e.message}`, 'error', e.details);
+    if (e && e.status === 409) {
+      setStatus('Another job is already running. Stop it before starting a new one.', 'error');
+      setJobControlsState(true);
+    } else {
+      setStatus(`Failed to start job: ${e.message}`, 'error', e.details);
+    }
   }
 }
 
@@ -224,7 +228,12 @@ async function stopJob() {
     setStatus(`Job stopped: ${job.id}`);
     await refreshJobStatus();
   } catch (e) {
-    setStatus(`Failed to stop job: ${e.message}`, 'error', e.details);
+    if (e && e.status === 404) {
+      setStatus('No active job to stop.', 'error');
+      setJobControlsState(false);
+    } else {
+      setStatus(`Failed to stop job: ${e.message}`, 'error', e.details);
+    }
   }
 }
 
@@ -250,6 +259,11 @@ async function refreshJobStatus() {
       const box = document.getElementById('jobStatus');
       if (box) box.textContent = text;
     }
+    // Toggle controls based on job running state
+    try {
+      const st = res && typeof res === 'object' ? res.status : undefined;
+      setJobControlsState(st === 'running');
+    } catch (_) { /* ignore */ }
   } catch (e) {
     const pre = document.getElementById('jobStatusJson');
     if (pre) pre.textContent = '';
@@ -273,6 +287,45 @@ function setStatus(msg, level = 'info', details) {
   box.textContent = text;
 }
 
+// Enable/disable Start/Stop depending on whether a job is running
+function setJobControlsState(isRunning) {
+  const startBtn = document.getElementById('startJob');
+  const stopBtn = document.getElementById('stopJob');
+  const resetBtn = document.getElementById('resetDefaults');
+
+  // Set start button state
+  if (startBtn) {
+    startBtn.disabled = !!isRunning;
+    startBtn.classList.toggle('hidden', !!isRunning);
+  }
+
+  // Set stop button state
+  if (stopBtn) {
+    stopBtn.disabled = !isRunning;
+    stopBtn.classList.toggle('hidden', !isRunning);
+  }
+
+  // Set reset button state (always enabled)
+  if (resetBtn) {
+    resetBtn.disabled = false;
+  }
+
+  // Optionally lock target inputs while running to avoid confusion
+  try {
+    const form = document.getElementById('jobForm');
+    if (form) {
+      const inputs = form.querySelectorAll('input, select, button');
+      inputs.forEach(el => {
+        // Only disable controls that are not start/stop/reset buttons
+        if (el.id === 'startJob' || el.id === 'stopJob' || el.id === 'resetDefaults') {
+          return; // Their state is managed above
+        }
+        el.disabled = !!isRunning;
+      });
+    }
+  } catch (_) { /* ignore */ }
+}
+
 function addTargetRow() {
   const tpl = document.querySelector('#targets .target');
   const clone = tpl.cloneNode(true);
@@ -294,7 +347,16 @@ document.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'refreshWorkers') { loadWorkers(); }
   if (e.target && e.target.id === 'stopJob') { stopJob(); }
   if (e.target && e.target.id === 'distributeWorkers') { distributeWorkers(); }
-  if (e.target && e.target.classList.contains('exitWorker')) { exitWorker(e.target.dataset.workerId); }
+  if (e.target && e.target.classList.contains('exitWorker')) {
+    const workerId = e.target.dataset.workerId;
+    const status = e.target.dataset.workerStatus;
+    if (!workerId) return;
+    if (status === 'busy') {
+      const ok = window.confirm(`Worker ${workerId} is busy. Force-exit? This may interrupt the job.`);
+      if (!ok) return;
+    }
+    exitWorker(workerId);
+  }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
