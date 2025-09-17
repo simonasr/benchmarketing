@@ -240,13 +240,18 @@ async function exitWorker(workerId) {
 }
 
 async function refreshJobStatus() {
-  const pre = document.getElementById('jobStatusJson');
   try {
     const res = await fetchJSON('/job/status');
+    const pre = document.getElementById('jobStatusJson');
+    const text = typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res);
     if (pre) {
-      pre.textContent = typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res);
+      pre.textContent = text;
+    } else {
+      const box = document.getElementById('jobStatus');
+      if (box) box.textContent = text;
     }
   } catch (e) {
+    const pre = document.getElementById('jobStatusJson');
     if (pre) pre.textContent = '';
     setStatus(`Failed to fetch job status: ${e.message}`, 'error', e.details);
   }
