@@ -143,6 +143,8 @@ async function loadWorkers() {
     const tbody = document.querySelector('#workersTable tbody');
     tbody.innerHTML = '';
     const workers = sortWorkersData(Array.isArray(data.workers) ? data.workers : []);
+    // Pre-compute target mismatch vs current form
+    const currentTargets = (buildCurrentDtoFromForm()?.targets || []).reduce((m, t) => { const k = t.clusterUrl || t.redisUrl; if (k) m[k] = (m[k]||0) + (Number.isFinite(t.workerCount)?t.workerCount:0); return m; }, {});
     workers.forEach(w => {
       const row = el('tr', {}, [
         el('td', { text: w.id }),
@@ -156,6 +158,16 @@ async function loadWorkers() {
           return btn;
         })()),
       ]);
+      // Subtle highlight if busy and likely mismatch: we only know label via current form; if current job target label not in current form, mark
+      try {
+        if (w.status === 'busy' && w.currentJob) {
+          const label = String(w.currentJob).trim();
+          if (label && !(label in currentTargets)) {
+            row.classList.add('mismatch');
+            row.title = 'Worker target likely differs from current form';
+          }
+        }
+      } catch (_) {}
       tbody.appendChild(row);
     });
     // Update available workers info for distribution aid
@@ -211,7 +223,8 @@ async function startJob(evt) {
   try {
     const job = await fetchJSON('/job/start', { method: 'POST', body: JSON.stringify(payload) });
     setStatus(`Job started: ${job.id}`);
-    await refreshJobStatus();
+    // Immediately re-check once to catch fast-fail and overwrite optimistic message
+    await refreshJobStatus(true);
   } catch (e) {
     if (e && e.status === 409) {
       setStatus('Another job is already running. Stop it before starting a new one.', 'error');
@@ -248,7 +261,7 @@ async function exitWorker(workerId) {
   }
 }
 
-async function refreshJobStatus() {
+async function refreshJobStatus(isImmediateCheck = false) {
   try {
     const res = await fetchJSON('/job/status');
     const pre = document.getElementById('jobStatusJson');
@@ -263,6 +276,18 @@ async function refreshJobStatus() {
     try {
       const st = res && typeof res === 'object' ? res.status : undefined;
       setJobControlsState(st === 'running');
+      // Promote fail/success to status box message
+      if (st === 'failed') {
+        const msg = res?.errorMessage || 'Job failed';
+        setStatus(msg, 'error');
+        flashJobPanel('error');
+      } else if (st === 'completed') {
+        setStatus('Job completed', 'success');
+        flashJobPanel('success');
+      } else if (st === 'running' && isImmediateCheck) {
+        // On immediate recheck, keep the optimistic started message
+      } else if (!st || st === 'no_jobs') {
+      }
     } catch (_) { /* ignore */ }
   } catch (e) {
     const pre = document.getElementById('jobStatusJson');
@@ -285,6 +310,17 @@ function setStatus(msg, level = 'info', details) {
     } catch (_) { /* ignore */ }
   }
   box.textContent = text;
+}
+
+// Visual flash cue on panel head for success/error
+function flashJobPanel(kind) {
+  try {
+    const panel = document.getElementById('job');
+    if (!panel) return;
+    const head = panel.querySelector('.panel-head');
+    if (!head) return;
+    // No visual flash anymore as per request; leave hook empty for future tweaks
+  } catch(_) {}
 }
 
 // Enable/disable Start/Stop depending on whether a job is running
@@ -791,6 +827,23 @@ function openImportModal() {
   // Focus the dialog close for accessibility
   const closeBtn = document.getElementById('closeImportModal');
   if (closeBtn) { try { closeBtn.focus(); } catch(_) {} }
+  // Focus trap and ESC/Enter handlers
+  const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  function onKeydown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeImportModal(); return; }
+    if (e.key === 'Enter') { const confirm = document.getElementById('confirmImportBtn'); if (confirm && !confirm.disabled) { e.preventDefault(); confirm.click(); } }
+    if (e.key === 'Tab') {
+      if (focusable.length === 0) return;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  modal.addEventListener('keydown', onKeydown);
+  modal.dataset.trap = '1';
+  // store handler reference for cleanup
+  modal._keydownHandler = onKeydown;
 }
 
 function closeImportModal() {
@@ -800,6 +853,15 @@ function closeImportModal() {
   document.body.classList.remove('modal-open');
   const trigger = document.getElementById('importConfigBtn');
   if (trigger) { try { trigger.focus(); } catch(_) {} }
+  if (modal.dataset.trap === '1') {
+    try {
+      if (modal._keydownHandler) {
+        modal.removeEventListener('keydown', modal._keydownHandler);
+        delete modal._keydownHandler;
+      }
+    } catch(_) {}
+    delete modal.dataset.trap;
+  }
 }
 
 // Compute a human-readable diff focusing on config.test, config.redis and targets workerCount
@@ -853,6 +915,7 @@ async function updateImportConfigButtonState() {
     const current = buildCurrentDtoFromForm();
     const hasDiff = hasMeaningfulDiff(current, dto);
     btn.disabled = !hasDiff;
+    btn.title = btn.disabled ? 'No differences to apply' : '';
   } catch (_) {
     // keep button state as-is on error
   }
@@ -921,7 +984,10 @@ async function performImportAndClose() {
     applyRuntimeConfigToForm(dto, 'merge');
     applyTargetsToForm(dto.targets);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
-    setStatus('Imported runtime config into form.', 'success');
+    try {
+      const when = new Date().toLocaleString();
+      setStatus(`Imported runtime config @ ${when}`, 'success');
+    } catch(_) { setStatus('Imported runtime config into form.', 'success'); }
     closeImportModal();
     updateImportConfigButtonState();
   } catch (e) {

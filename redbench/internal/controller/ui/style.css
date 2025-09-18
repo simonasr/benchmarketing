@@ -38,6 +38,7 @@ button:hover { border-color: #334155; }
 #jobStatusDetails { margin-top: 12px; }
 #jobStatusDetails summary { cursor: pointer; color: var(--muted); }
 #jobStatusDetails pre { margin: 8px 0 0 0; white-space: pre-wrap; }
+#workersTable tr.mismatch { background: rgba(56,189,248,0.08); }
 
 /* Import Config button spacing in controls */
 #importConfigBtn[disabled] { opacity: 0.5; cursor: not-allowed; }
