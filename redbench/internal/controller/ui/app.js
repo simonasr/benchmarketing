@@ -704,6 +704,8 @@ function updatePredictions() {
 // --- Runtime Config Import (single button flow) ---
 const RUNTIME_CACHE_TTL_MS = 2000; // short TTL to avoid excessive calls while staying fresh
 let runtimeConfigCache = { dto: null, ts: 0 };
+// Track modal keydown handlers without attaching properties to DOM nodes
+const modalKeydownHandlers = new WeakMap();
 
 async function checkRuntimeConfigAvailable() {
   try {
@@ -863,8 +865,8 @@ function openImportModal() {
   }
   modal.addEventListener('keydown', onKeydown);
   modal.dataset.trap = '1';
-  // store handler reference for cleanup
-  modal._keydownHandler = onKeydown;
+  // store handler reference for cleanup (WeakMap for memory safety)
+  modalKeydownHandlers.set(modal, onKeydown);
 }
 
 function closeImportModal() {
@@ -876,9 +878,10 @@ function closeImportModal() {
   if (trigger) { try { trigger.focus(); } catch(_) {} }
   if (modal.dataset.trap === '1') {
     try {
-      if (modal._keydownHandler) {
-        modal.removeEventListener('keydown', modal._keydownHandler);
-        delete modal._keydownHandler;
+      const handler = modalKeydownHandlers.get(modal);
+      if (handler) {
+        modal.removeEventListener('keydown', handler);
+        modalKeydownHandlers.delete(modal);
       }
     } catch(_) {}
     delete modal.dataset.trap;
