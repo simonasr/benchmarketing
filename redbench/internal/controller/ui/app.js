@@ -832,12 +832,33 @@ function openImportModal() {
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   function onKeydown(e) {
-    if (e.key === 'Escape') { e.preventDefault(); closeImportModal(); return; }
-    if (e.key === 'Enter') { const confirm = document.getElementById('confirmImportBtn'); if (confirm && !confirm.disabled) { e.preventDefault(); confirm.click(); } }
+    // Close on Escape
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeImportModal();
+      return;
+    }
+    // Apply on Enter
+    if (e.key === 'Enter') {
+      const confirm = document.getElementById('confirmImportBtn');
+      if (confirm && !confirm.disabled) {
+        e.preventDefault();
+        confirm.click();
+      }
+      return;
+    }
+    // Focus trap with Tab
     if (e.key === 'Tab') {
       if (focusable.length === 0) return;
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      const active = document.activeElement;
+      const isShift = !!e.shiftKey;
+      if (isShift && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!isShift && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   }
   modal.addEventListener('keydown', onKeydown);
