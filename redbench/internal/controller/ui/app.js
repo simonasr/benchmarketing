@@ -143,6 +143,8 @@ async function loadWorkers() {
     const tbody = document.querySelector('#workersTable tbody');
     tbody.innerHTML = '';
     const workers = sortWorkersData(Array.isArray(data.workers) ? data.workers : []);
+    // Pre-compute target mismatch vs current form
+    const currentTargets = (buildCurrentDtoFromForm()?.targets || []).reduce((m, t) => { const k = t.clusterUrl || t.redisUrl; if (k) m[k] = (m[k]||0) + (Number.isFinite(t.workerCount)?t.workerCount:0); return m; }, {});
     workers.forEach(w => {
       const row = el('tr', {}, [
         el('td', { text: w.id }),
@@ -156,6 +158,16 @@ async function loadWorkers() {
           return btn;
         })()),
       ]);
+      // Subtle highlight if busy and likely mismatch: we only know label via current form; if current job target label not in current form, mark
+      try {
+        if (w.status === 'busy' && w.currentJob) {
+          const label = String(w.currentJob).trim();
+          if (label && !(label in currentTargets)) {
+            row.classList.add('mismatch');
+            row.title = 'Worker target likely differs from current form';
+          }
+        }
+      } catch (_) {}
       tbody.appendChild(row);
     });
     // Update available workers info for distribution aid
@@ -211,7 +223,8 @@ async function startJob(evt) {
   try {
     const job = await fetchJSON('/job/start', { method: 'POST', body: JSON.stringify(payload) });
     setStatus(`Job started: ${job.id}`);
-    await refreshJobStatus();
+    // Immediately re-check once to catch fast-fail and overwrite optimistic message
+    await refreshJobStatus(true);
   } catch (e) {
     if (e && e.status === 409) {
       setStatus('Another job is already running. Stop it before starting a new one.', 'error');
@@ -248,7 +261,7 @@ async function exitWorker(workerId) {
   }
 }
 
-async function refreshJobStatus() {
+async function refreshJobStatus(isImmediateCheck = false) {
   try {
     const res = await fetchJSON('/job/status');
     const pre = document.getElementById('jobStatusJson');
@@ -263,6 +276,18 @@ async function refreshJobStatus() {
     try {
       const st = res && typeof res === 'object' ? res.status : undefined;
       setJobControlsState(st === 'running');
+      // Promote fail/success to status box message
+      if (st === 'failed') {
+        const msg = res?.errorMessage || 'Job failed';
+        setStatus(msg, 'error');
+        flashJobPanel('error');
+      } else if (st === 'completed') {
+        setStatus('Job completed', 'success');
+        flashJobPanel('success');
+      } else if (st === 'running' && isImmediateCheck) {
+        // On immediate recheck, keep the optimistic started message
+      } else if (!st || st === 'no_jobs') {
+      }
     } catch (_) { /* ignore */ }
   } catch (e) {
     const pre = document.getElementById('jobStatusJson');
@@ -285,6 +310,17 @@ function setStatus(msg, level = 'info', details) {
     } catch (_) { /* ignore */ }
   }
   box.textContent = text;
+}
+
+// Visual flash cue on panel head for success/error
+function flashJobPanel(kind) {
+  try {
+    const panel = document.getElementById('job');
+    if (!panel) return;
+    const head = panel.querySelector('.panel-head');
+    if (!head) return;
+    // No visual flash anymore as per request; leave hook empty for future tweaks
+  } catch(_) {}
 }
 
 // Enable/disable Start/Stop depending on whether a job is running
@@ -368,13 +404,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initPersistence();
   initReset();
   initWorkersHeaderSorting();
+  initRuntimeConfigImport();
   // Live predictions on any change within the form
   const updatePredictionsDebounced = debounce(updatePredictions, 150);
+  const updateImportBtnDebounced = debounce(updateImportConfigButtonState, 250);
   document.getElementById('jobForm').addEventListener('input', (e) => {
     if (e && e.target) updatePredictionsDebounced();
+    if (e && e.target) updateImportBtnDebounced();
   });
   document.getElementById('jobForm').addEventListener('change', (e) => {
     if (e && e.target) updatePredictionsDebounced();
+    if (e && e.target) updateImportBtnDebounced();
   });
   updatePredictions();
 });
@@ -458,7 +498,7 @@ function restoreForm(data) {
   if (!data || !Array.isArray(data.targets)) return;
   const container = document.getElementById('targets');
   const rows = container.querySelectorAll('.target');
-  rows.forEach((row, i) => { if (i) row.remove(); });
+  Array.from(rows).slice(1).forEach(row => row.remove());
   function getOrCreateRow(index) {
     // Ensure there are (index+1) rows by clicking Add Target as needed
     while (container.querySelectorAll('.target').length <= index) {
@@ -521,8 +561,8 @@ function initReset() {
     const latencyEl = document.getElementById('assumedLatencyMs');
     if (latencyEl) latencyEl.value = '0.5';
     const container = document.getElementById('targets');
-    const rows = container.querySelectorAll('.target');
-    rows.forEach((row, i) => { if (i) row.remove(); });
+  const rows = container.querySelectorAll('.target');
+  Array.from(rows).slice(1).forEach(row => row.remove());
     const first = container.querySelector('.target');
     first.querySelector('input[name="redisUrl"]').value = '';
     first.querySelector('input[name="clusterUrl"]').value = '';
@@ -661,3 +701,321 @@ function updatePredictions() {
   box.textContent = lines.join('\n');
 }
 
+// --- Runtime Config Import (single button flow) ---
+const RUNTIME_CACHE_TTL_MS = 2000; // short TTL to avoid excessive calls while staying fresh
+let runtimeConfigCache = { dto: null, ts: 0 };
+// Track modal keydown handlers without attaching properties to DOM nodes
+const modalKeydownHandlers = new WeakMap();
+
+async function checkRuntimeConfigAvailable() {
+  try {
+    const res = await fetch('/api/v1/runtime-config', { method: 'HEAD' });
+    return res.status === 204;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function fetchRuntimeConfig(opts) {
+  const force = !!(opts && opts.force);
+  const now = Date.now();
+  if (!force && runtimeConfigCache.dto && (now - runtimeConfigCache.ts) < RUNTIME_CACHE_TTL_MS) {
+    return runtimeConfigCache.dto;
+  }
+  const dto = await fetchJSON('/api/v1/runtime-config');
+  runtimeConfigCache = { dto, ts: now };
+  return dto;
+}
+
+function renderRuntimePreview(dto) {
+  const preInline = document.getElementById('runtimeConfigJson');
+  const details = document.getElementById('runtimeConfigPreview');
+  const modal = document.getElementById('importModal');
+  const curPre = document.getElementById('importModalCurrent');
+  const incPre = document.getElementById('importModalIncoming');
+  const diffPre = document.getElementById('importModalDiff');
+  const copy = { version: dto.version, updatedAt: dto.updatedAt, config: dto.config, targets: dto.targets };
+  const incomingText = JSON.stringify(copy, null, 2);
+
+  // Build current snapshot from the form
+  const current = buildCurrentDtoFromForm();
+
+  const currentText = JSON.stringify(current, null, 2);
+  const diffText = prettyKeyDiff(current, copy);
+
+  if (modal && curPre && incPre && diffPre) {
+    curPre.textContent = currentText;
+    incPre.textContent = incomingText;
+    diffPre.textContent = diffText || 'No changes.';
+    openImportModal();
+  } else if (preInline && details) {
+    preInline.textContent = incomingText;
+    details.classList.remove('hidden');
+  }
+}
+
+function applyRuntimeConfigToForm(dto, mode = 'merge') {
+  if (!dto || !dto.config) return;
+  const cfg = dto.config;
+  const setIfNumber = (id, val) => {
+    if (Number.isFinite(val)) {
+      const el = document.getElementById(id);
+      if (el) el.value = String(val);
+    }
+  };
+  setIfNumber('minClients', cfg.test?.minClients);
+  setIfNumber('maxClients', cfg.test?.maxClients);
+  setIfNumber('stageIntervalMs', cfg.test?.stageIntervalMs);
+  setIfNumber('requestDelayMs', cfg.test?.requestDelayMs);
+  setIfNumber('keySize', cfg.test?.keySize);
+  setIfNumber('valueSize', cfg.test?.valueSize);
+  setIfNumber('operationTimeoutMs', cfg.redis?.operationTimeoutMs);
+  if (Number.isFinite(cfg.redis?.expiration)) {
+    const el = document.getElementById('expiration');
+    if (el) el.value = String(cfg.redis.expiration);
+  }
+  updatePredictions();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+}
+
+function initRuntimeConfigImport() {
+  const importBtn = document.getElementById('importConfigBtn');
+  const applyBtn = document.getElementById('applyRuntimeConfigBtn');
+  const confirmBtn = document.getElementById('confirmImportBtn');
+  const cancelBtn = document.getElementById('cancelImportBtn');
+  const closeBtn = document.getElementById('closeImportModal');
+  const backdrop = document.getElementById('importModalBackdrop');
+
+  (async () => {
+    const available = await checkRuntimeConfigAvailable();
+    if (importBtn) importBtn.disabled = !available;
+    if (available) updateImportConfigButtonState();
+  })();
+
+  if (importBtn) {
+    importBtn.addEventListener('click', async () => {
+      try {
+        const dto = await fetchRuntimeConfig({ force: true });
+        renderRuntimePreview(dto);
+        setStatus('Loaded runtime config preview.', 'success');
+      } catch (e) {
+        setStatus(`Failed to load runtime config: ${e.message}`, 'error', e.details);
+      }
+    });
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      try { await performImportAndClose(); } catch (_) {}
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      try { await performImportAndClose(); } catch (_) {}
+    });
+  }
+
+  if (cancelBtn) cancelBtn.addEventListener('click', closeImportModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeImportModal);
+  if (backdrop) backdrop.addEventListener('click', closeImportModal);
+}
+
+function openImportModal() {
+  const modal = document.getElementById('importModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  // Focus the dialog close for accessibility
+  const closeBtn = document.getElementById('closeImportModal');
+  if (closeBtn) { try { closeBtn.focus(); } catch(_) {} }
+  // Focus trap and ESC/Enter handlers
+  const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  function onKeydown(e) {
+    // Close on Escape
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeImportModal();
+      return;
+    }
+    // Apply on Enter
+    if (e.key === 'Enter') {
+      const confirm = document.getElementById('confirmImportBtn');
+      if (confirm && !confirm.disabled) {
+        e.preventDefault();
+        confirm.click();
+      }
+      return;
+    }
+    // Focus trap with Tab
+    if (e.key === 'Tab') {
+      if (focusable.length === 0) return;
+      const active = document.activeElement;
+      const isShift = !!e.shiftKey;
+      if (isShift && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!isShift && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  modal.addEventListener('keydown', onKeydown);
+  modal.dataset.trap = '1';
+  // store handler reference for cleanup (WeakMap for memory safety)
+  modalKeydownHandlers.set(modal, onKeydown);
+}
+
+function closeImportModal() {
+  const modal = document.getElementById('importModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  const trigger = document.getElementById('importConfigBtn');
+  if (trigger) { try { trigger.focus(); } catch(_) {} }
+  if (modal.dataset.trap === '1') {
+    try {
+      const handler = modalKeydownHandlers.get(modal);
+      if (handler) {
+        modal.removeEventListener('keydown', handler);
+        modalKeydownHandlers.delete(modal);
+      }
+    } catch(_) {}
+    delete modal.dataset.trap;
+  }
+}
+
+// Compute a human-readable diff focusing on config.test, config.redis and targets workerCount
+function prettyKeyDiff(current, incoming) {
+  try {
+    const lines = [];
+    function cmp(path, a, b) {
+      if (a === b) return;
+      lines.push(`${path}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
+    }
+    const ct = current?.config?.test || {};
+    const it = incoming?.config?.test || {};
+    cmp('test.minClients', ct.minClients, it.minClients);
+    cmp('test.maxClients', ct.maxClients, it.maxClients);
+    cmp('test.stageIntervalMs', ct.stageIntervalMs, it.stageIntervalMs);
+    cmp('test.requestDelayMs', ct.requestDelayMs, it.requestDelayMs);
+    cmp('test.keySize', ct.keySize, it.keySize);
+    cmp('test.valueSize', ct.valueSize, it.valueSize);
+    const cr = current?.config?.redis || {};
+    const ir = incoming?.config?.redis || {};
+    cmp('redis.operationTimeoutMs', cr.operationTimeoutMs, ir.operationTimeoutMs);
+    cmp('redis.expiration', cr.expiration, ir.expiration);
+    const ctgs = Array.isArray(current?.targets) ? current.targets : [];
+    const itgs = Array.isArray(incoming?.targets) ? incoming.targets : [];
+    // Map by label for comparison
+    const mapT = (arr) => {
+      const m = {};
+      arr.forEach(t => {
+        const key = t.clusterUrl || t.redisUrl || '';
+        if (!key) return;
+        m[key] = (m[key] || 0) + (Number.isFinite(t.workerCount) ? t.workerCount : 0);
+      });
+      return m;
+    };
+    const mC = mapT(ctgs);
+    const mI = mapT(itgs);
+    const labels = new Set([...Object.keys(mC), ...Object.keys(mI)]);
+    labels.forEach(k => cmp(`targets[${k}].workerCount`, mC[k] || 0, mI[k] || 0));
+    return lines.join('\n');
+  } catch (_) {
+    return '';
+  }
+}
+
+// Determine if there are any meaningful changes between current form state and incoming DTO
+async function updateImportConfigButtonState() {
+  try {
+    const btn = document.getElementById('importConfigBtn');
+    if (!btn || btn.disabled) return; // disabled due to availability
+    const dto = await fetchRuntimeConfig();
+    const current = buildCurrentDtoFromForm();
+    const hasDiff = hasMeaningfulDiff(current, dto);
+    btn.disabled = !hasDiff;
+    btn.title = btn.disabled ? 'No differences to apply' : '';
+  } catch (_) {
+    // keep button state as-is on error
+  }
+}
+
+function buildCurrentDtoFromForm() {
+  const s = snapshotForm();
+  const cfg = {
+    test: {
+      minClients: parseInt(s.test.minClients, 10),
+      maxClients: parseInt(s.test.maxClients, 10),
+      stageIntervalMs: parseInt(s.test.stageIntervalMs, 10),
+      requestDelayMs: parseInt(s.test.requestDelayMs, 10),
+      keySize: parseInt(s.test.keySize, 10),
+      valueSize: parseInt(s.test.valueSize, 10),
+    },
+    redis: {
+      operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),
+      expiration: parseInt(s.redis.expiration, 10),
+    }
+  };
+  const targets = s.targets.map(t => {
+    const parsed = parseInt(t.workerCount, 10);
+    const wc = (Number.isFinite(parsed) && parsed > 0) ? parsed : 1;
+    return {
+      redisUrl: t.redisUrl || '',
+      clusterUrl: t.clusterUrl || '',
+      workerCount: wc,
+    };
+  }).filter(t => (t.redisUrl || t.clusterUrl));
+  return { version: 'v1', updatedAt: new Date().toISOString(), config: cfg, targets };
+}
+
+function hasMeaningfulDiff(current, incoming) {
+  const diff = prettyKeyDiff(current, incoming);
+  return !!(diff && diff.trim().length);
+}
+
+// Apply targets list to the form (clears extra rows, ensures count)
+function applyTargetsToForm(targets) {
+  if (!Array.isArray(targets) || !targets.length) return;
+  const container = document.getElementById('targets');
+  const rows = container.querySelectorAll('.target');
+  Array.from(rows).slice(1).forEach(row => row.remove());
+  targets.forEach((t, i) => {
+    if (i > 0) {
+      const addBtn = document.getElementById('addTarget');
+      if (addBtn) addBtn.click();
+    }
+    const row = container.querySelectorAll('.target')[i] || container.querySelector('.target');
+    if (row) {
+      const redisInput = row.querySelector('input[name="redisUrl"]');
+      const clusterInput = row.querySelector('input[name="clusterUrl"]');
+      const wcInput = row.querySelector('input[name="workerCount"]');
+      if (redisInput) redisInput.value = t.redisUrl || '';
+      if (clusterInput) clusterInput.value = t.clusterUrl || '';
+      if (wcInput) wcInput.value = String(Number.isFinite(t.workerCount) && t.workerCount > 0 ? t.workerCount : 1);
+    }
+  });
+}
+
+// Shared import handler for Apply/Confirm buttons
+async function performImportAndClose() {
+  try {
+    const dto = await fetchRuntimeConfig({ force: true });
+    applyRuntimeConfigToForm(dto, 'merge');
+    applyTargetsToForm(dto.targets);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+    try {
+      const when = new Date().toLocaleString();
+      setStatus(`Imported runtime config @ ${when}`, 'success');
+    } catch(_) { setStatus('Imported runtime config into form.', 'success'); }
+    closeImportModal();
+    updateImportConfigButtonState();
+  } catch (e) {
+    setStatus(`Failed to import runtime config: ${e.message}`, 'error', e.details);
+    throw e;
+  }
+}

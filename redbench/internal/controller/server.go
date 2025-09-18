@@ -25,6 +25,7 @@ type Controller struct {
 	registry   *Registry
 	jobManager *JobManager
 	config     *config.Config
+	startedAt  time.Time
 }
 
 // NewController creates a new controller instance.
@@ -36,6 +37,7 @@ func NewController(cfg *config.Config) *Controller {
 		registry:   registry,
 		jobManager: jobManager,
 		config:     cfg,
+		startedAt:  time.Now(),
 	}
 }
 
@@ -54,6 +56,9 @@ func NewServer(port int, cfg *config.Config, metricsRegistry *prometheus.Registr
 	mux.HandleFunc("/job/start", controller.StartJobHandler)
 	mux.HandleFunc("/job/stop", controller.StopJobHandler)
 	mux.HandleFunc("/job/status", controller.JobStatusHandler)
+
+	// Runtime configuration endpoint for UI import
+	mux.HandleFunc("/api/v1/runtime-config", controller.RuntimeConfigHandler)
 
 	// Health and metrics
 	mux.HandleFunc("/health", controller.HealthHandler)
