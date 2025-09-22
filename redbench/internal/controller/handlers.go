@@ -294,21 +294,7 @@ func (c *Controller) JobStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jobs := c.jobManager.ListJobs()
-
-	// Find the most recent job or active job
-	var currentJob *Job
-	for _, job := range jobs {
-		if job.Status == JobStatusRunning {
-			currentJob = job
-			break
-		}
-	}
-
-	// If no running job, return the most recent job
-	if currentJob == nil && len(jobs) > 0 {
-		currentJob = jobs[len(jobs)-1] // Assuming jobs are ordered by creation time
-	}
+	currentJob := c.findSelectedJob()
 
 	if currentJob == nil {
 		response := map[string]interface{}{
