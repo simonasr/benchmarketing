@@ -189,6 +189,36 @@ Use the provided demo script to test the controller-worker setup:
 ./scripts/test-controller-worker.sh
 ```
 
+## Docker Compose Usage
+
+The repository provides `compose-example.yaml` that starts:
+
+- `controller` on port 8081 (exposed to host)
+- three Redis servers (`redis8`, `redis7`, `valkey`)
+- one worker per Redis (workers are not exposed; Prometheus scrapes them internally)
+
+After `docker compose up`, start a coordinated job via the controller:
+
+```bash
+curl -X POST http://localhost:8081/job/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {"redisUrl": "redis://redis8:6379", "workerCount": 1},
+      {"redisUrl": "redis://redis7:6379", "workerCount": 1},
+      {"redisUrl": "redis://valkey:6379", "workerCount": 1}
+    ],
+    "config": {
+      "test": { "minClients": 1, "maxClients": 50, "stageIntervalMs": 1000, "requestDelayMs": 100, "keySize": 10, "valueSize": 100 }
+    }
+  }'
+
+curl http://localhost:8081/workers
+curl http://localhost:8081/job/status
+```
+
+Prometheus scrapes the workers and the controller; Grafana dashboards are pre-provisioned to visualize metrics.
+
 ## Legacy Modes (unchanged)
 
 ```bash

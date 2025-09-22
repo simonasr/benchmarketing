@@ -12,26 +12,41 @@ x-bench_base: &bench_base
     - valkey
 
 services:
-  bench_redis8:
+  controller:
     <<: *bench_base
+    command: ["--mode=controller", "--port=8081"]
     ports:
-      - "8081:8080"
-    environment:
-      - REDIS_URL=redis://redis8:6379
+      - "8081:8081"
 
-  bench_redis7:
+  worker_redis8_1:
     <<: *bench_base
-    ports:
-      - "8083:8080"
-    environment:
-      - REDIS_URL=redis://redis7:6379
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_redis8_1"]
+    depends_on:
+      - prometheus
+      - redis8
+      - redis7
+      - valkey
+      - controller
 
-  bench_valkey:
+  worker_redis7_1:
     <<: *bench_base
-    ports:
-      - "8082:8080"
-    environment:
-      - REDIS_URL=redis://valkey:6379
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_redis7_1"]
+    depends_on:
+      - prometheus
+      - redis8
+      - redis7
+      - valkey
+      - controller
+
+  worker_valkey_1:
+    <<: *bench_base
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_valkey_1"]
+    depends_on:
+      - prometheus
+      - redis8
+      - redis7
+      - valkey
+      - controller
 
   redis8:
     image: redis:8.0
@@ -114,5 +129,21 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana:/etc/grafana/provisioning/datasources
       - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+  job_init:
+    image: alpine:3.20
+    container_name: job_init
+    depends_on:
+      - controller
+      - worker_redis8_1
+      - worker_redis7_1
+      - worker_valkey_1
+    volumes:
+      - ./redbench/scripts/compose-start-job.sh:/compose-start-job.sh:ro
+    environment:
+      - CONTROLLER_URL=http://controller:8081
+      - EXPECTED_WORKERS=3
+      - MAX_WAIT_SECS=180
+      - SLEEP_SECS=2
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl >/dev/null 2>&1 && /bin/sh /compose-start-job.sh"]
 volumes:
   prom_data:

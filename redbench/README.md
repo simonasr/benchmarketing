@@ -6,6 +6,7 @@ Redis benchmarking tool that measures performance and provides Prometheus metric
 
 - **CLI Mode**: Traditional one-shot benchmarking
 - **Service Mode**: HTTP API for remote control and multiple benchmarks
+- **Controller/Worker Mode**: Centralized orchestration across workers with optional UI
 - **Prometheus Metrics**: Real-time performance monitoring
 - **TLS Support**: Secure connections with certificate validation
 - **Cluster Support**: Redis cluster and single-instance modes
@@ -46,6 +47,35 @@ curl http://localhost:8080/status | jq
 
 # Stop benchmark
 curl -X DELETE http://localhost:8080/stop | jq
+```
+
+### Controller/Worker Mode (Docker Compose)
+
+```bash
+# 1) Start the stack (controller, workers, Redis, Prometheus, Grafana)
+docker compose -f compose-example.yaml up --build
+
+# 2) Start a coordinated job via the controller (port 8081)
+curl -X POST http://localhost:8081/job/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {"redisUrl": "redis://redis8:6379", "workerCount": 1},
+      {"redisUrl": "redis://redis7:6379", "workerCount": 1},
+      {"redisUrl": "redis://valkey:6379", "workerCount": 1}
+    ],
+    "config": {
+      "test": { "minClients": 1, "maxClients": 50, "stageIntervalMs": 1000, "requestDelayMs": 100, "keySize": 10, "valueSize": 100 }
+    }
+  }'
+
+# 3) Inspect controller and workers
+curl http://localhost:8081/health
+curl http://localhost:8081/workers
+curl http://localhost:8081/job/status
+
+# UI (served by controller)
+# http://localhost:8081/ui/
 ```
 
 ## Project Structure
@@ -218,11 +248,17 @@ Redis connection requires either URL or ClusterURL to be specified
 
 ### Prometheus Metrics
 
-Metrics are available at `http://localhost:8080/metrics` (unified port for both CLI and service modes):
+Metrics are exposed on each running server under `/metrics`:
+
+- In CLI and service modes, the default port is 8080 (configurable via `API_PORT`).
+- In controller/worker mode (Compose), the controller exposes `http://localhost:8081/metrics`; workers are scraped inside the Compose network by Prometheus.
 
 ```bash
-# View all redbench metrics
+# Example (service/CLI mode):
 curl http://localhost:8080/metrics | grep redbench
+
+# Example (controller mode):
+curl http://localhost:8081/metrics | grep redbench
 ```
 
 Key metrics:
@@ -291,7 +327,7 @@ go tool cover -html=coverage.out
 
 ### Docker Compose Setup
 
-See `compose-example.yaml` for a complete setup with Redis, Grafana, and Prometheus.
+See `compose-example.yaml` for a complete controller/worker setup with Redis, Prometheus, and Grafana.
 
 ### CI/CD
 
