@@ -1,0 +1,72 @@
+x-redbench_base: &redbench_base
+  build:
+    context: ./redbench
+    dockerfile: Dockerfile
+  volumes:
+    - ./redbench/config.yaml:/config.yaml
+  restart: no
+
+services:
+  controller:
+    <<: *redbench_base
+    command: ["--mode=controller", "--port=8081"]
+    ports:
+      - "8081:8081"
+
+  worker_1:
+    <<: *redbench_base
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_1"]
+    depends_on:
+      - controller
+
+  worker_2:
+    <<: *redbench_base
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_2"]
+    depends_on:
+      - controller
+
+  worker_3:
+    <<: *redbench_base
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_3"]
+    depends_on:
+      - controller
+
+  worker_4:
+    <<: *redbench_base
+    command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_4"]
+    depends_on:
+      - controller
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus-min
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus-minimal.yml:/etc/prometheus/prometheus.yml
+      - prom_data_min:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana-min
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_DASHBOARDS_JSON_ENABLED=true
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_PATHS_DASHBOARDS=/var/lib/grafana/dashboards
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+
+volumes:
+  prom_data_min:
+
+

@@ -2,6 +2,7 @@ global:
   scrape_interval: 10s
   scrape_timeout: 5s
   evaluation_interval: 10s
+
 scrape_configs:
 - job_name: redbench_workers
   honor_timestamps: true
@@ -11,18 +12,19 @@ scrape_configs:
   scheme: http
   static_configs:
   - targets:
-    - worker_redis8_1:8080
-    - worker_redis7_1:8080
-    - worker_valkey_1:8080
+    - worker_1:8080
+    - worker_2:8080
+    - worker_3:8080
+    - worker_4:8080
 
-- job_name: redis_exporters
+- job_name: redbench_controller
   honor_timestamps: true
   scrape_interval: 10s
   scrape_timeout: 5s
   metrics_path: /metrics
   scheme: http
   static_configs:
-    - targets:
-      - redis8-exporter:9121
-      - redis7-exporter:9121
-      - valkey-exporter:9121
+  - targets:
+    - controller:8081
+
+
