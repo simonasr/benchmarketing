@@ -1,48 +1,72 @@
 ---
-globs: redbench/internal/controller/ui/**/*.html,redbench/internal/controller/ui/**/*.css,redbench/internal/controller/ui/**/*.js
+description: RedBench Controller UI guidelines for polling, status-only refresh, persistence, accessibility, sorting, and error handling
+globs: redbench/internal/controller/ui/**/*.js,redbench/internal/controller/ui/**/*.css,redbench/internal/controller/ui/**/*.html
 ---
-# RedBench Controller UI Guidelines
 
-These rules guide UI implementation for the controller dashboard.
+# RedBench Controller UI Guidelines (v2)
+
+These rules guide implementation of the controller dashboard UI. They codify current behavior and expectations to keep the UI consistent, accessible, and easy to maintain.
 
 ## Architecture
-- Prefer vanilla HTML/CSS/JS; do not introduce frameworks or CDNs.
+- Prefer vanilla HTML/CSS/JS; do not introduce frameworks or CDNs. All assets must be self-hosted.
 - UI consumes controller REST only; keep business logic on the server.
 - UI state is transient and stored client-side (localStorage) only.
 
 ## File Structure
 - UI lives under [redbench/internal/controller/ui/](mdc:redbench/internal/controller/ui/).
-- Use a single entry point: [index.html](mdc:redbench/internal/controller/ui/index.html), script [app.js](mdc:redbench/internal/controller/ui/app.js), styles [style.css](mdc:redbench/internal/controller/ui/style.css).
-- Add future assets within `ui/` and keep embed patterns compatible.
+- Single entry: [index.html](mdc:redbench/internal/controller/ui/index.html), script [app.js](mdc:redbench/internal/controller/ui/app.js), styles [style.css](mdc:redbench/internal/controller/ui/style.css).
 
-## Styling
-- Use CSS variables defined in `:root`; avoid hardcoded hex where possible.
-- Reuse existing utility classes: `panel`, `panel-head`, `controls`, `status`, `muted`.
-- Status/state classes: `info`, `success`, `error`, and worker states `ok`, `idle`, `running`, `failed`, `stopped`.
-- Maintain responsive layout with the existing grid/breakpoints.
+## Polling & Refresh
+- Default polling interval: declare `REFRESH_MS = 1000` near the top-level constants.
+- Implement full auto-refresh with a single interval that calls both `loadWorkers()` and `refreshJobStatus()`.
+- When the Auto-Refresh toggle is OFF, run a dedicated status-only loop at `STATUS_REFRESH_MS` that calls `refreshJobStatus()` only. Never run both loops concurrently.
+- Pause all polling on `document.hidden`; resume the appropriate loop on visibility restore.
+- Avoid duplicate requests: stop one loop before starting another.
+- Maintain a small `failureCount` for resilience and future backoff; do not spam the console.
 
-## JavaScript
-- Keep functions short and focused; reuse helpers like `fetchJSON`, `setStatus`, `loadWorkers`, `refreshJobStatus`.
-- Parse error bodies and surface actionable messages via `fetchJSON` → `parseErrorResponse`.
-- Persist form values and UI prefs via localStorage using versioned keys (`rb_ui_v1_*`).
-- When mutating lists, rebuild DOM rows; use the `el()` helper for node creation.
-- Polling defaults to 1s; pause on tab hide and resume on focus. Keep manual refresh and toggle.
+## Status Rendering
+- Use `refreshJobStatus()` as the single source of truth for job state and UI control toggling via `setJobControlsState()`.
+- Promote terminal states to the status panel using `setStatus()`:
+  - `failed` → level `error`, include `errorMessage` when available.
+  - `completed` → level `success`.
+  - `running` on immediate recheck after start may keep the optimistic start message; otherwise do not overwrite.
+  - `no_jobs` should not emit an error.
+- Suppress flicker by caching the last seen `{jobId, status}` and only updating the status panel when either changes.
+
+## Workers Table & Sorting
+- Persist sorting in localStorage key `rb_ui_v1_workersSort` with shape `{ key, dir }`.
+- Default sort: `id` ascending. Numeric compare for numeric columns; date compare for `lastSeen` if parseable; string compare otherwise.
+- Update `aria-sort` on header cells and support keyboard activation (Enter/Space).
+- When a worker is `busy` on a target that is not present in the current form, add a subtle `mismatch` row style and tooltip.
+
+## Persistence & Toggles
+- Persist form values in `rb_ui_v1_jobForm`; debounce writes (≈200ms).
+- Persist auto-refresh toggle state in `rb_ui_v1_autoRefresh` using `'1'|'0'`.
+- The Reset action must be idempotent: clear localStorage and restore the initial HTML defaults.
+
+## Error Handling
+- Use `fetchJSON()` with `parseErrorResponse()` which prefers `error` or `message` fields when present.
+- When showing details, pretty-print JSON on a new line after the main message.
+- Never swallow exceptions silently in user flows; surface actionable information via `setStatus()` with an appropriate level.
 
 ## Accessibility
-- Ensure interactive elements are focusable; visible focus outline.
-- Use descriptive button text. Prefer `aria-live="polite"` on status containers for dynamic updates.
+- Ensure interactive elements are focusable; visible focus outlines.
+- Use `aria-live="polite"` on the main status container.
+- Modal dialogs must trap focus, support Escape to close, and Enter to confirm.
 
-## Validation & UX
-- Validate required fields and numeric ranges client-side before POST.
-- Keep “Reset to defaults” idempotent (clear localStorage + restore initial HTML defaults).
-- Show clear success/error messages in the status box with details when available.
+## Styling
+- Reuse existing utility classes: `panel`, `panel-head`, `controls`, `status`, `muted`.
+- Status/state classes: `info`, `success`, `error`, and worker states `ok`, `idle`, `running`, `failed`, `stopped`.
+- Prefer CSS variables defined in `:root` instead of hardcoded hex.
 
 ## Extractability
-- Avoid hardcoding controller host; when introduced, read API base from a small config surface (e.g., `window.__RB_CONFIG__`).
-- Do not depend on controller internals beyond public endpoints.
+- Keep API paths relative to the controller host. When introducing configuration, attach a small surface like `window.__RB_CONFIG__` and read from it.
+
+## Constants & No Magic Numbers
+- Declare and reuse UI constants at the top of the script. Current key constants include:
+  - `REFRESH_MS`, `STATUS_REFRESH_MS`, `RUNTIME_CACHE_TTL_MS`
+  - `DEFAULT_ASSUMED_LATENCY_MS`, `MIN_GOROUTINE_MS`, `MIN_PER_ITERATION_MS`, `MS_PADDING_LENGTH`, `OPS_PER_GOROUTINE`, `OPS_PER_ITERATION`
 
 ## Conventions
-- LocalStorage keys: `rb_ui_v1_jobForm`, `rb_ui_v1_autoRefresh` (bump version when schema changes).
-- Class naming: lowercase, hyphenated; represent states as additional classes (e.g., `status error`).
+- LocalStorage keys are versioned with `rb_ui_v1_*`. Bump the version when schema changes.
 - Keep all UI logic in [app.js](mdc:redbench/internal/controller/ui/app.js) unless file size becomes unwieldy.
-

@@ -123,12 +123,28 @@ func (c *Controller) findSelectedJob() *Job {
 	if len(jobs) == 0 {
 		return nil
 	}
+	// Prefer the currently running job if any
 	for _, j := range jobs {
 		if j.Status == JobStatusRunning {
 			return j
 		}
 	}
-	return jobs[len(jobs)-1]
+	// Otherwise, pick the most recent deterministically by EndTime, then StartTime
+	var latest *Job
+	var latestTs time.Time
+	for _, j := range jobs {
+		var ts time.Time
+		if j.EndTime != nil {
+			ts = *j.EndTime
+		} else if j.StartTime != nil {
+			ts = *j.StartTime
+		}
+		if latest == nil || ts.After(latestTs) {
+			latest = j
+			latestTs = ts
+		}
+	}
+	return latest
 }
 
 // deriveTargetsFromJobs attempts to reconstruct targets with worker counts from

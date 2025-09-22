@@ -421,7 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
 const REFRESH_MS = 1000;
+// Status-only refresh interval to keep status line updated when auto-refresh is off
+const STATUS_REFRESH_MS = REFRESH_MS;
 let refreshTimer = null;
+let statusTimer = null;
 let failureCount = 0;
 
 async function tickRefresh() {
@@ -446,18 +449,67 @@ function stopAutoRefresh() {
 }
 
 function initAutoRefresh() {
+  // Default: start auto-refresh; status-only loop will be enabled when toggle is off
   startAutoRefresh(REFRESH_MS);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopAutoRefresh(); else startAutoRefresh(REFRESH_MS);
+    if (document.hidden) {
+      stopAutoRefresh();
+      stopStatusRefresh();
+    } else {
+      const toggle = document.getElementById('autoRefreshToggle');
+      if (toggle && toggle.checked) {
+        startAutoRefresh(REFRESH_MS);
+        stopStatusRefresh();
+      } else {
+        stopAutoRefresh();
+        startStatusRefresh(STATUS_REFRESH_MS);
+      }
+    }
   });
   const toggle = document.getElementById('autoRefreshToggle');
   if (toggle) {
     toggle.addEventListener('change', () => {
-      if (toggle.checked) startAutoRefresh(REFRESH_MS); else stopAutoRefresh();
+      if (toggle.checked) {
+        // Switch to full auto-refresh; stop status-only loop to avoid duplicate calls
+        stopStatusRefresh();
+        startAutoRefresh(REFRESH_MS);
+      } else {
+        // Switch to status-only loop; stop full auto refresh
+        stopAutoRefresh();
+        startStatusRefresh(STATUS_REFRESH_MS);
+      }
       try { localStorage.setItem(TOGGLE_KEY, toggle.checked ? '1' : '0'); } catch {}
     });
     try { const v = localStorage.getItem(TOGGLE_KEY); if (v !== null) toggle.checked = v === '1'; } catch {}
-    if (!toggle.checked) stopAutoRefresh();
+    if (!toggle.checked) {
+      // Ensure only status line keeps refreshing when auto refresh is disabled
+      stopAutoRefresh();
+      startStatusRefresh(STATUS_REFRESH_MS);
+    } else {
+      // Auto refresh enabled, ensure status-only loop is not running
+      stopStatusRefresh();
+    }
+  }
+}
+
+async function tickStatusRefresh() {
+  try {
+    await refreshJobStatus();
+    failureCount = 0;
+  } catch (_) {
+    failureCount += 1;
+  }
+}
+
+function startStatusRefresh(intervalMs = STATUS_REFRESH_MS) {
+  stopStatusRefresh();
+  statusTimer = setInterval(tickStatusRefresh, intervalMs);
+}
+
+function stopStatusRefresh() {
+  if (statusTimer) {
+    clearInterval(statusTimer);
+    statusTimer = null;
   }
 }
 
