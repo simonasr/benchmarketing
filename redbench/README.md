@@ -76,6 +76,9 @@ curl http://localhost:8081/job/status
 
 # UI (served by controller)
 # http://localhost:8081/ui/
+
+# Tip: optional autostart profile to kick off a job at boot
+# docker compose -f compose-example.yaml --profile autostart up --build
 ```
 
 ## Project Structure

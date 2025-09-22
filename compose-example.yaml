@@ -132,6 +132,7 @@ services:
   job_init:
     image: alpine:3.20
     container_name: job_init
+    profiles: ["autostart"]
     depends_on:
       - controller
       - worker_redis8_1
