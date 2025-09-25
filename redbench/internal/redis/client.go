@@ -15,6 +15,13 @@ import (
 type Client interface {
 	Set(ctx context.Context, key string, value string, expiration int32) error
 	Get(ctx context.Context, key string) (string, error)
+	// Batch and advanced operations
+	PipelineSet(ctx context.Context, items []KeyValue, expiration int32) error
+	TransactionSet(ctx context.Context, items []KeyValue, expiration int32) error
+	// Sorted set operations
+	ZAdd(ctx context.Context, key string, members []ZMember) (int64, error)
+	ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]ZMember, error)
+	ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error)
 	PoolStats() *redis.PoolStats
 	Close() error
 }
@@ -22,6 +29,18 @@ type Client interface {
 // RedisClient implements the Client interface using go-redis.
 type RedisClient struct {
 	client redis.UniversalClient
+}
+
+// KeyValue represents a key/value pair used in batch operations.
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
+// ZMember represents a sorted set member with a score.
+type ZMember struct {
+	Score  float64
+	Member string
 }
 
 // RedisOptsLog is a serializable subset of redis.Options for logging.
@@ -124,6 +143,65 @@ func (r *RedisClient) Set(ctx context.Context, key string, value string, expirat
 // Get implements the Client interface for retrieving a value by key.
 func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 	return r.client.Get(ctx, key).Result()
+}
+
+// PipelineSet executes a batch of SET operations using a pipeline.
+func (r *RedisClient) PipelineSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	if len(items) == 0 {
+		return nil
+	}
+	pipe := r.client.Pipeline()
+	expr := time.Duration(expiration) * time.Second
+	for _, kv := range items {
+		pipe.Set(ctx, kv.Key, kv.Value, expr)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// TransactionSet executes a batch of SET operations inside a MULTI/EXEC transaction.
+func (r *RedisClient) TransactionSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	if len(items) == 0 {
+		return nil
+	}
+	expr := time.Duration(expiration) * time.Second
+	_, err := r.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, kv := range items {
+			pipe.Set(ctx, kv.Key, kv.Value, expr)
+		}
+		return nil
+	})
+	return err
+}
+
+// ZAdd adds one or more members to a sorted set.
+func (r *RedisClient) ZAdd(ctx context.Context, key string, members []ZMember) (int64, error) {
+	if len(members) == 0 {
+		return 0, nil
+	}
+	zm := make([]redis.Z, 0, len(members))
+	for _, m := range members {
+		zm = append(zm, redis.Z{Score: m.Score, Member: m.Member})
+	}
+	return r.client.ZAdd(ctx, key, zm...).Result()
+}
+
+// ZRevRangeWithScores returns a range of members with scores from the sorted set, highest scores first.
+func (r *RedisClient) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]ZMember, error) {
+	res, err := r.client.ZRevRangeWithScores(ctx, key, start, stop).Result()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ZMember, 0, len(res))
+	for _, z := range res {
+		out = append(out, ZMember{Score: z.Score, Member: fmt.Sprint(z.Member)})
+	}
+	return out, nil
+}
+
+// ZIncrBy increments the score of a member in the sorted set by the given increment.
+func (r *RedisClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error) {
+	return r.client.ZIncrBy(ctx, key, increment, member).Result()
 }
 
 // PoolStats returns the connection pool statistics.

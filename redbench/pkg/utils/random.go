@@ -43,3 +43,15 @@ func RandomString(length int) string {
 	randPool.Put(r)
 	return string(b)
 }
+
+// RandomIntn returns, as an int, a non-negative pseudo-random number in [0,n).
+// If n <= 0, it returns 0.
+func RandomIntn(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	r := randPool.Get().(*rand.Rand)
+	v := r.Intn(n)
+	randPool.Put(r)
+	return v
+}

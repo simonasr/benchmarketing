@@ -65,6 +65,15 @@ type Test struct {
 	RequestDelayMs  int `yaml:"requestDelayMs" json:"requestDelayMs"`
 	KeySize         int `yaml:"keySize" json:"keySize"`
 	ValueSize       int `yaml:"valueSize" json:"valueSize"`
+	// Workload selection and parameters
+	Workload    string `yaml:"workload" json:"workload"`
+	BatchSize   int    `yaml:"batchSize" json:"batchSize"`
+	DatasetSize int    `yaml:"datasetSize" json:"datasetSize"`
+	TopK        int    `yaml:"topK" json:"topK"`
+	// KeyTag ensures single slot in Redis Cluster using hash tags: key format will include `{KeyTag}`
+	KeyTag string `yaml:"keyTag" json:"keyTag"`
+	// TagCardinality controls how many distinct hash tags to randomize across (to spread load over slots)
+	TagCardinality int `yaml:"tagCardinality" json:"tagCardinality"`
 }
 
 // ControllerConfig contains controller-specific configuration.
@@ -209,7 +218,8 @@ func LoadConfig(path string) (*Config, error) {
 				if intVal, err := strconv.Atoi(val); err == nil {
 					testVal.Field(i).SetInt(int64(intVal))
 				}
-				// Add more types as needed
+			case reflect.String:
+				testVal.Field(i).SetString(val)
 			}
 		}
 	}

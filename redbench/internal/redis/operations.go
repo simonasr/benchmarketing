@@ -14,6 +14,8 @@ type MetricsRecorder interface {
 	ObserveGetDuration(duration float64)
 	IncrementSetFailures()
 	IncrementGetFailures()
+	ObserveDuration(command string, duration float64)
+	IncrementFailures(command string)
 }
 
 // Operations handles Redis benchmark operations.
@@ -67,5 +69,81 @@ func (o *Operations) GetData(ctx context.Context, key string) error {
 		fmt.Printf("item fetched from redis: key=%s, value=%s\n", key, val)
 	}
 
+	return nil
+}
+
+// PipelineSet performs batch SETs with a pipeline.
+func (o *Operations) PipelineSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	start := time.Now()
+	err := o.client.PipelineSet(ctx, items, expiration)
+	o.metrics.ObserveDuration("pipeline_set", time.Since(start).Seconds())
+	if err != nil {
+		o.metrics.IncrementFailures("pipeline_set")
+		return fmt.Errorf("pipeline set failed: %w", err)
+	}
+	return nil
+}
+
+// TransactionSet performs batch SETs inside MULTI/EXEC.
+func (o *Operations) TransactionSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	start := time.Now()
+	err := o.client.TransactionSet(ctx, items, expiration)
+	o.metrics.ObserveDuration("transaction_set", time.Since(start).Seconds())
+	if err != nil {
+		o.metrics.IncrementFailures("transaction_set")
+		return fmt.Errorf("transaction set failed: %w", err)
+	}
+	return nil
+}
+
+// ZSetTopKPrepare seeds a sorted set with datasetSize members under a given key.
+// Use a stable key with a hash tag to ensure single-slot affinity in cluster.
+func (o *Operations) ZSetTopKPrepare(ctx context.Context, key string, datasetSize int) error {
+	const batch = 100
+	remaining := datasetSize
+	i := 0
+	for remaining > 0 {
+		n := batch
+		if remaining < batch {
+			n = remaining
+		}
+		members := make([]ZMember, 0, n)
+		for j := 0; j < n; j++ {
+			members = append(members, ZMember{Score: float64(i + j), Member: utils.RandomString(16)})
+		}
+		start := time.Now()
+		_, err := o.client.ZAdd(ctx, key, members)
+		o.metrics.ObserveDuration("zadd", time.Since(start).Seconds())
+		if err != nil {
+			o.metrics.IncrementFailures("zadd")
+			return fmt.Errorf("zadd failed: %w", err)
+		}
+		remaining -= n
+		i += n
+	}
+	return nil
+}
+
+// ZSetTopK queries the top K elements of the sorted set.
+func (o *Operations) ZSetTopK(ctx context.Context, key string, k int) ([]ZMember, error) {
+	start := time.Now()
+	res, err := o.client.ZRevRangeWithScores(ctx, key, 0, int64(k-1))
+	o.metrics.ObserveDuration("zrevrange", time.Since(start).Seconds())
+	if err != nil {
+		o.metrics.IncrementFailures("zrevrange")
+		return nil, fmt.Errorf("zrevrange failed: %w", err)
+	}
+	return res, nil
+}
+
+// ZSetIncr simulates score churn for a given member.
+func (o *Operations) ZSetIncr(ctx context.Context, key string, member string, delta float64) error {
+	start := time.Now()
+	_, err := o.client.ZIncrBy(ctx, key, delta, member)
+	o.metrics.ObserveDuration("zincrby", time.Since(start).Seconds())
+	if err != nil {
+		o.metrics.IncrementFailures("zincrby")
+		return fmt.Errorf("zincrby failed: %w", err)
+	}
 	return nil
 }

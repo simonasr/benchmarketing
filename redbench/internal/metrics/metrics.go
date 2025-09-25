@@ -23,6 +23,10 @@ type Metrics struct {
 	requestFailedSet prometheus.Counter
 	requestFailedGet prometheus.Counter
 
+	// dynamic caches for arbitrary command labels
+	durationByCommand map[string]prometheus.Observer
+	failedByCommand   map[string]prometheus.Counter
+
 	redisPoolTotalConns prometheus.Gauge
 	redisPoolIdleConns  prometheus.Gauge
 	redisPoolStaleConns prometheus.Gauge
@@ -166,6 +170,8 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 			Help:        "Number of times a wait for a connection timed out.",
 			ConstLabels: prometheus.Labels{"target": target},
 		}),
+		durationByCommand: make(map[string]prometheus.Observer),
+		failedByCommand:   make(map[string]prometheus.Counter),
 	}
 
 	// Register or reuse collectors
@@ -222,6 +228,34 @@ func (m *Metrics) IncrementSetFailures() {
 // IncrementGetFailures increments the counter for failed GET operations.
 func (m *Metrics) IncrementGetFailures() {
 	m.requestFailedGet.Inc()
+}
+
+// ObserveDuration records duration for an arbitrary command label.
+func (m *Metrics) ObserveDuration(command string, duration float64) {
+	if command == "" {
+		return
+	}
+	if obs, ok := m.durationByCommand[command]; ok {
+		obs.Observe(duration)
+		return
+	}
+	child := m.duration.WithLabelValues(command, "redis", m.target)
+	m.durationByCommand[command] = child
+	child.Observe(duration)
+}
+
+// IncrementFailures increments failure counter for an arbitrary command label.
+func (m *Metrics) IncrementFailures(command string) {
+	if command == "" {
+		return
+	}
+	if cnt, ok := m.failedByCommand[command]; ok {
+		cnt.Inc()
+		return
+	}
+	child := m.requestFailed.WithLabelValues(command, "redis", m.target)
+	m.failedByCommand[command] = child
+	child.Inc()
 }
 
 // StartPrometheusServer starts an HTTP server to expose Prometheus metrics.

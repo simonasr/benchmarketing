@@ -13,8 +13,23 @@ type noopClient struct{}
 
 func (n *noopClient) Set(ctx context.Context, k, v string, exp int32) error { return nil }
 func (n *noopClient) Get(ctx context.Context, k string) (string, error)     { return "", nil }
-func (n *noopClient) PoolStats() *redis.PoolStats                           { return &redis.PoolStats{} }
-func (n *noopClient) Close() error                                          { return nil }
+func (n *noopClient) PipelineSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	return nil
+}
+func (n *noopClient) TransactionSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	return nil
+}
+func (n *noopClient) ZAdd(ctx context.Context, key string, members []ZMember) (int64, error) {
+	return 0, nil
+}
+func (n *noopClient) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]ZMember, error) {
+	return nil, nil
+}
+func (n *noopClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error) {
+	return 0, nil
+}
+func (n *noopClient) PoolStats() *redis.PoolStats { return &redis.PoolStats{} }
+func (n *noopClient) Close() error                { return nil }
 
 func BenchmarkSaveRandomData(b *testing.B) {
 	m := metrics.New(prometheus.NewRegistry(), "bench")

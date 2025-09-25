@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 	"github.com/simonasr/benchmarketing/redbench/internal/metrics"
+	benchredis "github.com/simonasr/benchmarketing/redbench/internal/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -39,6 +40,27 @@ func (m *MockRedisClient) PoolStats() *redis.PoolStats {
 func (m *MockRedisClient) Close() error {
 	args := m.Called()
 	return args.Error(0)
+}
+
+// Additional methods to satisfy extended interface
+func (m *MockRedisClient) PipelineSet(ctx context.Context, items []benchredis.KeyValue, expiration int32) error {
+	return nil
+}
+
+func (m *MockRedisClient) TransactionSet(ctx context.Context, items []benchredis.KeyValue, expiration int32) error {
+	return nil
+}
+
+func (m *MockRedisClient) ZAdd(ctx context.Context, key string, members []benchredis.ZMember) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockRedisClient) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]benchredis.ZMember, error) {
+	return nil, nil
+}
+
+func (m *MockRedisClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error) {
+	return 0, nil
 }
 
 func TestNewRunner(t *testing.T) {

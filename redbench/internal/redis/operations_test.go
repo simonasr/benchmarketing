@@ -35,6 +35,35 @@ func (m *MockClient) Close() error {
 	return args.Error(0)
 }
 
+// Extended interface methods
+func (m *MockClient) PipelineSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	args := m.Called(ctx, items, expiration)
+	return args.Error(0)
+}
+
+func (m *MockClient) TransactionSet(ctx context.Context, items []KeyValue, expiration int32) error {
+	args := m.Called(ctx, items, expiration)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZAdd(ctx context.Context, key string, members []ZMember) (int64, error) {
+	args := m.Called(ctx, key, members)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockClient) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]ZMember, error) {
+	args := m.Called(ctx, key, start, stop)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]ZMember), args.Error(1)
+}
+
+func (m *MockClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error) {
+	args := m.Called(ctx, key, increment, member)
+	return args.Get(0).(float64), args.Error(1)
+}
+
 // MockMetrics is a mock implementation of the metrics functionality
 type MockMetrics struct {
 	mock.Mock
@@ -54,6 +83,14 @@ func (m *MockMetrics) IncrementSetFailures() {
 
 func (m *MockMetrics) IncrementGetFailures() {
 	m.Called()
+}
+
+func (m *MockMetrics) ObserveDuration(command string, duration float64) {
+	m.Called(command, duration)
+}
+
+func (m *MockMetrics) IncrementFailures(command string) {
+	m.Called(command)
 }
 
 func (m *MockMetrics) UpdateRedisPoolStats(stats *redis.PoolStats) {

@@ -39,12 +39,18 @@ type TLSOverrides struct {
 
 // TestOverrides allows overriding specific test configuration values.
 type TestOverrides struct {
-	MinClients      *int `json:"minClients,omitempty"`
-	MaxClients      *int `json:"maxClients,omitempty"`
-	StageIntervalMs *int `json:"stageIntervalMs,omitempty"`
-	RequestDelayMs  *int `json:"requestDelayMs,omitempty"`
-	KeySize         *int `json:"keySize,omitempty"`
-	ValueSize       *int `json:"valueSize,omitempty"`
+	MinClients      *int    `json:"minClients,omitempty"`
+	MaxClients      *int    `json:"maxClients,omitempty"`
+	StageIntervalMs *int    `json:"stageIntervalMs,omitempty"`
+	RequestDelayMs  *int    `json:"requestDelayMs,omitempty"`
+	KeySize         *int    `json:"keySize,omitempty"`
+	ValueSize       *int    `json:"valueSize,omitempty"`
+	Workload        *string `json:"workload,omitempty"`
+	BatchSize       *int    `json:"batchSize,omitempty"`
+	DatasetSize     *int    `json:"datasetSize,omitempty"`
+	TopK            *int    `json:"topK,omitempty"`
+	KeyTag          *string `json:"keyTag,omitempty"`
+	TagCardinality  *int    `json:"tagCardinality,omitempty"`
 }
 
 // ParseBenchmarkRequest parses the raw request body into a BenchmarkRequest.
@@ -206,6 +212,24 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	}
 	if overrides.ValueSize != nil {
 		testConfig.ValueSize = *overrides.ValueSize
+	}
+	if overrides.Workload != nil {
+		testConfig.Workload = *overrides.Workload
+	}
+	if overrides.BatchSize != nil {
+		testConfig.BatchSize = *overrides.BatchSize
+	}
+	if overrides.DatasetSize != nil {
+		testConfig.DatasetSize = *overrides.DatasetSize
+	}
+	if overrides.TopK != nil {
+		testConfig.TopK = *overrides.TopK
+	}
+	if overrides.KeyTag != nil {
+		testConfig.KeyTag = *overrides.KeyTag
+	}
+	if overrides.TagCardinality != nil {
+		testConfig.TagCardinality = *overrides.TagCardinality
 	}
 }
 
