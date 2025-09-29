@@ -19,6 +19,7 @@ type MetricsRecorder interface {
 	IncrementGetFailures()
 	IncrementMSetFailures()
 	IncrementMGetFailures()
+	IncrementExpireFailures()
 }
 
 // Operations handles Redis benchmark operations.
@@ -115,9 +116,9 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 
 	if expiration > 0 {
 		expStart := time.Now()
-        if err := o.client.ExpireMany(ctx, keys, expiration); err != nil {
-            // Count as expire failure separately
-            o.metrics.IncrementExpireFailures()
+		if err := o.client.ExpireMany(ctx, keys, expiration); err != nil {
+			// Count as expire failure separately
+			o.metrics.IncrementExpireFailures()
 			return nil, fmt.Errorf("failed to expire keys after mset: %w", err)
 		}
 		o.metrics.ObserveExpireDuration(time.Since(expStart).Seconds())

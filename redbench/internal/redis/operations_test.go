@@ -91,6 +91,10 @@ func (m *MockMetrics) IncrementMGetFailures() {
 	m.Called()
 }
 
+func (m *MockMetrics) IncrementExpireFailures() {
+	m.Called()
+}
+
 func (m *MockMetrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
 	m.Called(stats)
 }

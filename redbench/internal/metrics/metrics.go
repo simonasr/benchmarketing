@@ -18,15 +18,15 @@ type Metrics struct {
 	requestFailed *prometheus.CounterVec
 
 	// Precomputed label handles to avoid per-call map allocations
-	durationSet       prometheus.Observer
-	durationGet       prometheus.Observer
-	durationMSet      prometheus.Observer
-	durationMGet      prometheus.Observer
-	durationExpire    prometheus.Observer
-	requestFailedSet  prometheus.Counter
-	requestFailedGet  prometheus.Counter
-	requestFailedMSet prometheus.Counter
-	requestFailedMGet prometheus.Counter
+	durationSet         prometheus.Observer
+	durationGet         prometheus.Observer
+	durationMSet        prometheus.Observer
+	durationMGet        prometheus.Observer
+	durationExpire      prometheus.Observer
+	requestFailedSet    prometheus.Counter
+	requestFailedGet    prometheus.Counter
+	requestFailedMSet   prometheus.Counter
+	requestFailedMGet   prometheus.Counter
 	requestFailedExpire prometheus.Counter
 
 	redisPoolTotalConns prometheus.Gauge

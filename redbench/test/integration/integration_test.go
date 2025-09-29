@@ -31,6 +31,38 @@ func (t *testRedisClient) Get(ctx context.Context, key string) (string, error) {
 	return t.client.Get(ctx, key).Result()
 }
 
+func (t *testRedisClient) MSet(ctx context.Context, kv map[string]string) error {
+	if len(kv) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(kv)*2)
+	for k, v := range kv {
+		args = append(args, k, v)
+	}
+	return t.client.MSet(ctx, args...).Err()
+}
+
+func (t *testRedisClient) MGet(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	_, err := t.client.MGet(ctx, keys...).Result()
+	return err
+}
+
+func (t *testRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
+	if len(keys) == 0 || expiration <= 0 {
+		return nil
+	}
+	expr := time.Duration(expiration) * time.Second
+	pipe := t.client.Pipeline()
+	for _, k := range keys {
+		pipe.Expire(ctx, k, expr)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
 func (t *testRedisClient) PoolStats() *redis.PoolStats {
 	return t.client.PoolStats()
 }
