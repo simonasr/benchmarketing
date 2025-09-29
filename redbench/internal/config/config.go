@@ -92,6 +92,15 @@ type Test struct {
 	SameSlotPerClient bool `yaml:"sameSlotPerClient" json:"sameSlotPerClient,omitempty"`
 	// TagsCount controls the number of distinct cluster hash-slot tags to spread keys across for cluster-aware workloads (e.g., ZSET leaderboards).
 	TagsCount int `yaml:"tagsCount" json:"tagsCount,omitempty"`
+	// ZSET-specific knobs
+	// ZSetBatchSize controls number of members per ZADD batch for ZSET workload.
+	ZSetBatchSize int `yaml:"zsetBatchSize" json:"zsetBatchSize,omitempty"`
+	// ZSetTopK controls how many members are read and retained per leaderboard (trim keeps topK).
+	ZSetTopK int `yaml:"zsetTopK" json:"zsetTopK,omitempty"`
+	// ZSetPerTagLeaderboards controls how many leaderboard keys exist per tag (union fan-in is bounded by this).
+	ZSetPerTagLeaderboards int `yaml:"zsetPerTagLeaderboards" json:"zsetPerTagLeaderboards,omitempty"`
+	// ZSetUnionFanIn controls how many leaderboards to union per union operation (0 disables unions).
+	ZSetUnionFanIn int `yaml:"zsetUnionFanIn" json:"zsetUnionFanIn,omitempty"`
 }
 
 // ControllerConfig contains controller-specific configuration.

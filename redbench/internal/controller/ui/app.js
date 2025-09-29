@@ -207,6 +207,11 @@ function serializeJobForm() {
       batchSize: parseInt(document.getElementById('batchSize')?.value, 10) || 10,
       sameSlotPerClient: !!document.getElementById('sameSlotPerClient')?.checked,
       tagsCount: parseInt(document.getElementById('tagsCount')?.value, 10) || 1024,
+      zsetTopK: parseInt(document.getElementById('zsetTopK')?.value, 10) || 50,
+      zsetPerTagLeaderboards: parseInt(document.getElementById('zsetPerTagLeaderboards')?.value, 10) || 4,
+      zsetUnionFanIn: parseInt(document.getElementById('zsetUnionFanIn')?.value, 10) || 3,
+      // Allow overriding batch size specifically for zset; fallback to generic batch size
+      zsetBatchSize: parseInt(document.getElementById('zsetBatchSize')?.value, 10) || (parseInt(document.getElementById('batchSize')?.value, 10) || 10),
     },
     redis: {
       operationTimeoutMs: parseInt(document.getElementById('operationTimeoutMs').value, 10),
@@ -591,6 +596,10 @@ function restoreForm(data) {
   set('operationTimeoutMs', data.redis?.operationTimeoutMs);
   set('expiration', data.redis?.expiration);
   set('assumedLatencyMs', data.assumptions?.latencyMs);
+  set('zsetBatchSize', data.test?.zsetBatchSize);
+  set('zsetTopK', data.test?.zsetTopK);
+  set('zsetPerTagLeaderboards', data.test?.zsetPerTagLeaderboards);
+  set('zsetUnionFanIn', data.test?.zsetUnionFanIn);
   updatePredictions();
 }
 
@@ -1046,6 +1055,10 @@ function buildCurrentDtoFromForm() {
       batchSize: parseInt(s.test.batchSize, 10),
       sameSlotPerClient: s.test.sameSlotPerClient === '1',
       tagsCount: parseInt(s.test.tagsCount, 10),
+      zsetBatchSize: parseInt(s.test.zsetBatchSize, 10),
+      zsetTopK: parseInt(s.test.zsetTopK, 10),
+      zsetPerTagLeaderboards: parseInt(s.test.zsetPerTagLeaderboards, 10),
+      zsetUnionFanIn: parseInt(s.test.zsetUnionFanIn, 10),
     },
     redis: {
       operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),

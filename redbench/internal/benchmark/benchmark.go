@@ -183,7 +183,11 @@ func (r *Runner) Run(ctx context.Context) error {
 					tag := "{" + tagBody + "}"
 
 					// Within a tag, pick a leaderboard key and perform operations
-					batchSize := r.config.Test.BatchSize
+					// Use zset-specific batch size when set, otherwise fall back to generic BatchSize
+					batchSize := r.config.Test.ZSetBatchSize
+					if batchSize <= 0 {
+						batchSize = r.config.Test.BatchSize
+					}
 					if batchSize <= 0 {
 						batchSize = defaultBatchSize
 					}
@@ -213,7 +217,10 @@ func (r *Runner) Run(ctx context.Context) error {
 
 					// Read top-K
 					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
-					const topK = int64(50)
+					topK := int64(r.config.Test.ZSetTopK)
+					if topK <= 0 {
+						topK = 50
+					}
 					if err := r.redisOps.ZReadTopK(opCtx2, zkey, topK); err != nil {
 						if ctx.Err() == nil {
 							slog.Error("ZReadTopK failed", "err", err)
@@ -230,21 +237,33 @@ func (r *Runner) Run(ctx context.Context) error {
 					}
 					cancel3()
 
-					// Occasionally union across few per-tag leaderboards
+					// Occasionally union across few per-tag leaderboards using configured fan-in
 					if (time.Now().UnixNano() & 0x7) == 0 { // ~1/8 ops
-						opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
-						sources := []string{
-							"z:lb:" + tag + ":" + utils.Base36Padded(0, 1),
-							"z:lb:" + tag + ":" + utils.Base36Padded(1, 1),
-							"z:lb:" + tag + ":" + utils.Base36Padded(2, 1),
+						fanIn := r.config.Test.ZSetUnionFanIn
+						if fanIn < 0 {
+							fanIn = 0
 						}
-						dest := "z:lb:" + tag + ":union"
-						if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
-							if ctx.Err() == nil {
-								slog.Error("ZUnionWithinTag failed", "err", err)
+						if fanIn > 0 {
+							perTag := r.config.Test.ZSetPerTagLeaderboards
+							if perTag <= 0 {
+								perTag = 4
 							}
+							if fanIn > perTag {
+								fanIn = perTag
+							}
+							sources := make([]string, 0, fanIn)
+							for i := 0; i < fanIn; i++ {
+								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, 1))
+							}
+							opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
+							dest := "z:lb:" + tag + ":union"
+							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
+								if ctx.Err() == nil {
+									slog.Error("ZUnionWithinTag failed", "err", err)
+								}
+							}
+							cancel4()
 						}
-						cancel4()
 					}
 				default:
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)

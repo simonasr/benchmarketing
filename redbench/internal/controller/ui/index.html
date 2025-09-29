@@ -69,7 +69,11 @@
               <label id="sameSlotLabel" class="workload-mset">
                 <input type="checkbox" id="sameSlotPerClient"> Use hashtags
               </label>
-              <label id="tagsCountLabel" class="workload-zset">Tags Count<input type="number" id="tagsCount" value="1024" min="1"></label>
+              <label id="tagsCountLabel" class="workload-zset" title="Number of distinct hashtags to spread across cluster slots; higher = wider shard distribution.">Tags Count<input type="number" id="tagsCount" value="1024" min="1"></label>
+              <label class="workload-zset" title="Members per ZADD; controls per-op CPU and memory growth.">ZSET Batch Size<input type="number" id="zsetBatchSize" value="10" min="1"></label>
+              <label class="workload-zset" title="Read and keep only the top K members per leaderboard.">Top-K<input type="number" id="zsetTopK" value="50" min="1"></label>
+              <label class="workload-zset" title="Number of leaderboards per tag (e.g., lb0..lbN) used for unions.">Per-Tag Leaderboards<input type="number" id="zsetPerTagLeaderboards" value="4" min="1"></label>
+              <label class="workload-zset" title="Number of sources in each ZUNIONSTORE; set 0 to disable unions.">Union Fan-in<input type="number" id="zsetUnionFanIn" value="3" min="0"></label>
             </div>
           </fieldset>
 
