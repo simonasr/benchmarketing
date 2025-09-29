@@ -17,15 +17,16 @@ import (
 
 // Workload identifiers kept in one place to avoid magic strings.
 const (
-	WorkloadSetGet   = "set_get"
-	WorkloadMSetMGet = "mset_mget"
+	WorkloadSetGet    = "set_get"
+	WorkloadMSetMGet  = "mset_mget"
+	WorkloadHSetHMGet = "hset_hmget"
 )
 
 // IsBatchWorkload reports whether the given workload uses batch operations.
 // Keeping this here allows future batch workloads to be added without touching call sites.
 func IsBatchWorkload(workload string) bool {
 	switch workload {
-	case WorkloadMSetMGet:
+	case WorkloadMSetMGet, WorkloadHSetHMGet:
 		return true
 	default:
 		return false

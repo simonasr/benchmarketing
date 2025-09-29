@@ -17,6 +17,9 @@ type Client interface {
 	Get(ctx context.Context, key string) (string, error)
 	MSet(ctx context.Context, kv map[string]string) error
 	MGet(ctx context.Context, keys []string) error
+	HSet(ctx context.Context, key string, fieldValues map[string]string) error
+	HMGet(ctx context.Context, key string, fields []string) error
+	HGet(ctx context.Context, key string, field string) (string, error)
 	ExpireMany(ctx context.Context, keys []string, expiration int32) error
 	PoolStats() *redis.PoolStats
 	Close() error
@@ -148,6 +151,32 @@ func (r *RedisClient) MGet(ctx context.Context, keys []string) error {
 	}
 	_, err := r.client.MGet(ctx, keys...).Result()
 	return err
+}
+
+// HSet sets multiple field/value pairs on a hash key.
+func (r *RedisClient) HSet(ctx context.Context, key string, fieldValues map[string]string) error {
+	if len(fieldValues) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(fieldValues)*2)
+	for f, v := range fieldValues {
+		args = append(args, f, v)
+	}
+	return r.client.HSet(ctx, key, args...).Err()
+}
+
+// HMGet fetches multiple fields from a hash key.
+func (r *RedisClient) HMGet(ctx context.Context, key string, fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	_, err := r.client.HMGet(ctx, key, fields...).Result()
+	return err
+}
+
+// HGet fetches a single field from a hash key.
+func (r *RedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
+	return r.client.HGet(ctx, key, field).Result()
 }
 
 // ExpireMany applies expiration to a set of keys using a pipeline for efficiency.

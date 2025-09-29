@@ -50,6 +50,29 @@ func (t *testRedisClient) MGet(ctx context.Context, keys []string) error {
 	return err
 }
 
+func (t *testRedisClient) HSet(ctx context.Context, key string, fieldValues map[string]string) error {
+	if len(fieldValues) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(fieldValues)*2)
+	for f, v := range fieldValues {
+		args = append(args, f, v)
+	}
+	return t.client.HSet(ctx, key, args...).Err()
+}
+
+func (t *testRedisClient) HMGet(ctx context.Context, key string, fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	_, err := t.client.HMGet(ctx, key, fields...).Result()
+	return err
+}
+
+func (t *testRedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
+	return t.client.HGet(ctx, key, field).Result()
+}
+
 func (t *testRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	if len(keys) == 0 || expiration <= 0 {
 		return nil

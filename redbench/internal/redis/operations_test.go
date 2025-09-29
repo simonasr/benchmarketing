@@ -35,6 +35,21 @@ func (m *MockClient) MGet(ctx context.Context, keys []string) error {
 	return args.Error(0)
 }
 
+func (m *MockClient) HSet(ctx context.Context, key string, fieldValues map[string]string) error {
+	args := m.Called(ctx, key, fieldValues)
+	return args.Error(0)
+}
+
+func (m *MockClient) HMGet(ctx context.Context, key string, fields []string) error {
+	args := m.Called(ctx, key, fields)
+	return args.Error(0)
+}
+
+func (m *MockClient) HGet(ctx context.Context, key string, field string) (string, error) {
+	args := m.Called(ctx, key, field)
+	return args.String(0), args.Error(1)
+}
+
 func (m *MockClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	args := m.Called(ctx, keys, expiration)
 	return args.Error(0)
@@ -71,6 +86,16 @@ func (m *MockMetrics) ObserveMGetDuration(duration float64) {
 	m.Called(duration)
 }
 
+func (m *MockMetrics) ObserveHSetDuration(duration float64) {
+	m.Called(duration)
+}
+func (m *MockMetrics) ObserveHMGetDuration(duration float64) {
+	m.Called(duration)
+}
+func (m *MockMetrics) ObserveHGetDuration(duration float64) {
+	m.Called(duration)
+}
+
 func (m *MockMetrics) ObserveExpireDuration(duration float64) {
 	m.Called(duration)
 }
@@ -88,6 +113,16 @@ func (m *MockMetrics) IncrementMSetFailures() {
 }
 
 func (m *MockMetrics) IncrementMGetFailures() {
+	m.Called()
+}
+
+func (m *MockMetrics) IncrementHSetFailures() {
+	m.Called()
+}
+func (m *MockMetrics) IncrementHMGetFailures() {
+	m.Called()
+}
+func (m *MockMetrics) IncrementHGetFailures() {
 	m.Called()
 }
 

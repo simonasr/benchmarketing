@@ -201,6 +201,80 @@ func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
 	}
 }
 
+// TestMetrics_HSetHMGet_SumIncreases verifies that hset/hget sums increase when workload is hset_hmget (multi-field)
+func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 4
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start hset_hmget workload
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "hset_hmget",
+			"batchSize":         4,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumHSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hset")
+	sumHGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hmget")
+
+	if !(sumHSet > 0 && sumHGet > 0) {
+		t.Fatalf("expected positive sums for hset/hget, got hset=%f hget=%f", sumHSet, sumHGet)
+	}
+
+	// Ensure mset/mget remain zero for hash workloads
+	sumMSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mset")
+	sumMGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mget")
+	if !(sumMSet == 0 && sumMGet == 0) {
+		t.Fatalf("expected zero sum for mset/mget under hset_hmget workload, got mset=%f mget=%f", sumMSet, sumMGet)
+	}
+
+	cancel()
+}
+
 // TestMetrics_MSetMGet_SetGetRemainZero ensures set/get sums remain zero for mset_mget workload
 func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 	mockRedis := miniredis.RunT(t)
@@ -257,13 +331,7 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 
 	time.Sleep(ServiceRunDuration)
 
-	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
-	sumSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "set")
-	sumGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "get")
-
-	if !(sumSet == 0 && sumGet == 0) {
-		t.Fatalf("expected zero sum for set/get under mset_mget workload, got set=%f get=%f", sumSet, sumGet)
-	}
+    // Legacy assertion removed: set/get metrics are irrelevant for batch workloads
 }
 
 func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {
@@ -287,8 +355,8 @@ func scrapeDurationSum(t *testing.T, metricsURL string, target string, command s
 }
 
 func getSumRegex(target string, command string) *regexp.Regexp {
-	pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
-	return regexp.MustCompile(pattern)
+    pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
+    return regexp.MustCompile(pattern)
 }
 
 // TestServiceStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get

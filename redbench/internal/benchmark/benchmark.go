@@ -138,6 +138,37 @@ func (r *Runner) Run(ctx context.Context) error {
 							slog.Error("GetBatchData failed", "err", err)
 						}
 					}
+				case config.WorkloadHSetHMGet:
+					tag := ""
+					if r.config.Test.SameSlotPerClient {
+						tag = utils.NewHashSlotTag()
+					}
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					batchSize := r.config.Test.BatchSize
+					if batchSize <= 0 {
+						batchSize = defaultBatchSize
+					}
+					hashKey, fields, err := r.redisOps.SaveRandomHashData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize, batchSize, tag)
+					cancel()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("SaveRandomHashData failed", "err", err)
+						}
+					}
+
+					if ctx.Err() != nil {
+						<-clients
+						return
+					}
+
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					err = r.redisOps.GetHashData(opCtx2, hashKey, fields)
+					cancel2()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("GetHashData failed", "err", err)
+						}
+					}
 				default:
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
 					key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
