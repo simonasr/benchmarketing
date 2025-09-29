@@ -27,6 +27,7 @@ type Metrics struct {
 	requestFailedGet  prometheus.Counter
 	requestFailedMSet prometheus.Counter
 	requestFailedMGet prometheus.Counter
+	requestFailedExpire prometheus.Counter
 
 	redisPoolTotalConns prometheus.Gauge
 	redisPoolIdleConns  prometheus.Gauge
@@ -195,6 +196,7 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
 	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
 	m.requestFailedMGet = m.requestFailed.WithLabelValues("mget", "redis", target)
+	m.requestFailedExpire = m.requestFailed.WithLabelValues("expire", "redis", target)
 
 	return m
 }
@@ -257,6 +259,11 @@ func (m *Metrics) IncrementMSetFailures() {
 // IncrementMGetFailures increments the counter for failed MGET operations.
 func (m *Metrics) IncrementMGetFailures() {
 	m.requestFailedMGet.Inc()
+}
+
+// IncrementExpireFailures increments the counter for failed EXPIRE operations.
+func (m *Metrics) IncrementExpireFailures() {
+	m.requestFailedExpire.Inc()
 }
 
 // StartPrometheusServer starts an HTTP server to expose Prometheus metrics.

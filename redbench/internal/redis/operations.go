@@ -115,9 +115,9 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 
 	if expiration > 0 {
 		expStart := time.Now()
-		if err := o.client.ExpireMany(ctx, keys, expiration); err != nil {
-			// Expiration errors count toward MSET failures as part of the batch write
-			o.metrics.IncrementMSetFailures()
+        if err := o.client.ExpireMany(ctx, keys, expiration); err != nil {
+            // Count as expire failure separately
+            o.metrics.IncrementExpireFailures()
 			return nil, fmt.Errorf("failed to expire keys after mset: %w", err)
 		}
 		o.metrics.ObserveExpireDuration(time.Since(expStart).Seconds())
