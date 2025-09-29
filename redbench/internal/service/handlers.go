@@ -153,7 +153,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sanitize: hide workload-specific fields for non-batch workloads to avoid leaking unrelated params
-	if mergedConfig.Test.Workload != "mset_mget" {
+	if !config.IsBatchWorkload(mergedConfig.Test.Workload) {
 		mergedConfig.Test.BatchSize = 0
 		mergedConfig.Test.SameSlotPerClient = false
 	}

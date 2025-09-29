@@ -439,7 +439,7 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobID string, jobConfig *
 		// Propagate workload-specific fields so workers run the intended workload
 		if jobConfig.Test.Workload != "" {
 			to["workload"] = jobConfig.Test.Workload
-			if jobConfig.Test.Workload == "mset_mget" {
+			if config.IsBatchWorkload(jobConfig.Test.Workload) {
 				if jobConfig.Test.BatchSize != 0 {
 					to["batchSize"] = jobConfig.Test.BatchSize
 				}

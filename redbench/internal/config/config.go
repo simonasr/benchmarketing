@@ -15,6 +15,23 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Workload identifiers kept in one place to avoid magic strings.
+const (
+	WorkloadSetGet   = "set_get"
+	WorkloadMSetMGet = "mset_mget"
+)
+
+// IsBatchWorkload reports whether the given workload uses batch operations.
+// Keeping this here allows future batch workloads to be added without touching call sites.
+func IsBatchWorkload(workload string) bool {
+	switch workload {
+	case WorkloadMSetMGet:
+		return true
+	default:
+		return false
+	}
+}
+
 // Config represents the application configuration.
 type Config struct {
 	Debug      bool             `yaml:"debug" json:"debug"`

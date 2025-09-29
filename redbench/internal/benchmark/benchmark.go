@@ -102,7 +102,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 				opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
 				switch r.config.Test.Workload {
-				case "mset_mget":
+				case config.WorkloadMSetMGet:
 					// Generate an optional same-slot tag if enabled (NewHashSlotTag returns a pre-wrapped tag "{...}")
 					tag := ""
 					if r.config.Test.SameSlotPerClient {
