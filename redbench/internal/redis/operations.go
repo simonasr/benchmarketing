@@ -14,11 +14,15 @@ type MetricsRecorder interface {
 	ObserveGetDuration(duration float64)
 	ObserveMSetDuration(duration float64)
 	ObserveMGetDuration(duration float64)
+	ObserveHSetDuration(duration float64)
+	ObserveHMGetDuration(duration float64)
 	ObserveExpireDuration(duration float64)
 	IncrementSetFailures()
 	IncrementGetFailures()
 	IncrementMSetFailures()
 	IncrementMGetFailures()
+	IncrementHSetFailures()
+	IncrementHMGetFailures()
 	IncrementExpireFailures()
 }
 
@@ -32,6 +36,9 @@ type Operations struct {
 const (
 	// defaultTaggedSuffixLen is the fixed suffix length to ensure uniqueness within a batch
 	defaultTaggedSuffixLen = utils.DefaultTaggedSuffixLen
+	// counterPadLen controls zero-padding for base36 counters used in field names and
+	// key-collision avoidance suffixes. Kept small to minimize inflation while ensuring stability.
+	counterPadLen = 1
 )
 
 // NewOperations creates a new Operations instance.
@@ -99,7 +106,7 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 			key = utils.RandomString(keySize)
 			// Guarantee uniqueness for non-tagged case by appending a base36 counter if collision
 			if _, exists := kv[key]; exists {
-				key = key[:len(key)-1] + utils.Base36Padded(i, 1)
+				key = key[:len(key)-1] + utils.Base36Padded(i, counterPadLen)
 			}
 		}
 		value := utils.RandomString(valueSize)
@@ -145,5 +152,57 @@ func (o *Operations) GetBatchData(ctx context.Context, keys []string) error {
 	if o.debug {
 		fmt.Printf("mget fetched %d items\n", len(keys))
 	}
+	return nil
+}
+
+// SaveRandomHashData creates one hash key with batchSize fields using HSET and applies expiration.
+// Returns the hash key and list of field names used.
+func (o *Operations) SaveRandomHashData(ctx context.Context, expiration int32, keySize, fieldValueSize, batchSize int, sameSlotTag string) (string, []string, error) {
+	if batchSize <= 0 {
+		return "", nil, fmt.Errorf("batch size must be > 0")
+	}
+	var key string
+	if sameSlotTag != "" {
+		key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, defaultTaggedSuffixLen, 0)
+	} else {
+		key = utils.RandomString(keySize)
+	}
+
+	fields := make([]string, 0, batchSize)
+	fv := make(map[string]string, batchSize)
+	for i := 0; i < batchSize; i++ {
+		field := "f" + utils.Base36Padded(i, counterPadLen)
+		fields = append(fields, field)
+		fv[field] = utils.RandomString(fieldValueSize)
+	}
+
+	start := time.Now()
+	if err := o.client.HSet(ctx, key, fv); err != nil {
+		o.metrics.IncrementHSetFailures()
+		return "", nil, fmt.Errorf("failed to hset fields in Redis: %w", err)
+	}
+	o.metrics.ObserveHSetDuration(time.Since(start).Seconds())
+
+	if expiration > 0 {
+		if err := o.client.ExpireMany(ctx, []string{key}, expiration); err != nil {
+			o.metrics.IncrementExpireFailures()
+			return "", nil, fmt.Errorf("failed to expire hash key: %w", err)
+		}
+		// We do not observe separate expire duration for single-key path to keep parity
+	}
+	return key, fields, nil
+}
+
+// GetHashData fetches multiple fields from a hash key using HMGET.
+func (o *Operations) GetHashData(ctx context.Context, key string, fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	start := time.Now()
+	if err := o.client.HMGet(ctx, key, fields); err != nil {
+		o.metrics.IncrementHMGetFailures()
+		return fmt.Errorf("failed to hmget fields from Redis: %w", err)
+	}
+	o.metrics.ObserveHMGetDuration(time.Since(start).Seconds())
 	return nil
 }
