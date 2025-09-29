@@ -53,6 +53,9 @@ type TestOverrides struct {
 	ZSetTopK               *int    `json:"zsetTopK,omitempty"`
 	ZSetPerTagLeaderboards *int    `json:"zsetPerTagLeaderboards,omitempty"`
 	ZSetUnionFanIn         *int    `json:"zsetUnionFanIn,omitempty"`
+	ZSetUnionEveryNOps     *int    `json:"zsetUnionEveryNOps,omitempty"`
+	ZSetUpdateRatio        *int    `json:"zsetUpdateRatio,omitempty"`
+	ZSetScoreMode          *string `json:"zsetScoreMode,omitempty"`
 }
 
 // ParseBenchmarkRequest parses the raw request body into a BenchmarkRequest.
@@ -238,6 +241,15 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	}
 	if overrides.ZSetUnionFanIn != nil {
 		testConfig.ZSetUnionFanIn = *overrides.ZSetUnionFanIn
+	}
+	if overrides.ZSetUnionEveryNOps != nil {
+		testConfig.ZSetUnionEveryNOps = *overrides.ZSetUnionEveryNOps
+	}
+	if overrides.ZSetUpdateRatio != nil {
+		testConfig.ZSetUpdateRatio = *overrides.ZSetUpdateRatio
+	}
+	if overrides.ZSetScoreMode != nil {
+		testConfig.ZSetScoreMode = *overrides.ZSetScoreMode
 	}
 }
 

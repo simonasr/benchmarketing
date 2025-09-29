@@ -212,6 +212,9 @@ function serializeJobForm() {
       zsetUnionFanIn: parseInt(document.getElementById('zsetUnionFanIn')?.value, 10) || 3,
       // Allow overriding batch size specifically for zset; fallback to generic batch size
       zsetBatchSize: parseInt(document.getElementById('zsetBatchSize')?.value, 10) || (parseInt(document.getElementById('batchSize')?.value, 10) || 10),
+      zsetUnionEveryNOps: parseInt(document.getElementById('zsetUnionEveryNOps')?.value, 10) || 8,
+      zsetUpdateRatio: parseInt(document.getElementById('zsetUpdateRatio')?.value, 10) || 0,
+      zsetScoreMode: (document.getElementById('zsetScoreMode')?.value) || 'time',
     },
     redis: {
       operationTimeoutMs: parseInt(document.getElementById('operationTimeoutMs').value, 10),
@@ -600,6 +603,9 @@ function restoreForm(data) {
   set('zsetTopK', data.test?.zsetTopK);
   set('zsetPerTagLeaderboards', data.test?.zsetPerTagLeaderboards);
   set('zsetUnionFanIn', data.test?.zsetUnionFanIn);
+  set('zsetUnionEveryNOps', data.test?.zsetUnionEveryNOps);
+  set('zsetUpdateRatio', data.test?.zsetUpdateRatio);
+  const scoreEl = document.getElementById('zsetScoreMode'); if (scoreEl && data.test?.zsetScoreMode) scoreEl.value = data.test.zsetScoreMode;
   updatePredictions();
 }
 
@@ -1059,6 +1065,9 @@ function buildCurrentDtoFromForm() {
       zsetTopK: parseInt(s.test.zsetTopK, 10),
       zsetPerTagLeaderboards: parseInt(s.test.zsetPerTagLeaderboards, 10),
       zsetUnionFanIn: parseInt(s.test.zsetUnionFanIn, 10),
+      zsetUnionEveryNOps: parseInt(s.test.zsetUnionEveryNOps, 10),
+      zsetUpdateRatio: parseInt(s.test.zsetUpdateRatio, 10),
+      zsetScoreMode: s.test.zsetScoreMode || 'time',
     },
     redis: {
       operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),

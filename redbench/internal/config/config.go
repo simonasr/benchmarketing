@@ -101,6 +101,13 @@ type Test struct {
 	ZSetPerTagLeaderboards int `yaml:"zsetPerTagLeaderboards" json:"zsetPerTagLeaderboards,omitempty"`
 	// ZSetUnionFanIn controls how many leaderboards to union per union operation (0 disables unions).
 	ZSetUnionFanIn int `yaml:"zsetUnionFanIn" json:"zsetUnionFanIn,omitempty"`
+	// Advanced knobs (optional)
+	// ZSetUnionEveryNOps controls union frequency. For example 8 means ~every 1/8 ops.
+	ZSetUnionEveryNOps int `yaml:"zsetUnionEveryNOps" json:"zsetUnionEveryNOps,omitempty"`
+	// ZSetUpdateRatio is 0..100. If >0, a portion of operations do ZINCRBY on existing members.
+	ZSetUpdateRatio int `yaml:"zsetUpdateRatio" json:"zsetUpdateRatio,omitempty"`
+	// ZSetScoreMode controls how scores are generated: "time", "random", "increment".
+	ZSetScoreMode string `yaml:"zsetScoreMode" json:"zsetScoreMode,omitempty"`
 }
 
 // ControllerConfig contains controller-specific configuration.
