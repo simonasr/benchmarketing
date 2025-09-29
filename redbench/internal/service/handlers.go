@@ -152,6 +152,12 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sanitize: hide workload-specific fields for non-batch workloads to avoid leaking unrelated params
+	if !config.IsBatchWorkload(mergedConfig.Test.Workload) {
+		mergedConfig.Test.BatchSize = 0
+		mergedConfig.Test.SameSlotPerClient = false
+	}
+
 	// Create Redis connection from request overrides or use base connection
 	redisConn, err := CreateRedisConnectionFromRequest(s.baseRedisConn, req)
 	if err != nil {

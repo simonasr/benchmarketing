@@ -15,6 +15,9 @@ import (
 type Client interface {
 	Set(ctx context.Context, key string, value string, expiration int32) error
 	Get(ctx context.Context, key string) (string, error)
+	MSet(ctx context.Context, kv map[string]string) error
+	MGet(ctx context.Context, keys []string) error
+	ExpireMany(ctx context.Context, keys []string, expiration int32) error
 	PoolStats() *redis.PoolStats
 	Close() error
 }
@@ -124,6 +127,41 @@ func (r *RedisClient) Set(ctx context.Context, key string, value string, expirat
 // Get implements the Client interface for retrieving a value by key.
 func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 	return r.client.Get(ctx, key).Result()
+}
+
+// MSet implements setting multiple key-value pairs in a single operation.
+func (r *RedisClient) MSet(ctx context.Context, kv map[string]string) error {
+	if len(kv) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(kv)*2)
+	for k, v := range kv {
+		args = append(args, k, v)
+	}
+	return r.client.MSet(ctx, args...).Err()
+}
+
+// MGet implements fetching multiple keys in a single operation.
+func (r *RedisClient) MGet(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	_, err := r.client.MGet(ctx, keys...).Result()
+	return err
+}
+
+// ExpireMany applies expiration to a set of keys using a pipeline for efficiency.
+func (r *RedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
+	if expiration <= 0 || len(keys) == 0 {
+		return nil
+	}
+	expr := time.Duration(expiration) * time.Second
+	pipe := r.client.Pipeline()
+	for _, k := range keys {
+		pipe.Expire(ctx, k, expr)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PoolStats returns the connection pool statistics.

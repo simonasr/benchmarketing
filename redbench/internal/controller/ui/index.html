@@ -56,6 +56,17 @@
               <label>Op Timeout (ms)<input type="number" id="operationTimeoutMs" value="250" min="1"></label>
               <label>Expiration (s)<input type="number" id="expiration" value="45" min="1"></label>
               <label>Assumed Redis Latency (ms)<input type="number" id="assumedLatencyMs" value="0.5" min="0" step="0.1"></label>
+              <div class="line-break"></div>
+              <label>Workload
+                <select id="workload">
+                  <option value="set_get" selected>SET / GET</option>
+                  <option value="mset_mget">MSET / MGET</option>
+                </select>
+              </label>
+              <label id="batchSizeLabel" class="workload-mset">Batch Size<input type="number" id="batchSize" value="10" min="1"></label>
+              <label id="sameSlotLabel" class="workload-mset">
+                <input type="checkbox" id="sameSlotPerClient"> Use hashtags
+              </label>
             </div>
           </fieldset>
 

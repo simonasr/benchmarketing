@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,4 +132,315 @@ func scrapeSetCount(t *testing.T, metricsURL string, target string) int {
 func getSetCountRegex(target string) *regexp.Regexp {
 	pattern := `redbench_request_duration_seconds_count\{[^}]*command="set"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+(\d+)`
 	return regexp.MustCompile(pattern)
+}
+
+// --- New tests for MSET/MGET workload metrics ---
+
+// TestMetrics_MSetMGet_SumIncreases verifies that mset/mget sums increase when workload is mset_mget
+func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 2
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         3,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumMSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mset")
+	sumMGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mget")
+
+	if !(sumMSet > 0 && sumMGet > 0) {
+		t.Fatalf("expected positive sums for mset/mget, got mset=%f mget=%f", sumMSet, sumMGet)
+	}
+}
+
+// TestMetrics_MSetMGet_SetGetRemainZero ensures set/get sums remain zero for mset_mget workload
+func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 3
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         3,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "set")
+	sumGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "get")
+
+	if !(sumSet == 0 && sumGet == 0) {
+		t.Fatalf("expected zero sum for set/get under mset_mget workload, got set=%f get=%f", sumSet, sumGet)
+	}
+}
+
+func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {
+	t.Helper()
+	resp, err := http.Get(metricsURL)
+	if err != nil {
+		t.Fatalf("scrape metrics: %v", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	re := getSumRegex(target, command)
+	m := re.FindSubmatch(b)
+	if len(m) < 2 {
+		t.Fatalf("metric redbench_request_duration_seconds_sum command=%s target=%s not found in scrape", command, target)
+	}
+	val, err := strconv.ParseFloat(string(m[1]), 64)
+	if err != nil {
+		t.Fatalf("parse metric value: %v", err)
+	}
+	return val
+}
+
+func getSumRegex(target string, command string) *regexp.Regexp {
+	pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
+	return regexp.MustCompile(pattern)
+}
+
+// TestServiceStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get
+func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 5
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start set_get workload (default) explicitly
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":        "set_get",
+			"minClients":      1,
+			"maxClients":      1,
+			"stageIntervalMs": TestStageIntervalFast,
+			"requestDelayMs":  TestRequestDelayNormal,
+			"keySize":         TestKeySize,
+			"valueSize":       TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	if resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b)); err != nil {
+		t.Fatalf("start: %v", err)
+	} else {
+		resp.Body.Close()
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	// Query /status and ensure configuration omits batch-only fields
+	resp, err := http.Get(baseURL + "/status")
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	defer resp.Body.Close()
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	cfgObj, _ := body["configuration"].(map[string]any)
+	if cfgObj == nil {
+		t.Fatalf("expected configuration in status")
+	}
+	testObj, _ := cfgObj["test"].(map[string]any)
+	if testObj == nil {
+		t.Fatalf("expected test configuration in status")
+	}
+	if _, ok := testObj["batchSize"]; ok {
+		t.Fatalf("unexpected batchSize present for set_get workload")
+	}
+	if _, ok := testObj["sameSlotPerClient"]; ok {
+		t.Fatalf("unexpected sameSlotPerClient present for set_get workload")
+	}
+}
+
+// TestKeysContainHashTagWithSameSlot verifies generated keys include hash-slot tags and match configured size
+func TestKeysContainHashTagWithSameSlot(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 4
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload with sameSlotPerClient=true
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         4,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	// Inspect keys in miniredis
+	keys := mockRedis.Keys()
+	if len(keys) == 0 {
+		t.Fatalf("expected some keys to be created")
+	}
+
+	for _, k := range keys {
+		// ignore any internal keys used by miniredis
+		if strings.HasPrefix(k, "__") {
+			continue
+		}
+		if !strings.HasPrefix(k, "{") || !strings.Contains(k, "}") {
+			t.Fatalf("key %q does not include hash tag braces", k)
+		}
+		if len(k) != TestKeySize {
+			t.Fatalf("key %q length=%d, expected %d", k, len(k), TestKeySize)
+		}
+		break // one representative key is enough
+	}
 }

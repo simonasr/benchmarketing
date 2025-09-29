@@ -28,6 +28,21 @@ func (m *MockRedisClient) Get(ctx context.Context, key string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockRedisClient) MSet(ctx context.Context, kv map[string]string) error {
+	args := m.Called(ctx, kv)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) MGet(ctx context.Context, keys []string) error {
+	args := m.Called(ctx, keys)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
+	args := m.Called(ctx, keys, expiration)
+	return args.Error(0)
+}
+
 func (m *MockRedisClient) PoolStats() *redis.PoolStats {
 	args := m.Called()
 	if args.Get(0) == nil {
@@ -145,6 +160,55 @@ func TestRun(t *testing.T) {
 	err := runner.Run(ctx)
 
 	// Assert
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestRun_MSetMGet(t *testing.T) {
+	cfg := &config.Config{
+		Debug: false,
+		Test: config.Test{
+			MinClients:        1,
+			MaxClients:        1,
+			RequestDelayMs:    10,
+			StageIntervalMs:   500,
+			KeySize:           5,
+			ValueSize:         8,
+			Workload:          "mset_mget",
+			BatchSize:         3,
+			SameSlotPerClient: true,
+		},
+		Redis: config.RedisConfig{
+			OperationTimeoutMs: 200,
+			Expiration:         5,
+		},
+	}
+
+	mockMetrics := metrics.New(prometheus.NewRegistry(), "test-target")
+	mockClient := &MockRedisClient{}
+	redisConn := &config.RedisConnection{URL: "redis://localhost:6379"}
+
+	// Allow PoolStats maybe multiple times
+	poolStats := &redis.PoolStats{TotalConns: 1}
+	mockClient.On("PoolStats").Return(poolStats).Maybe()
+
+	// Expect MSet with any map of size BatchSize
+	mockClient.On("MSet", mock.AnythingOfType("*context.timerCtx"), mock.MatchedBy(func(kv map[string]string) bool {
+		return len(kv) == cfg.Test.BatchSize
+	})).Return(nil)
+	// Expect ExpireMany for the same number of keys
+	mockClient.On("ExpireMany", mock.AnythingOfType("*context.timerCtx"), mock.MatchedBy(func(keys []string) bool {
+		return len(keys) == cfg.Test.BatchSize
+	}), cfg.Redis.Expiration).Return(nil)
+	// Expect MGet with the same number of keys
+	mockClient.On("MGet", mock.AnythingOfType("*context.timerCtx"), mock.MatchedBy(func(keys []string) bool {
+		return len(keys) == cfg.Test.BatchSize
+	})).Return(nil)
+
+	runner := NewRunner(cfg, mockMetrics, mockClient, redisConn)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	err := runner.Run(ctx)
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
 }

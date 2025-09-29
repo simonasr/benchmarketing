@@ -18,10 +18,16 @@ type Metrics struct {
 	requestFailed *prometheus.CounterVec
 
 	// Precomputed label handles to avoid per-call map allocations
-	durationSet      prometheus.Observer
-	durationGet      prometheus.Observer
-	requestFailedSet prometheus.Counter
-	requestFailedGet prometheus.Counter
+	durationSet         prometheus.Observer
+	durationGet         prometheus.Observer
+	durationMSet        prometheus.Observer
+	durationMGet        prometheus.Observer
+	durationExpire      prometheus.Observer
+	requestFailedSet    prometheus.Counter
+	requestFailedGet    prometheus.Counter
+	requestFailedMSet   prometheus.Counter
+	requestFailedMGet   prometheus.Counter
+	requestFailedExpire prometheus.Counter
 
 	redisPoolTotalConns prometheus.Gauge
 	redisPoolIdleConns  prometheus.Gauge
@@ -183,8 +189,14 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	// Precompute child metrics with fixed labels to reduce per-call overhead
 	m.durationSet = m.duration.WithLabelValues("set", "redis", target)
 	m.durationGet = m.duration.WithLabelValues("get", "redis", target)
+	m.durationMSet = m.duration.WithLabelValues("mset", "redis", target)
+	m.durationMGet = m.duration.WithLabelValues("mget", "redis", target)
+	m.durationExpire = m.duration.WithLabelValues("expire", "redis", target)
 	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
 	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
+	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
+	m.requestFailedMGet = m.requestFailed.WithLabelValues("mget", "redis", target)
+	m.requestFailedExpire = m.requestFailed.WithLabelValues("expire", "redis", target)
 
 	return m
 }
@@ -214,6 +226,21 @@ func (m *Metrics) ObserveGetDuration(duration float64) {
 	m.durationGet.Observe(duration)
 }
 
+// ObserveMSetDuration records the duration of an MSET operation.
+func (m *Metrics) ObserveMSetDuration(duration float64) {
+	m.durationMSet.Observe(duration)
+}
+
+// ObserveMGetDuration records the duration of an MGET operation.
+func (m *Metrics) ObserveMGetDuration(duration float64) {
+	m.durationMGet.Observe(duration)
+}
+
+// ObserveExpireDuration records the duration of an EXPIRE operation (batched via pipeline).
+func (m *Metrics) ObserveExpireDuration(duration float64) {
+	m.durationExpire.Observe(duration)
+}
+
 // IncrementSetFailures increments the counter for failed SET operations.
 func (m *Metrics) IncrementSetFailures() {
 	m.requestFailedSet.Inc()
@@ -222,6 +249,21 @@ func (m *Metrics) IncrementSetFailures() {
 // IncrementGetFailures increments the counter for failed GET operations.
 func (m *Metrics) IncrementGetFailures() {
 	m.requestFailedGet.Inc()
+}
+
+// IncrementMSetFailures increments the counter for failed MSET operations.
+func (m *Metrics) IncrementMSetFailures() {
+	m.requestFailedMSet.Inc()
+}
+
+// IncrementMGetFailures increments the counter for failed MGET operations.
+func (m *Metrics) IncrementMGetFailures() {
+	m.requestFailedMGet.Inc()
+}
+
+// IncrementExpireFailures increments the counter for failed EXPIRE operations.
+func (m *Metrics) IncrementExpireFailures() {
+	m.requestFailedExpire.Inc()
 }
 
 // StartPrometheusServer starts an HTTP server to expose Prometheus metrics.
