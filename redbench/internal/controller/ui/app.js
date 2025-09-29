@@ -197,12 +197,15 @@ function serializeJobForm() {
 
   const config = {
     test: {
+      workload: (document.getElementById('workload')?.value) || 'set_get',
       minClients: parseInt(document.getElementById('minClients').value, 10),
       maxClients: parseInt(document.getElementById('maxClients').value, 10),
       stageIntervalMs: parseInt(document.getElementById('stageIntervalMs').value, 10),
       requestDelayMs: parseInt(document.getElementById('requestDelayMs').value, 10),
       keySize: parseInt(document.getElementById('keySize').value, 10),
       valueSize: parseInt(document.getElementById('valueSize').value, 10),
+      batchSize: parseInt(document.getElementById('batchSize')?.value, 10) || 10,
+      sameSlotPerClient: !!document.getElementById('sameSlotPerClient')?.checked,
     },
     redis: {
       operationTimeoutMs: parseInt(document.getElementById('operationTimeoutMs').value, 10),
@@ -411,11 +414,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('jobForm').addEventListener('input', (e) => {
     if (e && e.target) updatePredictionsDebounced();
     if (e && e.target) updateImportBtnDebounced();
+    if (e && e.target && e.target.id === 'workload') updateWorkloadVisibility();
   });
   document.getElementById('jobForm').addEventListener('change', (e) => {
     if (e && e.target) updatePredictionsDebounced();
     if (e && e.target) updateImportBtnDebounced();
+    if (e && e.target && e.target.id === 'workload') updateWorkloadVisibility();
   });
+  updateWorkloadVisibility();
   updatePredictions();
 });
 
@@ -529,12 +535,15 @@ function snapshotForm() {
   return {
     targets,
     test: {
+      workload: document.getElementById('workload')?.value,
       minClients: document.getElementById('minClients').value,
       maxClients: document.getElementById('maxClients').value,
       stageIntervalMs: document.getElementById('stageIntervalMs').value,
       requestDelayMs: document.getElementById('requestDelayMs').value,
       keySize: document.getElementById('keySize').value,
       valueSize: document.getElementById('valueSize').value,
+      batchSize: document.getElementById('batchSize')?.value,
+      sameSlotPerClient: document.getElementById('sameSlotPerClient')?.checked ? '1' : '0',
     },
     redis: {
       operationTimeoutMs: document.getElementById('operationTimeoutMs').value,
@@ -566,12 +575,16 @@ function restoreForm(data) {
     row.querySelector('input[name="workerCount"]').value = t.workerCount || '1';
   });
   const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  const setChecked = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+  set('workload', data.test?.workload);
   set('minClients', data.test?.minClients);
   set('maxClients', data.test?.maxClients);
   set('stageIntervalMs', data.test?.stageIntervalMs);
   set('requestDelayMs', data.test?.requestDelayMs);
   set('keySize', data.test?.keySize);
   set('valueSize', data.test?.valueSize);
+  set('batchSize', data.test?.batchSize);
+  setChecked('sameSlotPerClient', data.test?.sameSlotPerClient === '1' || data.test?.sameSlotPerClient === true);
   set('operationTimeoutMs', data.redis?.operationTimeoutMs);
   set('expiration', data.redis?.expiration);
   set('assumedLatencyMs', data.assumptions?.latencyMs);
@@ -821,13 +834,26 @@ function applyRuntimeConfigToForm(dto, mode = 'merge') {
   setIfNumber('requestDelayMs', cfg.test?.requestDelayMs);
   setIfNumber('keySize', cfg.test?.keySize);
   setIfNumber('valueSize', cfg.test?.valueSize);
+  if (cfg.test?.workload) { const el = document.getElementById('workload'); if (el) el.value = cfg.test.workload; }
+  setIfNumber('batchSize', cfg.test?.batchSize);
+  try { const el = document.getElementById('sameSlotPerClient'); if (el && typeof cfg.test?.sameSlotPerClient === 'boolean') el.checked = cfg.test.sameSlotPerClient; } catch {}
   setIfNumber('operationTimeoutMs', cfg.redis?.operationTimeoutMs);
   if (Number.isFinite(cfg.redis?.expiration)) {
     const el = document.getElementById('expiration');
     if (el) el.value = String(cfg.redis.expiration);
   }
   updatePredictions();
+  updateWorkloadVisibility();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotForm())); } catch {}
+}
+
+function updateWorkloadVisibility() {
+  const wl = document.getElementById('workload')?.value || 'set_get';
+  const showMset = wl === 'mset_mget';
+  document.querySelectorAll('.workload-mset').forEach(el => {
+    // Labels are flex in this UI; ensure consistent layout when showing
+    el.style.display = showMset ? 'flex' : 'none';
+  });
 }
 
 function initRuntimeConfigImport() {
@@ -1001,12 +1027,15 @@ function buildCurrentDtoFromForm() {
   const s = snapshotForm();
   const cfg = {
     test: {
+      workload: s.test.workload || 'set_get',
       minClients: parseInt(s.test.minClients, 10),
       maxClients: parseInt(s.test.maxClients, 10),
       stageIntervalMs: parseInt(s.test.stageIntervalMs, 10),
       requestDelayMs: parseInt(s.test.requestDelayMs, 10),
       keySize: parseInt(s.test.keySize, 10),
       valueSize: parseInt(s.test.valueSize, 10),
+      batchSize: parseInt(s.test.batchSize, 10),
+      sameSlotPerClient: s.test.sameSlotPerClient === '1',
     },
     redis: {
       operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),
