@@ -853,7 +853,7 @@ function applyRuntimeConfigToForm(dto, mode = 'merge') {
 
 function updateWorkloadVisibility() {
   const wl = document.getElementById('workload')?.value || 'set_get';
-  const isBatch = (wl === 'mset_mget' || wl === 'hset_hmget' || wl === 'zset_leaderboards');
+  const isBatch = (wl === 'mset_mget' || wl === 'hset_hmget');
   document.querySelectorAll('.workload-mset').forEach(el => {
     // Labels are flex in this UI; ensure consistent layout when showing
     el.style.display = isBatch ? 'flex' : 'none';

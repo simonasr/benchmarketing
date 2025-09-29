@@ -16,6 +16,8 @@ const (
 	poolStatsUpdateInterval = 2 * time.Second
 	// defaultBatchSize is used when no batch size is configured
 	defaultBatchSize = 10
+	// defaultTagsCount is the default number of distinct hash-slot tags used by cluster-aware workloads
+	defaultTagsCount = 1024
 )
 
 // Runner handles the benchmark execution.
@@ -170,15 +172,12 @@ func (r *Runner) Run(ctx context.Context) error {
 						}
 					}
 				case config.WorkloadZSet:
-					// Static tag space: use configured TagsCount to spread load across slots
-					// Determine tag for this goroutine/op
+					// Always use a hashtag to co-locate per-tag leaderboards and enable unions safely
+					// Use a static tag space controlled by TagsCount to spread load across slots
 					tagsCount := r.config.Test.TagsCount
 					if tagsCount <= 0 {
-						tagsCount = 1024
+						tagsCount = defaultTagsCount
 					}
-					// Compose a deterministic tag based on current time to distribute across tagsCount
-					// Note: utils.NewHashSlotTag() gives unique tag; for static count, synthesize from counter modulo
-					// We'll approximate a per-op counter by nanoseconds and mod tagsCount
 					idx := int(time.Now().UnixNano() % int64(tagsCount))
 					tagBody := utils.Base36Padded(idx, 4)
 					tag := "{" + tagBody + "}"
