@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/pkg/utils"
@@ -93,27 +92,13 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 	for i := 0; i < batchSize; i++ {
 		var key string
 		if sameSlotTag != "" {
-			key = utils.ComposeTaggedKey(sameSlotTag, keySize, defaultTaggedSuffixLen)
+			// Use deterministic base36 counter suffix to guarantee uniqueness
+			key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, defaultTaggedSuffixLen, i)
 		} else {
 			key = utils.RandomString(keySize)
-		}
-		// Ensure uniqueness within this batch to avoid map overwrites
-		for {
-			if _, exists := kv[key]; !exists {
-				break
-			}
-			// Regenerate suffix to keep key size constant
-			if sameSlotTag != "" && len(key) >= defaultTaggedSuffixLen {
-				key = key[:len(key)-defaultTaggedSuffixLen] + utils.RandomString(defaultTaggedSuffixLen)
-			} else if !strings.HasPrefix(key, "{") {
-				// Plain key; replace the last character
-				if len(key) >= 1 {
-					key = key[:len(key)-1] + utils.RandomString(1)
-				} else {
-					key = utils.RandomString(keySize)
-				}
-			} else {
-				key = utils.RandomString(keySize)
+			// Guarantee uniqueness for non-tagged case by appending a base36 counter if collision
+			if _, exists := kv[key]; exists {
+				key = key[:len(key)-1] + utils.Base36Padded(i, 1)
 			}
 		}
 		value := utils.RandomString(valueSize)

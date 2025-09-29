@@ -112,3 +112,49 @@ func ComposeTaggedKey(tag string, keySize int, suffixLen int) string {
 	suffix := RandomString(suffixLen)
 	return "{" + tagInner + "}" + suffix
 }
+
+// Base36Padded returns the base36 representation of n, left-padded with '0'
+// to width. If the representation is longer than width, the rightmost width
+// characters are returned.
+func Base36Padded(n int, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	s := strconv.FormatInt(int64(n), 36)
+	if len(s) > width {
+		return s[len(s)-width:]
+	}
+	if len(s) < width {
+		pad := make([]byte, width-len(s))
+		for i := range pad {
+			pad[i] = '0'
+		}
+		return string(pad) + s
+	}
+	return s
+}
+
+// ComposeTaggedKeyWithCounter composes a tagged key with a deterministic base36
+// counter suffix of a fixed width.
+func ComposeTaggedKeyWithCounter(tag string, keySize int, suffixLen int, counter int) string {
+	suffix := Base36Padded(counter, suffixLen)
+	if keySize < MinKeySizeForTagged {
+		keySize = MinKeySizeForTagged
+	}
+	innerLen := keySize - 2 - suffixLen
+	if innerLen < 1 {
+		innerLen = 1
+	}
+	tagBody := ExtractTagBody(tag)
+	tagInner := tagBody
+	if len(tagInner) > innerLen {
+		tagInner = tagInner[:innerLen]
+	} else if len(tagInner) < innerLen {
+		pad := make([]byte, innerLen-len(tagInner))
+		for i := range pad {
+			pad[i] = 'x'
+		}
+		tagInner = tagInner + string(pad)
+	}
+	return "{" + tagInner + "}" + suffix
+}
