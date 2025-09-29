@@ -69,8 +69,6 @@ func (t *testRedisClient) HMGet(ctx context.Context, key string, fields []string
 	return err
 }
 
-// (removed) HGet from integration test client
-
 func (t *testRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	if len(keys) == 0 || expiration <= 0 {
 		return nil

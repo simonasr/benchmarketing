@@ -254,8 +254,6 @@ func (m *Metrics) ObserveHMGetDuration(duration float64) {
 	m.durationHMGet.Observe(duration)
 }
 
-// (removed) ObserveHGetDuration
-
 // ObserveExpireDuration records the duration of an EXPIRE operation (batched via pipeline).
 func (m *Metrics) ObserveExpireDuration(duration float64) {
 	m.durationExpire.Observe(duration)
@@ -290,8 +288,6 @@ func (m *Metrics) IncrementHSetFailures() {
 func (m *Metrics) IncrementHMGetFailures() {
 	m.requestFailedHMGet.Inc()
 }
-
-// (removed) IncrementHGetFailures
 
 // IncrementExpireFailures increments the counter for failed EXPIRE operations.
 func (m *Metrics) IncrementExpireFailures() {

@@ -201,7 +201,7 @@ func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
 	}
 }
 
-// TestMetrics_HSetHMGet_SumIncreases verifies that hset/hget sums increase when workload is hset_hmget (multi-field)
+// TestMetrics_HSetHMGet_SumIncreases verifies that hset/hmget sums increase when workload is hset_hmget (multi-field)
 func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
 	mockRedis := miniredis.RunT(t)
 

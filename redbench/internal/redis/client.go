@@ -173,9 +173,6 @@ func (r *RedisClient) HMGet(ctx context.Context, key string, fields []string) er
 	return err
 }
 
-// HGet fetches a single field from a hash key.
-// (removed) HGet – single-field helper is not used by workloads
-
 // ExpireMany applies expiration to a set of keys using a pipeline for efficiency.
 func (r *RedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	if expiration <= 0 || len(keys) == 0 {

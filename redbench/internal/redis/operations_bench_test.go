@@ -18,7 +18,6 @@ func (n *noopClient) MGet(ctx context.Context, keys []string) error             
 func (n *noopClient) HSet(ctx context.Context, key string, fv map[string]string) error { return nil }
 func (n *noopClient) HMGet(ctx context.Context, key string, fields []string) error     { return nil }
 
-// (removed) HGet in noop client
 func (n *noopClient) ExpireMany(ctx context.Context, keys []string, exp int32) error {
 	return nil
 }

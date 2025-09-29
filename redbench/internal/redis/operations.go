@@ -206,6 +206,3 @@ func (o *Operations) GetHashData(ctx context.Context, key string, fields []strin
 	o.metrics.ObserveHMGetDuration(time.Since(start).Seconds())
 	return nil
 }
-
-// GetHashField fetches a single field from a hash key using HGET.
-// (removed) HGET single-field helper – no longer used
