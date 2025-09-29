@@ -22,6 +22,7 @@ type Metrics struct {
 	durationGet       prometheus.Observer
 	durationMSet      prometheus.Observer
 	durationMGet      prometheus.Observer
+	durationExpire    prometheus.Observer
 	requestFailedSet  prometheus.Counter
 	requestFailedGet  prometheus.Counter
 	requestFailedMSet prometheus.Counter
@@ -189,6 +190,7 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.durationGet = m.duration.WithLabelValues("get", "redis", target)
 	m.durationMSet = m.duration.WithLabelValues("mset", "redis", target)
 	m.durationMGet = m.duration.WithLabelValues("mget", "redis", target)
+	m.durationExpire = m.duration.WithLabelValues("expire", "redis", target)
 	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
 	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
 	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
@@ -230,6 +232,11 @@ func (m *Metrics) ObserveMSetDuration(duration float64) {
 // ObserveMGetDuration records the duration of an MGET operation.
 func (m *Metrics) ObserveMGetDuration(duration float64) {
 	m.durationMGet.Observe(duration)
+}
+
+// ObserveExpireDuration records the duration of an EXPIRE operation (batched via pipeline).
+func (m *Metrics) ObserveExpireDuration(duration float64) {
+	m.durationExpire.Observe(duration)
 }
 
 // IncrementSetFailures increments the counter for failed SET operations.

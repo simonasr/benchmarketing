@@ -15,6 +15,7 @@ type MetricsRecorder interface {
 	ObserveGetDuration(duration float64)
 	ObserveMSetDuration(duration float64)
 	ObserveMGetDuration(duration float64)
+	ObserveExpireDuration(duration float64)
 	IncrementSetFailures()
 	IncrementGetFailures()
 	IncrementMSetFailures()
@@ -84,7 +85,7 @@ func (o *Operations) GetData(ctx context.Context, key string) error {
 
 // SaveRandomBatchData generates a batch of random keys and values, saves them using MSET, and returns the keys.
 // If sameSlotTag is non-empty (e.g., "{slot}"), the keys will include the tag to ensure same hash slot in Redis Cluster.
-func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, keySize, valueSize, batchSize int, sameSlotTag string, applyExpiration bool) ([]string, error) {
+func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, keySize, valueSize, batchSize int, sameSlotTag string) ([]string, error) {
 	if batchSize <= 0 {
 		return nil, fmt.Errorf("batch size must be > 0")
 	}
@@ -154,12 +155,14 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 	}
 	o.metrics.ObserveMSetDuration(time.Since(start).Seconds())
 
-	if applyExpiration && expiration > 0 {
+	if expiration > 0 {
+		expStart := time.Now()
 		if err := o.client.ExpireMany(ctx, keys, expiration); err != nil {
 			// Expiration errors count toward MSET failures as part of the batch write
 			o.metrics.IncrementMSetFailures()
 			return nil, fmt.Errorf("failed to expire keys after mset: %w", err)
 		}
+		o.metrics.ObserveExpireDuration(time.Since(expStart).Seconds())
 	}
 
 	if o.debug {

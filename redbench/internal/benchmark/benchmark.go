@@ -116,7 +116,7 @@ func (r *Runner) Run(ctx context.Context) error {
 					if batchSize <= 0 {
 						batchSize = defaultBatchSize
 					}
-					keys, err := r.redisOps.SaveRandomBatchData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize, batchSize, tag, r.config.Test.ApplyBatchExpiration)
+					keys, err := r.redisOps.SaveRandomBatchData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize, batchSize, tag)
 					cancel()
 					if err != nil {
 						if ctx.Err() == nil {

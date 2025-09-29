@@ -71,6 +71,10 @@ func (m *MockMetrics) ObserveMGetDuration(duration float64) {
 	m.Called(duration)
 }
 
+func (m *MockMetrics) ObserveExpireDuration(duration float64) {
+	m.Called(duration)
+}
+
 func (m *MockMetrics) IncrementSetFailures() {
 	m.Called()
 }
@@ -184,8 +188,9 @@ func TestSaveRandomBatchData(t *testing.T) {
 	mockClient.On("MSet", ctx, mock.AnythingOfType("map[string]string")).Return(nil)
 	mockMetrics.On("ObserveMSetDuration", mock.AnythingOfType("float64")).Return()
 	mockClient.On("ExpireMany", ctx, mock.AnythingOfType("[]string"), expiration).Return(nil)
+	mockMetrics.On("ObserveExpireDuration", mock.AnythingOfType("float64")).Return()
 
-	keys, err := ops.SaveRandomBatchData(ctx, expiration, keySize, valueSize, batchSize, "{tag}", true)
+	keys, err := ops.SaveRandomBatchData(ctx, expiration, keySize, valueSize, batchSize, "{tag}")
 	assert.NoError(t, err)
 	assert.Equal(t, batchSize, len(keys))
 
