@@ -3,12 +3,12 @@ package benchmark
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 	"github.com/simonasr/benchmarketing/redbench/internal/metrics"
 	"github.com/simonasr/benchmarketing/redbench/internal/redis"
+	"github.com/simonasr/benchmarketing/redbench/pkg/utils"
 )
 
 const (
@@ -107,7 +107,7 @@ func (r *Runner) Run(ctx context.Context) error {
 					tag := ""
 					if r.config.Test.SameSlotPerClient {
 						// Use a stable tag per goroutine invocation to keep keys in same slot; tag must be wrapped in {}
-						tag = "{" + strconv.FormatInt(time.Now().UnixNano(), 36) + "}"
+						tag = utils.NewHashSlotTag()
 					}
 
 					// MSET batch
