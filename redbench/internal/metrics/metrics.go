@@ -22,11 +22,15 @@ type Metrics struct {
 	durationGet         prometheus.Observer
 	durationMSet        prometheus.Observer
 	durationMGet        prometheus.Observer
+	durationHSet        prometheus.Observer
+	durationHGet        prometheus.Observer
 	durationExpire      prometheus.Observer
 	requestFailedSet    prometheus.Counter
 	requestFailedGet    prometheus.Counter
 	requestFailedMSet   prometheus.Counter
 	requestFailedMGet   prometheus.Counter
+	requestFailedHSet   prometheus.Counter
+	requestFailedHGet   prometheus.Counter
 	requestFailedExpire prometheus.Counter
 
 	redisPoolTotalConns prometheus.Gauge
@@ -191,11 +195,15 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.durationGet = m.duration.WithLabelValues("get", "redis", target)
 	m.durationMSet = m.duration.WithLabelValues("mset", "redis", target)
 	m.durationMGet = m.duration.WithLabelValues("mget", "redis", target)
+	m.durationHSet = m.duration.WithLabelValues("hset", "redis", target)
+	m.durationHGet = m.duration.WithLabelValues("hget", "redis", target)
 	m.durationExpire = m.duration.WithLabelValues("expire", "redis", target)
 	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
 	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
 	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
 	m.requestFailedMGet = m.requestFailed.WithLabelValues("mget", "redis", target)
+	m.requestFailedHSet = m.requestFailed.WithLabelValues("hset", "redis", target)
+	m.requestFailedHGet = m.requestFailed.WithLabelValues("hget", "redis", target)
 	m.requestFailedExpire = m.requestFailed.WithLabelValues("expire", "redis", target)
 
 	return m
@@ -236,6 +244,16 @@ func (m *Metrics) ObserveMGetDuration(duration float64) {
 	m.durationMGet.Observe(duration)
 }
 
+// ObserveHSetDuration records the duration of an HSET operation.
+func (m *Metrics) ObserveHSetDuration(duration float64) {
+	m.durationHSet.Observe(duration)
+}
+
+// ObserveHGetDuration records the duration of an HGET operation.
+func (m *Metrics) ObserveHGetDuration(duration float64) {
+	m.durationHGet.Observe(duration)
+}
+
 // ObserveExpireDuration records the duration of an EXPIRE operation (batched via pipeline).
 func (m *Metrics) ObserveExpireDuration(duration float64) {
 	m.durationExpire.Observe(duration)
@@ -259,6 +277,16 @@ func (m *Metrics) IncrementMSetFailures() {
 // IncrementMGetFailures increments the counter for failed MGET operations.
 func (m *Metrics) IncrementMGetFailures() {
 	m.requestFailedMGet.Inc()
+}
+
+// IncrementHSetFailures increments the counter for failed HSET operations.
+func (m *Metrics) IncrementHSetFailures() {
+	m.requestFailedHSet.Inc()
+}
+
+// IncrementHGetFailures increments the counter for failed HGET operations.
+func (m *Metrics) IncrementHGetFailures() {
+	m.requestFailedHGet.Inc()
 }
 
 // IncrementExpireFailures increments the counter for failed EXPIRE operations.

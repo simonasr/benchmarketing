@@ -11,10 +11,12 @@ import (
 
 type noopClient struct{}
 
-func (n *noopClient) Set(ctx context.Context, k, v string, exp int32) error { return nil }
-func (n *noopClient) Get(ctx context.Context, k string) (string, error)     { return "", nil }
-func (n *noopClient) MSet(ctx context.Context, kv map[string]string) error  { return nil }
-func (n *noopClient) MGet(ctx context.Context, keys []string) error         { return nil }
+func (n *noopClient) Set(ctx context.Context, k, v string, exp int32) error            { return nil }
+func (n *noopClient) Get(ctx context.Context, k string) (string, error)                { return "", nil }
+func (n *noopClient) MSet(ctx context.Context, kv map[string]string) error             { return nil }
+func (n *noopClient) MGet(ctx context.Context, keys []string) error                    { return nil }
+func (n *noopClient) HSet(ctx context.Context, key string, fv map[string]string) error { return nil }
+func (n *noopClient) HMGet(ctx context.Context, key string, fields []string) error     { return nil }
 func (n *noopClient) ExpireMany(ctx context.Context, keys []string, exp int32) error {
 	return nil
 }

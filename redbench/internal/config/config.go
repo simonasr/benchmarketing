@@ -19,6 +19,7 @@ import (
 const (
 	WorkloadSetGet   = "set_get"
 	WorkloadMSetMGet = "mset_mget"
+	WorkloadHSetHGet = "hset_hget"
 )
 
 // IsBatchWorkload reports whether the given workload uses batch operations.
@@ -26,6 +27,8 @@ const (
 func IsBatchWorkload(workload string) bool {
 	switch workload {
 	case WorkloadMSetMGet:
+		return true
+	case WorkloadHSetHGet:
 		return true
 	default:
 		return false
