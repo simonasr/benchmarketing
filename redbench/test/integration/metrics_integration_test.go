@@ -330,6 +330,14 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 	}
 
 	time.Sleep(ServiceRunDuration)
+
+	// Verify set/get sums remain zero under mset_mget workload
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "set")
+	sumGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "get")
+	if !(sumSet == 0 && sumGet == 0) {
+		t.Fatalf("expected zero sum for set/get under mset_mget workload, got set=%f get=%f", sumSet, sumGet)
+	}
 }
 
 func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {
