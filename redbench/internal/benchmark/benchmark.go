@@ -18,6 +18,8 @@ const (
 	defaultBatchSize = 10
 	// defaultTagsCount is the default number of distinct hash-slot tags used by cluster-aware workloads
 	defaultTagsCount = 1024
+	// defaultScoreMax bounds generated scores to a stable range for comparability
+	defaultScoreMax = 1_000_000
 )
 
 // Runner handles the benchmark execution.
@@ -191,8 +193,15 @@ func (r *Runner) Run(ctx context.Context) error {
 					if batchSize <= 0 {
 						batchSize = defaultBatchSize
 					}
-					// Choose per-tag leaderboard index 0..3 by time-based selection (simple spread)
-					lbIdx := int(time.Now().UnixNano() & 0x3) // 0..3
+					// Choose per-tag leaderboard index based on configured per-tag leaderboards
+					perTag := r.config.Test.ZSetPerTagLeaderboards
+					if perTag <= 0 {
+						perTag = 4
+					}
+					lbIdx := 0
+					if perTag > 1 {
+						lbIdx = int(time.Now().UnixNano() % int64(perTag))
+					}
 					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, 1)
 
 					// ZADD a batch of members
@@ -200,8 +209,26 @@ func (r *Runner) Run(ctx context.Context) error {
 					members := make(map[string]float64, batchSize)
 					for i := 0; i < batchSize; i++ {
 						member := "m:" + utils.Base36Padded(i, 4)
-						// Score can be time-based to ensure movement
-						members[member] = float64(time.Now().UnixNano() % 1000000)
+						// Generate score according to configured mode
+						var score float64
+						switch r.config.Test.ZSetScoreMode {
+						case "random":
+							// Pseudo-random mix of time and index; bounded by defaultScoreMax
+							mixed := (time.Now().UnixNano() ^ int64(i*2654435761)) % int64(defaultScoreMax)
+							if mixed < 0 {
+								mixed = -mixed
+							}
+							score = float64(mixed)
+						case "increment":
+							// Simple increasing scores within the batch
+							score = float64(i % defaultScoreMax)
+						case "time":
+							fallthrough
+						default:
+							// Time-based to ensure natural movement
+							score = float64(time.Now().UnixNano() % int64(defaultScoreMax))
+						}
+						members[member] = score
 					}
 					if err := r.redisOps.ZAddMembers(opCtx, zkey, members, r.config.Redis.Expiration); err != nil {
 						if ctx.Err() == nil {
