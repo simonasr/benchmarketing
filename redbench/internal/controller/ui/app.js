@@ -206,6 +206,7 @@ function serializeJobForm() {
       valueSize: parseInt(document.getElementById('valueSize').value, 10),
       batchSize: parseInt(document.getElementById('batchSize')?.value, 10) || 10,
       sameSlotPerClient: !!document.getElementById('sameSlotPerClient')?.checked,
+      tagsCount: parseInt(document.getElementById('tagsCount')?.value, 10) || 1024,
     },
     redis: {
       operationTimeoutMs: parseInt(document.getElementById('operationTimeoutMs').value, 10),
@@ -544,6 +545,7 @@ function snapshotForm() {
       valueSize: document.getElementById('valueSize').value,
       batchSize: document.getElementById('batchSize')?.value,
       sameSlotPerClient: document.getElementById('sameSlotPerClient')?.checked ? '1' : '0',
+      tagsCount: document.getElementById('tagsCount')?.value,
     },
     redis: {
       operationTimeoutMs: document.getElementById('operationTimeoutMs').value,
@@ -585,6 +587,7 @@ function restoreForm(data) {
   set('valueSize', data.test?.valueSize);
   set('batchSize', data.test?.batchSize);
   setChecked('sameSlotPerClient', data.test?.sameSlotPerClient === '1' || data.test?.sameSlotPerClient === true);
+  set('tagsCount', data.test?.tagsCount);
   set('operationTimeoutMs', data.redis?.operationTimeoutMs);
   set('expiration', data.redis?.expiration);
   set('assumedLatencyMs', data.assumptions?.latencyMs);
@@ -850,10 +853,15 @@ function applyRuntimeConfigToForm(dto, mode = 'merge') {
 
 function updateWorkloadVisibility() {
   const wl = document.getElementById('workload')?.value || 'set_get';
-  const isBatch = (wl === 'mset_mget' || wl === 'hset_hmget');
+  const isBatch = (wl === 'mset_mget' || wl === 'hset_hmget' || wl === 'zset_leaderboards');
   document.querySelectorAll('.workload-mset').forEach(el => {
     // Labels are flex in this UI; ensure consistent layout when showing
     el.style.display = isBatch ? 'flex' : 'none';
+  });
+  // ZSET specific controls
+  const showZset = (wl === 'zset_leaderboards');
+  document.querySelectorAll('.workload-zset').forEach(el => {
+    el.style.display = showZset ? 'flex' : 'none';
   });
 }
 
@@ -1037,6 +1045,7 @@ function buildCurrentDtoFromForm() {
       valueSize: parseInt(s.test.valueSize, 10),
       batchSize: parseInt(s.test.batchSize, 10),
       sameSlotPerClient: s.test.sameSlotPerClient === '1',
+      tagsCount: parseInt(s.test.tagsCount, 10),
     },
     redis: {
       operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),

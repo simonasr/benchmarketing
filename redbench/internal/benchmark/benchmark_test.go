@@ -48,6 +48,37 @@ func (m *MockRedisClient) HMGet(ctx context.Context, key string, fields []string
 	return args.Error(0)
 }
 
+// ZSET methods to satisfy redis.Client interface
+func (m *MockRedisClient) ZAdd(ctx context.Context, key string, members map[string]float64) error {
+	args := m.Called(ctx, key, members)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) error {
+	args := m.Called(ctx, key, increment, member)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ZRange(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ZRevRange(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ZUnionStore(ctx context.Context, dest string, keys []string) error {
+	args := m.Called(ctx, dest, keys)
+	return args.Error(0)
+}
+
+func (m *MockRedisClient) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
 func (m *MockRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	args := m.Called(ctx, keys, expiration)
 	return args.Error(0)

@@ -17,6 +17,20 @@ func (n *noopClient) MSet(ctx context.Context, kv map[string]string) error      
 func (n *noopClient) MGet(ctx context.Context, keys []string) error                    { return nil }
 func (n *noopClient) HSet(ctx context.Context, key string, fv map[string]string) error { return nil }
 func (n *noopClient) HMGet(ctx context.Context, key string, fields []string) error     { return nil }
+func (n *noopClient) ZAdd(ctx context.Context, key string, members map[string]float64) error {
+	return nil
+}
+func (n *noopClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) error {
+	return nil
+}
+func (n *noopClient) ZRange(ctx context.Context, key string, start, stop int64) error { return nil }
+func (n *noopClient) ZRevRange(ctx context.Context, key string, start, stop int64) error {
+	return nil
+}
+func (n *noopClient) ZUnionStore(ctx context.Context, dest string, keys []string) error { return nil }
+func (n *noopClient) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error {
+	return nil
+}
 
 func (n *noopClient) ExpireMany(ctx context.Context, keys []string, exp int32) error {
 	return nil

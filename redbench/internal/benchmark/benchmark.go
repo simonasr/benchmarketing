@@ -169,6 +169,84 @@ func (r *Runner) Run(ctx context.Context) error {
 							slog.Error("GetHashData failed", "err", err)
 						}
 					}
+				case config.WorkloadZSet:
+					// Static tag space: use configured TagsCount to spread load across slots
+					// Determine tag for this goroutine/op
+					tagsCount := r.config.Test.TagsCount
+					if tagsCount <= 0 {
+						tagsCount = 1024
+					}
+					// Compose a deterministic tag based on current time to distribute across tagsCount
+					// Note: utils.NewHashSlotTag() gives unique tag; for static count, synthesize from counter modulo
+					// We'll approximate a per-op counter by nanoseconds and mod tagsCount
+					idx := int(time.Now().UnixNano() % int64(tagsCount))
+					tagBody := utils.Base36Padded(idx, 4)
+					tag := "{" + tagBody + "}"
+
+					// Within a tag, pick a leaderboard key and perform operations
+					batchSize := r.config.Test.BatchSize
+					if batchSize <= 0 {
+						batchSize = defaultBatchSize
+					}
+					// Choose per-tag leaderboard index 0..3 by time-based selection (simple spread)
+					lbIdx := int(time.Now().UnixNano() & 0x3) // 0..3
+					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, 1)
+
+					// ZADD a batch of members
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					members := make(map[string]float64, batchSize)
+					for i := 0; i < batchSize; i++ {
+						member := "m:" + utils.Base36Padded(i, 4)
+						// Score can be time-based to ensure movement
+						members[member] = float64(time.Now().UnixNano() % 1000000)
+					}
+					if err := r.redisOps.ZAddMembers(opCtx, zkey, members, r.config.Redis.Expiration); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZAddMembers failed", "err", err)
+						}
+					}
+					cancel()
+
+					if ctx.Err() != nil {
+						<-clients
+						return
+					}
+
+					// Read top-K
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					const topK = int64(50)
+					if err := r.redisOps.ZReadTopK(opCtx2, zkey, topK); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZReadTopK failed", "err", err)
+						}
+					}
+					cancel2()
+
+					// Trim to top-K
+					opCtx3, cancel3 := context.WithTimeout(ctx, opTimeout)
+					if err := r.redisOps.ZTrimToTopK(opCtx3, zkey, topK); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZTrimToTopK failed", "err", err)
+						}
+					}
+					cancel3()
+
+					// Occasionally union across few per-tag leaderboards
+					if (time.Now().UnixNano() & 0x7) == 0 { // ~1/8 ops
+						opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
+						sources := []string{
+							"z:lb:" + tag + ":" + utils.Base36Padded(0, 1),
+							"z:lb:" + tag + ":" + utils.Base36Padded(1, 1),
+							"z:lb:" + tag + ":" + utils.Base36Padded(2, 1),
+						}
+						dest := "z:lb:" + tag + ":union"
+						if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
+							if ctx.Err() == nil {
+								slog.Error("ZUnionWithinTag failed", "err", err)
+							}
+						}
+						cancel4()
+					}
 				default:
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
 					key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)

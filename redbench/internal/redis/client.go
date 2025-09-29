@@ -19,6 +19,13 @@ type Client interface {
 	MGet(ctx context.Context, keys []string) error
 	HSet(ctx context.Context, key string, fieldValues map[string]string) error
 	HMGet(ctx context.Context, key string, fields []string) error
+	// ZSET operations
+	ZAdd(ctx context.Context, key string, members map[string]float64) error
+	ZIncrBy(ctx context.Context, key string, increment float64, member string) error
+	ZRange(ctx context.Context, key string, start, stop int64) error
+	ZRevRange(ctx context.Context, key string, start, stop int64) error
+	ZUnionStore(ctx context.Context, dest string, keys []string) error
+	ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error
 	ExpireMany(ctx context.Context, keys []string, expiration int32) error
 	PoolStats() *redis.PoolStats
 	Close() error
@@ -171,6 +178,49 @@ func (r *RedisClient) HMGet(ctx context.Context, key string, fields []string) er
 	}
 	_, err := r.client.HMGet(ctx, key, fields...).Result()
 	return err
+}
+
+// ZAdd adds multiple members with scores to a sorted set key.
+func (r *RedisClient) ZAdd(ctx context.Context, key string, members map[string]float64) error {
+	if len(members) == 0 {
+		return nil
+	}
+	zs := make([]redis.Z, 0, len(members))
+	for member, score := range members {
+		zs = append(zs, redis.Z{Member: member, Score: score})
+	}
+	return r.client.ZAdd(ctx, key, zs...).Err()
+}
+
+// ZIncrBy increments the score of a member in a sorted set.
+func (r *RedisClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) error {
+	return r.client.ZIncrBy(ctx, key, increment, member).Err()
+}
+
+// ZRange retrieves a range of members by rank (ascending score).
+func (r *RedisClient) ZRange(ctx context.Context, key string, start, stop int64) error {
+	_, err := r.client.ZRange(ctx, key, start, stop).Result()
+	return err
+}
+
+// ZRevRange retrieves a range of members by rank (descending score).
+func (r *RedisClient) ZRevRange(ctx context.Context, key string, start, stop int64) error {
+	_, err := r.client.ZRevRange(ctx, key, start, stop).Result()
+	return err
+}
+
+// ZUnionStore computes the union of multiple sorted sets and stores the result.
+func (r *RedisClient) ZUnionStore(ctx context.Context, dest string, keys []string) error {
+	if len(keys) == 0 || dest == "" {
+		return nil
+	}
+	store := &redis.ZStore{Keys: keys}
+	return r.client.ZUnionStore(ctx, dest, store).Err()
+}
+
+// ZRemRangeByRank removes all elements in the sorted set within the given ranks.
+func (r *RedisClient) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error {
+	return r.client.ZRemRangeByRank(ctx, key, start, stop).Err()
 }
 
 // ExpireMany applies expiration to a set of keys using a pipeline for efficiency.

@@ -48,6 +48,7 @@ type TestOverrides struct {
 	Workload          *string `json:"workload,omitempty"`
 	BatchSize         *int    `json:"batchSize,omitempty"`
 	SameSlotPerClient *bool   `json:"sameSlotPerClient,omitempty"`
+	TagsCount         *int    `json:"tagsCount,omitempty"`
 }
 
 // ParseBenchmarkRequest parses the raw request body into a BenchmarkRequest.
@@ -218,6 +219,9 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	}
 	if overrides.SameSlotPerClient != nil {
 		testConfig.SameSlotPerClient = *overrides.SameSlotPerClient
+	}
+	if overrides.TagsCount != nil {
+		testConfig.TagsCount = *overrides.TagsCount
 	}
 }
 
