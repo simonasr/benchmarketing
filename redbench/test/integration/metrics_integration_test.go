@@ -132,3 +132,161 @@ func getSetCountRegex(target string) *regexp.Regexp {
 	pattern := `redbench_request_duration_seconds_count\{[^}]*command="set"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+(\d+)`
 	return regexp.MustCompile(pattern)
 }
+
+// --- New tests for MSET/MGET workload metrics ---
+
+// TestMetrics_MSetMGet_SumIncreases verifies that mset/mget sums increase when workload is mset_mget
+func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 2
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         3,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumMSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mset")
+	sumMGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mget")
+
+	if !(sumMSet > 0 && sumMGet > 0) {
+		t.Fatalf("expected positive sums for mset/mget, got mset=%f mget=%f", sumMSet, sumMGet)
+	}
+}
+
+// TestMetrics_MSetMGet_SetGetRemainZero ensures set/get sums remain zero for mset_mget workload
+func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 3
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         3,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
+	sumSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "set")
+	sumGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "get")
+
+	if !(sumSet == 0 && sumGet == 0) {
+		t.Fatalf("expected zero sum for set/get under mset_mget workload, got set=%f get=%f", sumSet, sumGet)
+	}
+}
+
+func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {
+	t.Helper()
+	resp, err := http.Get(metricsURL)
+	if err != nil {
+		t.Fatalf("scrape metrics: %v", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	re := getSumRegex(target, command)
+	m := re.FindSubmatch(b)
+	if len(m) < 2 {
+		// If metric not found, treat as zero and fail explicitly for increase tests
+		return 0
+	}
+	val, err := strconv.ParseFloat(string(m[1]), 64)
+	if err != nil {
+		t.Fatalf("parse metric value: %v", err)
+	}
+	return val
+}
+
+func getSumRegex(target string, command string) *regexp.Regexp {
+	pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
+	return regexp.MustCompile(pattern)
+}
