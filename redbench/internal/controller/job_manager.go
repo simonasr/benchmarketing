@@ -436,6 +436,17 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobID string, jobConfig *
 		if jobConfig.Test.ValueSize != 0 {
 			to["valueSize"] = jobConfig.Test.ValueSize
 		}
+		// Propagate workload-specific fields so workers run the intended workload
+		if jobConfig.Test.Workload != "" {
+			to["workload"] = jobConfig.Test.Workload
+		}
+		if jobConfig.Test.BatchSize != 0 {
+			to["batchSize"] = jobConfig.Test.BatchSize
+		}
+		// Only include boolean when true to avoid overriding defaults unnecessarily
+		if jobConfig.Test.SameSlotPerClient {
+			to["sameSlotPerClient"] = jobConfig.Test.SameSlotPerClient
+		}
 		if len(to) > 0 {
 			testOverrides = to
 		}

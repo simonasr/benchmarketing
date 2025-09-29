@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -289,4 +290,81 @@ func scrapeDurationSum(t *testing.T, metricsURL string, target string, command s
 func getSumRegex(target string, command string) *regexp.Regexp {
 	pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
 	return regexp.MustCompile(pattern)
+}
+
+// TestKeysContainHashTagWithSameSlot verifies generated keys include hash-slot tags and match configured size
+func TestKeysContainHashTagWithSameSlot(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 4
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start mset/mget workload with sameSlotPerClient=true
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":          "mset_mget",
+			"batchSize":         4,
+			"sameSlotPerClient": true,
+			"minClients":        1,
+			"maxClients":        2,
+			"stageIntervalMs":   TestStageIntervalFast,
+			"requestDelayMs":    TestRequestDelayNormal,
+			"keySize":           TestKeySize,
+			"valueSize":         TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected start status: %d", resp.StatusCode)
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	// Inspect keys in miniredis
+	keys := mockRedis.Keys()
+	if len(keys) == 0 {
+		t.Fatalf("expected some keys to be created")
+	}
+
+	for _, k := range keys {
+		// ignore any internal keys used by miniredis
+		if strings.HasPrefix(k, "__") {
+			continue
+		}
+		if !strings.HasPrefix(k, "{") || !strings.Contains(k, "}") {
+			t.Fatalf("key %q does not include hash tag braces", k)
+		}
+		if len(k) != TestKeySize {
+			t.Fatalf("key %q length=%d, expected %d", k, len(k), TestKeySize)
+		}
+		break // one representative key is enough
+	}
 }
