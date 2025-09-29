@@ -330,8 +330,6 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 	}
 
 	time.Sleep(ServiceRunDuration)
-
-	// Legacy assertion removed: set/get metrics are irrelevant for batch workloads
 }
 
 func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {

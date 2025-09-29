@@ -36,9 +36,9 @@ type Operations struct {
 const (
 	// defaultTaggedSuffixLen is the fixed suffix length to ensure uniqueness within a batch
 	defaultTaggedSuffixLen = utils.DefaultTaggedSuffixLen
-	// fieldCounterPadLen controls zero-padding for base36 counters used in field names and
-	// collision-avoidance suffixes. Kept small to minimize key/field inflation while ensuring stability.
-	fieldCounterPadLen = 1
+	// counterPadLen controls zero-padding for base36 counters used in field names and
+	// key-collision avoidance suffixes. Kept small to minimize inflation while ensuring stability.
+	counterPadLen = 1
 )
 
 // NewOperations creates a new Operations instance.
@@ -106,7 +106,7 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 			key = utils.RandomString(keySize)
 			// Guarantee uniqueness for non-tagged case by appending a base36 counter if collision
 			if _, exists := kv[key]; exists {
-				key = key[:len(key)-1] + utils.Base36Padded(i, fieldCounterPadLen)
+				key = key[:len(key)-1] + utils.Base36Padded(i, counterPadLen)
 			}
 		}
 		value := utils.RandomString(valueSize)
@@ -171,7 +171,7 @@ func (o *Operations) SaveRandomHashData(ctx context.Context, expiration int32, k
 	fields := make([]string, 0, batchSize)
 	fv := make(map[string]string, batchSize)
 	for i := 0; i < batchSize; i++ {
-		field := "f" + utils.Base36Padded(i, fieldCounterPadLen)
+		field := "f" + utils.Base36Padded(i, counterPadLen)
 		fields = append(fields, field)
 		fv[field] = utils.RandomString(fieldValueSize)
 	}
