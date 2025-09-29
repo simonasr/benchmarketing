@@ -45,6 +45,36 @@ func (m *MockClient) HMGet(ctx context.Context, key string, fields []string) err
 	return args.Error(0)
 }
 
+func (m *MockClient) ZAdd(ctx context.Context, key string, members map[string]float64) error {
+	args := m.Called(ctx, key, members)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) error {
+	args := m.Called(ctx, key, increment, member)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZRange(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZRevRange(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZUnionStore(ctx context.Context, dest string, keys []string) error {
+	args := m.Called(ctx, dest, keys)
+	return args.Error(0)
+}
+
+func (m *MockClient) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error {
+	args := m.Called(ctx, key, start, stop)
+	return args.Error(0)
+}
+
 func (m *MockClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	args := m.Called(ctx, keys, expiration)
 	return args.Error(0)
@@ -92,6 +122,14 @@ func (m *MockMetrics) ObserveExpireDuration(duration float64) {
 	m.Called(duration)
 }
 
+// ZSET durations
+func (m *MockMetrics) ObserveZAddDuration(duration float64)            { m.Called(duration) }
+func (m *MockMetrics) ObserveZIncrByDuration(duration float64)         { m.Called(duration) }
+func (m *MockMetrics) ObserveZRangeDuration(duration float64)          { m.Called(duration) }
+func (m *MockMetrics) ObserveZRevRangeDuration(duration float64)       { m.Called(duration) }
+func (m *MockMetrics) ObserveZUnionStoreDuration(duration float64)     { m.Called(duration) }
+func (m *MockMetrics) ObserveZRemRangeByRankDuration(duration float64) { m.Called(duration) }
+
 func (m *MockMetrics) IncrementSetFailures() {
 	m.Called()
 }
@@ -118,6 +156,14 @@ func (m *MockMetrics) IncrementHMGetFailures() {
 func (m *MockMetrics) IncrementExpireFailures() {
 	m.Called()
 }
+
+// ZSET failures
+func (m *MockMetrics) IncrementZAddFailures()            { m.Called() }
+func (m *MockMetrics) IncrementZIncrByFailures()         { m.Called() }
+func (m *MockMetrics) IncrementZRangeFailures()          { m.Called() }
+func (m *MockMetrics) IncrementZRevRangeFailures()       { m.Called() }
+func (m *MockMetrics) IncrementZUnionStoreFailures()     { m.Called() }
+func (m *MockMetrics) IncrementZRemRangeByRankFailures() { m.Called() }
 
 func (m *MockMetrics) UpdateRedisPoolStats(stats *redis.PoolStats) {
 	m.Called(stats)

@@ -24,6 +24,19 @@ type MetricsRecorder interface {
 	IncrementHSetFailures()
 	IncrementHMGetFailures()
 	IncrementExpireFailures()
+	// ZSET metrics
+	ObserveZAddDuration(duration float64)
+	ObserveZIncrByDuration(duration float64)
+	ObserveZRangeDuration(duration float64)
+	ObserveZRevRangeDuration(duration float64)
+	ObserveZUnionStoreDuration(duration float64)
+	ObserveZRemRangeByRankDuration(duration float64)
+	IncrementZAddFailures()
+	IncrementZIncrByFailures()
+	IncrementZRangeFailures()
+	IncrementZRevRangeFailures()
+	IncrementZUnionStoreFailures()
+	IncrementZRemRangeByRankFailures()
 }
 
 // Operations handles Redis benchmark operations.
@@ -204,5 +217,84 @@ func (o *Operations) GetHashData(ctx context.Context, key string, fields []strin
 		return fmt.Errorf("failed to hmget fields from Redis: %w", err)
 	}
 	o.metrics.ObserveHMGetDuration(time.Since(start).Seconds())
+	return nil
+}
+
+// ZAddMembers adds a batch of members with scores to a ZSET key and optionally expires it.
+func (o *Operations) ZAddMembers(ctx context.Context, key string, members map[string]float64, expiration int32) error {
+	if len(members) == 0 {
+		return nil
+	}
+	start := time.Now()
+	if err := o.client.ZAdd(ctx, key, members); err != nil {
+		o.metrics.IncrementZAddFailures()
+		return fmt.Errorf("failed to zadd members: %w", err)
+	}
+	o.metrics.ObserveZAddDuration(time.Since(start).Seconds())
+	if expiration > 0 {
+		if err := o.client.ExpireMany(ctx, []string{key}, expiration); err != nil {
+			o.metrics.IncrementExpireFailures()
+			return fmt.Errorf("failed to expire zset key: %w", err)
+		}
+	}
+	return nil
+}
+
+// ZIncrMember increments a member's score.
+func (o *Operations) ZIncrMember(ctx context.Context, key string, member string, by float64) error {
+	start := time.Now()
+	if err := o.client.ZIncrBy(ctx, key, by, member); err != nil {
+		o.metrics.IncrementZIncrByFailures()
+		return fmt.Errorf("failed to zincrby: %w", err)
+	}
+	o.metrics.ObserveZIncrByDuration(time.Since(start).Seconds())
+	return nil
+}
+
+// ZReadTopK reads top K members by score descending.
+func (o *Operations) ZReadTopK(ctx context.Context, key string, topK int64) error {
+	if topK <= 0 {
+		return nil
+	}
+	start := time.Now()
+	if err := o.client.ZRevRange(ctx, key, 0, topK-1); err != nil {
+		o.metrics.IncrementZRevRangeFailures()
+		return fmt.Errorf("failed to zrevrange: %w", err)
+	}
+	o.metrics.ObserveZRevRangeDuration(time.Since(start).Seconds())
+	return nil
+}
+
+// ZTrimToTopK trims the sorted set to keep only top K (by removing the rest by rank).
+func (o *Operations) ZTrimToTopK(ctx context.Context, key string, topK int64) error {
+	if topK <= 0 {
+		return nil
+	}
+	start := time.Now()
+	// Remove all elements below rank topK-1 (i.e., keep [0, topK-1])
+	if err := o.client.ZRemRangeByRank(ctx, key, topK, -1); err != nil {
+		o.metrics.IncrementZRemRangeByRankFailures()
+		return fmt.Errorf("failed to zremrangebyrank: %w", err)
+	}
+	o.metrics.ObserveZRemRangeByRankDuration(time.Since(start).Seconds())
+	return nil
+}
+
+// ZUnionWithinTag unions multiple keys into a destination key within same slot tag and trims.
+func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources []string, trimTopK int64) error {
+	if len(sources) == 0 || dest == "" {
+		return nil
+	}
+	start := time.Now()
+	if err := o.client.ZUnionStore(ctx, dest, sources); err != nil {
+		o.metrics.IncrementZUnionStoreFailures()
+		return fmt.Errorf("failed to zunionstore: %w", err)
+	}
+	o.metrics.ObserveZUnionStoreDuration(time.Since(start).Seconds())
+	if trimTopK > 0 {
+		if err := o.ZTrimToTopK(ctx, dest, trimTopK); err != nil {
+			return err
+		}
+	}
 	return nil
 }

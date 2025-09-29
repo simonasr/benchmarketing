@@ -62,12 +62,34 @@
                   <option value="set_get" selected>SET / GET</option>
                   <option value="mset_mget">MSET / MGET</option>
                   <option value="hset_hmget">HSET / HMGET</option>
+                  <option value="zset_leaderboards">ZSET Leaderboards</option>
                 </select>
               </label>
               <label id="batchSizeLabel" class="workload-mset">Batch Size<input type="number" id="batchSize" value="10" min="1"></label>
               <label id="sameSlotLabel" class="workload-mset">
                 <input type="checkbox" id="sameSlotPerClient"> Use hashtags
               </label>
+              <label id="tagsCountLabel" class="workload-zset" title="Number of distinct hashtags to spread across cluster slots; higher = wider shard distribution.">Tags Count<input type="number" id="tagsCount" value="1024" min="1"></label>
+              <label class="workload-zset" title="Members per ZADD; controls per-op CPU and memory growth.">ZSET Batch Size<input type="number" id="zsetBatchSize" value="10" min="1"></label>
+              <button type="button" id="zsetMoreBtn" class="workload-zset link-btn more-right">More</button>
+              <div class="line-break workload-zset"></div>
+              <div id="zsetAdvanced" class="workload-zset advanced-zset hidden full-row">
+                <div class="grid">
+                  <label title="Read and keep only the top K members per leaderboard.">Top-K<input type="number" id="zsetTopK" value="50" min="1"></label>
+                  <label title="Percentage of ops that perform ZINCRBY on existing members; 0..100.">Update ratio (%)<input type="number" id="zsetUpdateRatio" value="0" min="0" max="100"></label>
+                  <label title="Number of leaderboards per tag (e.g., lb0..lbN) used for unions.">Per-Tag Leaderboards<input type="number" id="zsetPerTagLeaderboards" value="4" min="1"></label>
+                  <label title="Number of sources in each ZUNIONSTORE; set 0 to disable unions.">Union Fan-in<input type="number" id="zsetUnionFanIn" value="3" min="0"></label>
+                  <label title="Run a union roughly every N ops; higher = less frequent.">Union every N ops<input type="number" id="zsetUnionEveryNOps" value="8" min="1"></label>
+                  <label title="How scores are generated for inserts: time, random, or increment.">Score mode<select id="zsetScoreMode">
+                    <option value="time" selected>time</option>
+                    <option value="random">random</option>
+                    <option value="increment">increment</option>
+                  </select></label>
+                </div>
+                <div class="actions" style="justify-content: flex-end;">
+                  <button type="button" id="zsetLessBtn" class="link-btn">Less</button>
+                </div>
+              </div>
             </div>
           </fieldset>
 

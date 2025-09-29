@@ -39,15 +39,23 @@ type TLSOverrides struct {
 
 // TestOverrides allows overriding specific test configuration values.
 type TestOverrides struct {
-	MinClients        *int    `json:"minClients,omitempty"`
-	MaxClients        *int    `json:"maxClients,omitempty"`
-	StageIntervalMs   *int    `json:"stageIntervalMs,omitempty"`
-	RequestDelayMs    *int    `json:"requestDelayMs,omitempty"`
-	KeySize           *int    `json:"keySize,omitempty"`
-	ValueSize         *int    `json:"valueSize,omitempty"`
-	Workload          *string `json:"workload,omitempty"`
-	BatchSize         *int    `json:"batchSize,omitempty"`
-	SameSlotPerClient *bool   `json:"sameSlotPerClient,omitempty"`
+	MinClients             *int    `json:"minClients,omitempty"`
+	MaxClients             *int    `json:"maxClients,omitempty"`
+	StageIntervalMs        *int    `json:"stageIntervalMs,omitempty"`
+	RequestDelayMs         *int    `json:"requestDelayMs,omitempty"`
+	KeySize                *int    `json:"keySize,omitempty"`
+	ValueSize              *int    `json:"valueSize,omitempty"`
+	Workload               *string `json:"workload,omitempty"`
+	BatchSize              *int    `json:"batchSize,omitempty"`
+	SameSlotPerClient      *bool   `json:"sameSlotPerClient,omitempty"`
+	TagsCount              *int    `json:"tagsCount,omitempty"`
+	ZSetBatchSize          *int    `json:"zsetBatchSize,omitempty"`
+	ZSetTopK               *int    `json:"zsetTopK,omitempty"`
+	ZSetPerTagLeaderboards *int    `json:"zsetPerTagLeaderboards,omitempty"`
+	ZSetUnionFanIn         *int    `json:"zsetUnionFanIn,omitempty"`
+	ZSetUnionEveryNOps     *int    `json:"zsetUnionEveryNOps,omitempty"`
+	ZSetUpdateRatio        *int    `json:"zsetUpdateRatio,omitempty"`
+	ZSetScoreMode          *string `json:"zsetScoreMode,omitempty"`
 }
 
 // ParseBenchmarkRequest parses the raw request body into a BenchmarkRequest.
@@ -218,6 +226,30 @@ func applyTestOverrides(testConfig *config.Test, overrides *TestOverrides) {
 	}
 	if overrides.SameSlotPerClient != nil {
 		testConfig.SameSlotPerClient = *overrides.SameSlotPerClient
+	}
+	if overrides.TagsCount != nil {
+		testConfig.TagsCount = *overrides.TagsCount
+	}
+	if overrides.ZSetTopK != nil {
+		testConfig.ZSetTopK = *overrides.ZSetTopK
+	}
+	if overrides.ZSetBatchSize != nil {
+		testConfig.ZSetBatchSize = *overrides.ZSetBatchSize
+	}
+	if overrides.ZSetPerTagLeaderboards != nil {
+		testConfig.ZSetPerTagLeaderboards = *overrides.ZSetPerTagLeaderboards
+	}
+	if overrides.ZSetUnionFanIn != nil {
+		testConfig.ZSetUnionFanIn = *overrides.ZSetUnionFanIn
+	}
+	if overrides.ZSetUnionEveryNOps != nil {
+		testConfig.ZSetUnionEveryNOps = *overrides.ZSetUnionEveryNOps
+	}
+	if overrides.ZSetUpdateRatio != nil {
+		testConfig.ZSetUpdateRatio = *overrides.ZSetUpdateRatio
+	}
+	if overrides.ZSetScoreMode != nil {
+		testConfig.ZSetScoreMode = *overrides.ZSetScoreMode
 	}
 }
 

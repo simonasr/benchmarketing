@@ -436,6 +436,9 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobID string, jobConfig *
 		if jobConfig.Test.ValueSize != 0 {
 			to["valueSize"] = jobConfig.Test.ValueSize
 		}
+		if jobConfig.Test.TagsCount != 0 {
+			to["tagsCount"] = jobConfig.Test.TagsCount
+		}
 		// Propagate workload-specific fields so workers run the intended workload
 		if jobConfig.Test.Workload != "" {
 			to["workload"] = jobConfig.Test.Workload
@@ -445,6 +448,29 @@ func (jm *JobManager) sendJobToWorker(workerID string, jobID string, jobConfig *
 				}
 				if jobConfig.Test.SameSlotPerClient {
 					to["sameSlotPerClient"] = jobConfig.Test.SameSlotPerClient
+				}
+			}
+			if jobConfig.Test.Workload == config.WorkloadZSet {
+				if jobConfig.Test.ZSetBatchSize != 0 {
+					to["zsetBatchSize"] = jobConfig.Test.ZSetBatchSize
+				}
+				if jobConfig.Test.ZSetTopK != 0 {
+					to["zsetTopK"] = jobConfig.Test.ZSetTopK
+				}
+				if jobConfig.Test.ZSetPerTagLeaderboards != 0 {
+					to["zsetPerTagLeaderboards"] = jobConfig.Test.ZSetPerTagLeaderboards
+				}
+				if jobConfig.Test.ZSetUnionFanIn != 0 {
+					to["zsetUnionFanIn"] = jobConfig.Test.ZSetUnionFanIn
+				}
+				if jobConfig.Test.ZSetUnionEveryNOps != 0 {
+					to["zsetUnionEveryNOps"] = jobConfig.Test.ZSetUnionEveryNOps
+				}
+				if jobConfig.Test.ZSetUpdateRatio != 0 {
+					to["zsetUpdateRatio"] = jobConfig.Test.ZSetUpdateRatio
+				}
+				if jobConfig.Test.ZSetScoreMode != "" {
+					to["zsetScoreMode"] = jobConfig.Test.ZSetScoreMode
 				}
 			}
 		}
