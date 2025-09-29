@@ -59,6 +59,10 @@ button { background: #0a101b; color: var(--fg); border: 1px solid #1f2937; paddi
 button:hover { border-color: #334155; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
 .hidden { display: none; }
+.link-btn { background: transparent; border: none; color: var(--accent); padding: 0; cursor: pointer; font-size: 13px; }
+.link-btn:hover { text-decoration: underline; }
+.advanced-zset { margin-top: 8px; }
+.more-right { align-self: end; justify-self: end; }
 .target { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 12px; margin-bottom: 8px; }
 .ok { color: var(--ok); }
 .idle { color: var(--muted); }
@@ -97,7 +101,10 @@ button:hover { border-color: #334155; }
 body.modal-open { overflow: hidden; }
 
 /* Details/summary spacing so expanded content starts on a new line with breathing room */
-details.full-row > summary { cursor: pointer; color: var(--muted); }
+details.full-row > summary { cursor: pointer; color: var(--muted); display: block; }
+details.full-row { grid-column: 1 / -1; width: 100%; }
+details.full-row > .grid { clear: both; margin-top: 8px; }
+details.full-row > summary .section-title { display: inline-block; font-size: 18px; color: var(--fg); font-weight: 600; margin-bottom: 4px; }
 details.full-row[open] > summary { margin-bottom: 8px; }
 
 

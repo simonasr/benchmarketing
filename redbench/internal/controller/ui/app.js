@@ -432,6 +432,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   updateWorkloadVisibility();
   updatePredictions();
+  // More/Less toggles for ZSET advanced
+  const moreBtn = document.getElementById('zsetMoreBtn');
+  const lessBtn = document.getElementById('zsetLessBtn');
+  const adv = document.getElementById('zsetAdvanced');
+  if (moreBtn && adv) {
+    moreBtn.addEventListener('click', () => {
+      adv.classList.remove('hidden');
+      moreBtn.classList.add('hidden');
+    });
+  }
+  if (lessBtn && adv && moreBtn) {
+    lessBtn.addEventListener('click', () => {
+      adv.classList.add('hidden');
+      moreBtn.classList.remove('hidden');
+    });
+  }
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
@@ -875,9 +891,28 @@ function updateWorkloadVisibility() {
   });
   // ZSET specific controls
   const showZset = (wl === 'zset_leaderboards');
+  const adv = document.getElementById('zsetAdvanced');
+  const moreBtn = document.getElementById('zsetMoreBtn');
   document.querySelectorAll('.workload-zset').forEach(el => {
-    el.style.display = showZset ? 'flex' : 'none';
+    if (!showZset) {
+      el.classList.add('hidden');
+      return;
+    }
+    if (el.id === 'zsetAdvanced') {
+      // Respect current visibility (collapsed by default below)
+    } else {
+      el.classList.remove('hidden');
+    }
   });
+  if (moreBtn && adv) {
+    if (showZset) {
+      adv.classList.add('hidden');
+      moreBtn.classList.remove('hidden');
+    } else {
+      moreBtn.classList.add('hidden');
+      adv.classList.add('hidden');
+    }
+  }
 }
 
 function initRuntimeConfigImport() {
