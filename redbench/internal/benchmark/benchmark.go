@@ -103,10 +103,10 @@ func (r *Runner) Run(ctx context.Context) error {
 				opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
 				switch r.config.Test.Workload {
 				case "mset_mget":
-					// Generate an optional same-slot tag if enabled
+					// Generate an optional same-slot tag if enabled (NewHashSlotTag returns a pre-wrapped tag "{...}")
 					tag := ""
 					if r.config.Test.SameSlotPerClient {
-						// Use a stable tag per goroutine invocation to keep keys in same slot; tag must be wrapped in {}
+						// Use a stable tag per goroutine invocation to keep keys in same slot
 						tag = utils.NewHashSlotTag()
 					}
 
