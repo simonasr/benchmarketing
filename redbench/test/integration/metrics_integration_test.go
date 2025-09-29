@@ -277,8 +277,7 @@ func scrapeDurationSum(t *testing.T, metricsURL string, target string, command s
 	re := getSumRegex(target, command)
 	m := re.FindSubmatch(b)
 	if len(m) < 2 {
-		// If metric not found, treat as zero and fail explicitly for increase tests
-		return 0
+		t.Fatalf("metric redbench_request_duration_seconds_sum command=%s target=%s not found in scrape", command, target)
 	}
 	val, err := strconv.ParseFloat(string(m[1]), 64)
 	if err != nil {

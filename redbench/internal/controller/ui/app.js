@@ -836,7 +836,8 @@ function applyRuntimeConfigToForm(dto, mode = 'merge') {
   setIfNumber('valueSize', cfg.test?.valueSize);
   if (cfg.test?.workload) { const el = document.getElementById('workload'); if (el) el.value = cfg.test.workload; }
   setIfNumber('batchSize', cfg.test?.batchSize);
-  try { const el = document.getElementById('sameSlotPerClient'); if (el && typeof cfg.test?.sameSlotPerClient === 'boolean') el.checked = cfg.test.sameSlotPerClient; } catch {}
+  const el = document.getElementById('sameSlotPerClient');
+  if (el && typeof cfg.test?.sameSlotPerClient === 'boolean') el.checked = cfg.test.sameSlotPerClient;
   setIfNumber('operationTimeoutMs', cfg.redis?.operationTimeoutMs);
   if (Number.isFinite(cfg.redis?.expiration)) {
     const el = document.getElementById('expiration');
