@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
@@ -13,6 +14,8 @@ import (
 const (
 	// poolStatsUpdateInterval defines how often to update Redis pool statistics metrics
 	poolStatsUpdateInterval = 2 * time.Second
+	// defaultBatchSize is used when no batch size is configured
+	defaultBatchSize = 10
 )
 
 // Runner handles the benchmark execution.
@@ -98,32 +101,65 @@ func (r *Runner) Run(ctx context.Context) error {
 				}
 
 				opTimeout := time.Duration(r.config.Redis.OperationTimeoutMs) * time.Millisecond
-				opCtx, cancel := context.WithTimeout(ctx, opTimeout)
-				defer cancel()
-
-				key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
-				if err != nil {
-					// Only log errors that aren't due to context cancellation
-					if ctx.Err() == nil {
-						slog.Error("SaveRandomData failed", "err", err)
+				switch r.config.Test.Workload {
+				case "mset_mget":
+					// Generate an optional same-slot tag if enabled
+					tag := ""
+					if r.config.Test.SameSlotPerClient {
+						// Use a stable tag per goroutine invocation to keep keys in same slot; tag must be wrapped in {}
+						tag = "{" + strconv.FormatInt(time.Now().UnixNano(), 36) + "}"
 					}
-				}
 
-				// Check context before second operation
-				if ctx.Err() != nil {
-					<-clients
-					return
-				}
+					// MSET batch
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					batchSize := r.config.Test.BatchSize
+					if batchSize <= 0 {
+						batchSize = defaultBatchSize
+					}
+					keys, err := r.redisOps.SaveRandomBatchData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize, batchSize, tag, r.config.Test.ApplyBatchExpiration)
+					cancel()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("SaveRandomBatchData failed", "err", err)
+						}
+					}
 
-				// Use a new context for the next operation to avoid reusing a canceled context
-				opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
-				defer cancel2()
+					if ctx.Err() != nil {
+						<-clients
+						return
+					}
 
-				err = r.redisOps.GetData(opCtx2, key)
-				if err != nil {
-					// Only log errors that aren't due to context cancellation
-					if ctx.Err() == nil {
-						slog.Error("GetData failed", "err", err)
+					// MGET batch
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					err = r.redisOps.GetBatchData(opCtx2, keys)
+					cancel2()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("GetBatchData failed", "err", err)
+						}
+					}
+				default:
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					key, err := r.redisOps.SaveRandomData(opCtx, r.config.Redis.Expiration, r.config.Test.KeySize, r.config.Test.ValueSize)
+					cancel()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("SaveRandomData failed", "err", err)
+						}
+					}
+
+					if ctx.Err() != nil {
+						<-clients
+						return
+					}
+
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					err = r.redisOps.GetData(opCtx2, key)
+					cancel2()
+					if err != nil {
+						if ctx.Err() == nil {
+							slog.Error("GetData failed", "err", err)
+						}
 					}
 				}
 

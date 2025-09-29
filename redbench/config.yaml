@@ -17,6 +17,10 @@ test:
   requestDelayMs: 1000
   keySize: 10
   valueSize: 10
+  workload: set_get
+  batchSize: 10
+  sameSlotPerClient: false
+  applyBatchExpiration: true
 controller:
   httpTimeoutMs: 10000
 

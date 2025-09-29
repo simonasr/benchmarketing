@@ -129,6 +129,8 @@ func TestObserveDurations(t *testing.T) {
 	for _, d := range durations {
 		m.ObserveSetDuration(d)
 		m.ObserveGetDuration(d)
+		m.ObserveMSetDuration(d)
+		m.ObserveMGetDuration(d)
 	}
 }
 
@@ -140,6 +142,8 @@ func TestIncrementFailures(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		m.IncrementSetFailures()
 		m.IncrementGetFailures()
+		m.IncrementMSetFailures()
+		m.IncrementMGetFailures()
 	}
 }
 

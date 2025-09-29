@@ -25,6 +25,21 @@ func (m *MockClient) Get(ctx context.Context, key string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockClient) MSet(ctx context.Context, kv map[string]string) error {
+	args := m.Called(ctx, kv)
+	return args.Error(0)
+}
+
+func (m *MockClient) MGet(ctx context.Context, keys []string) error {
+	args := m.Called(ctx, keys)
+	return args.Error(0)
+}
+
+func (m *MockClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
+	args := m.Called(ctx, keys, expiration)
+	return args.Error(0)
+}
+
 func (m *MockClient) PoolStats() *redis.PoolStats {
 	args := m.Called()
 	return args.Get(0).(*redis.PoolStats)
@@ -48,11 +63,27 @@ func (m *MockMetrics) ObserveGetDuration(duration float64) {
 	m.Called(duration)
 }
 
+func (m *MockMetrics) ObserveMSetDuration(duration float64) {
+	m.Called(duration)
+}
+
+func (m *MockMetrics) ObserveMGetDuration(duration float64) {
+	m.Called(duration)
+}
+
 func (m *MockMetrics) IncrementSetFailures() {
 	m.Called()
 }
 
 func (m *MockMetrics) IncrementGetFailures() {
+	m.Called()
+}
+
+func (m *MockMetrics) IncrementMSetFailures() {
+	m.Called()
+}
+
+func (m *MockMetrics) IncrementMGetFailures() {
 	m.Called()
 }
 
@@ -133,6 +164,49 @@ func TestGetData(t *testing.T) {
 
 	err = ops.GetData(ctx, key)
 	assert.Error(t, err)
+
+	mockClient.AssertExpectations(t)
+	mockMetrics.AssertExpectations(t)
+}
+
+func TestSaveRandomBatchData(t *testing.T) {
+	mockClient := new(MockClient)
+	mockMetrics := &MockMetrics{}
+
+	ops := NewOperations(mockClient, mockMetrics, false)
+
+	ctx := context.Background()
+	expiration := int32(30)
+	keySize := 8
+	valueSize := 16
+	batchSize := 5
+
+	mockClient.On("MSet", ctx, mock.AnythingOfType("map[string]string")).Return(nil)
+	mockMetrics.On("ObserveMSetDuration", mock.AnythingOfType("float64")).Return()
+	mockClient.On("ExpireMany", ctx, mock.AnythingOfType("[]string"), expiration).Return(nil)
+
+	keys, err := ops.SaveRandomBatchData(ctx, expiration, keySize, valueSize, batchSize, "{tag}", true)
+	assert.NoError(t, err)
+	assert.Equal(t, batchSize, len(keys))
+
+	mockClient.AssertExpectations(t)
+	mockMetrics.AssertExpectations(t)
+}
+
+func TestGetBatchData(t *testing.T) {
+	mockClient := new(MockClient)
+	mockMetrics := &MockMetrics{}
+
+	ops := NewOperations(mockClient, mockMetrics, false)
+
+	ctx := context.Background()
+	keys := []string{"a", "b", "c"}
+
+	mockClient.On("MGet", ctx, keys).Return(nil)
+	mockMetrics.On("ObserveMGetDuration", mock.AnythingOfType("float64")).Return()
+
+	err := ops.GetBatchData(ctx, keys)
+	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
 	mockMetrics.AssertExpectations(t)
