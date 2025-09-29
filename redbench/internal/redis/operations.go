@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/pkg/utils"
@@ -26,6 +27,13 @@ type Operations struct {
 	metrics MetricsRecorder
 	debug   bool
 }
+
+const (
+	// minKeySizeForTagged enforces a minimum total key length when tags are used
+	minKeySizeForTagged = 8
+	// defaultTaggedSuffixLen is the fixed suffix length to ensure uniqueness within a batch
+	defaultTaggedSuffixLen = 2
+)
 
 // NewOperations creates a new Operations instance.
 func NewOperations(client Client, metrics MetricsRecorder, debug bool) *Operations {
@@ -86,13 +94,32 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 	for i := 0; i < batchSize; i++ {
 		var key string
 		if sameSlotTag != "" {
-			// Treat keySize as total desired length when possible
-			// Ensure at least 1-char random suffix for uniqueness when tag is too long
-			suffixLen := keySize - len(sameSlotTag)
-			if suffixLen < 1 {
-				suffixLen = 1
+			// Enforce minimum key size for simpler composition
+			if keySize < minKeySizeForTagged {
+				keySize = minKeySizeForTagged
 			}
-			key = sameSlotTag + utils.RandomString(suffixLen)
+			// Extract tag content between braces if present
+			tagBody := sameSlotTag
+			if left := strings.Index(sameSlotTag, "{"); left >= 0 {
+				if right := strings.Index(sameSlotTag[left+1:], "}"); right >= 0 {
+					tagBody = sameSlotTag[left+1 : left+1+right]
+				}
+			}
+			// Fixed-size suffix for uniqueness; rest is tag body truncated/padded deterministically
+			innerLen := keySize - 2 - defaultTaggedSuffixLen // exclude braces and suffix
+			if innerLen < 1 {
+				innerLen = 1
+			}
+			// Use the tag body directly, truncated or right-padded to innerLen
+			tagInner := tagBody
+			if len(tagInner) > innerLen {
+				tagInner = tagInner[:innerLen]
+			} else if len(tagInner) < innerLen {
+				tagInner = tagInner + strings.Repeat("x", innerLen-len(tagInner))
+			}
+			compressed := "{" + tagInner + "}"
+			suffix := utils.RandomString(defaultTaggedSuffixLen)
+			key = compressed + suffix
 		} else {
 			key = utils.RandomString(keySize)
 		}
@@ -101,7 +128,19 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 			if _, exists := kv[key]; !exists {
 				break
 			}
-			key += utils.RandomString(1)
+			// Regenerate suffix to keep key size constant
+			if sameSlotTag != "" && len(key) >= defaultTaggedSuffixLen {
+				key = key[:len(key)-defaultTaggedSuffixLen] + utils.RandomString(defaultTaggedSuffixLen)
+			} else if !strings.HasPrefix(key, "{") {
+				// Plain key; replace the last character
+				if len(key) >= 1 {
+					key = key[:len(key)-1] + utils.RandomString(1)
+				} else {
+					key = utils.RandomString(keySize)
+				}
+			} else {
+				key = utils.RandomString(keySize)
+			}
 		}
 		value := utils.RandomString(valueSize)
 		kv[key] = value

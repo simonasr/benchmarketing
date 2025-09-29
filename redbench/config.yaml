@@ -15,7 +15,7 @@ test:
   maxClients: 2000
   stageIntervalMs: 1000
   requestDelayMs: 1000
-  keySize: 10
+  keySize: 8
   valueSize: 10
   workload: set_get
   batchSize: 10
