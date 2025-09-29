@@ -292,6 +292,83 @@ func getSumRegex(target string, command string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
+// TestServiceStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get
+func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
+	mockRedis := miniredis.RunT(t)
+
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	ConfigureQuickBenchmark(cfg)
+
+	redisConn := &config.RedisConnection{
+		URL:         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+		TargetLabel: TestRedisLabel,
+	}
+
+	reg := prometheus.NewRegistry()
+	port := ServicePortBase + 5
+	server := service.NewServer(port, cfg, redisConn, reg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	go func() { _ = server.Start(ctx) }()
+	time.Sleep(StartupDelay)
+
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
+
+	// Start set_get workload (default) explicitly
+	startReq := map[string]any{
+		"test": map[string]any{
+			"workload":        "set_get",
+			"minClients":      1,
+			"maxClients":      1,
+			"stageIntervalMs": TestStageIntervalFast,
+			"requestDelayMs":  TestRequestDelayNormal,
+			"keySize":         TestKeySize,
+			"valueSize":       TestValueSizeSmall,
+		},
+		"redis": map[string]any{
+			"url":         fmt.Sprintf("redis://%s", mockRedis.Addr()),
+			"targetLabel": TestRedisLabel,
+		},
+	}
+	b, _ := json.Marshal(startReq)
+	if resp, err := http.Post(baseURL+"/start", "application/json", bytes.NewBuffer(b)); err != nil {
+		t.Fatalf("start: %v", err)
+	} else {
+		resp.Body.Close()
+	}
+
+	time.Sleep(ServiceRunDuration)
+
+	// Query /status and ensure configuration omits batch-only fields
+	resp, err := http.Get(baseURL + "/status")
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	defer resp.Body.Close()
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	cfgObj, _ := body["configuration"].(map[string]any)
+	if cfgObj == nil {
+		t.Fatalf("expected configuration in status")
+	}
+	testObj, _ := cfgObj["test"].(map[string]any)
+	if testObj == nil {
+		t.Fatalf("expected test configuration in status")
+	}
+	if _, ok := testObj["batchSize"]; ok {
+		t.Fatalf("unexpected batchSize present for set_get workload")
+	}
+	if _, ok := testObj["sameSlotPerClient"]; ok {
+		t.Fatalf("unexpected sameSlotPerClient present for set_get workload")
+	}
+}
+
 // TestKeysContainHashTagWithSameSlot verifies generated keys include hash-slot tags and match configured size
 func TestKeysContainHashTagWithSameSlot(t *testing.T) {
 	mockRedis := miniredis.RunT(t)
