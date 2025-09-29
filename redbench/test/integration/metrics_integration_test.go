@@ -331,7 +331,7 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 
 	time.Sleep(ServiceRunDuration)
 
-    // Legacy assertion removed: set/get metrics are irrelevant for batch workloads
+	// Legacy assertion removed: set/get metrics are irrelevant for batch workloads
 }
 
 func scrapeDurationSum(t *testing.T, metricsURL string, target string, command string) float64 {
@@ -355,8 +355,8 @@ func scrapeDurationSum(t *testing.T, metricsURL string, target string, command s
 }
 
 func getSumRegex(target string, command string) *regexp.Regexp {
-    pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
-    return regexp.MustCompile(pattern)
+	pattern := `redbench_request_duration_seconds_sum\{[^}]*command="` + regexp.QuoteMeta(command) + `"[^}]*target="` + regexp.QuoteMeta(target) + `"[^}]*\}\s+([0-9]+\.?[0-9]*)`
+	return regexp.MustCompile(pattern)
 }
 
 // TestServiceStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get

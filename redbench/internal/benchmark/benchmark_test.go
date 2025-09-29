@@ -48,10 +48,7 @@ func (m *MockRedisClient) HMGet(ctx context.Context, key string, fields []string
 	return args.Error(0)
 }
 
-func (m *MockRedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
-	args := m.Called(ctx, key, field)
-	return args.String(0), args.Error(1)
-}
+// (removed) HGet from benchmark mock
 
 func (m *MockRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	args := m.Called(ctx, keys, expiration)

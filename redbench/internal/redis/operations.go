@@ -16,7 +16,6 @@ type MetricsRecorder interface {
 	ObserveMGetDuration(duration float64)
 	ObserveHSetDuration(duration float64)
 	ObserveHMGetDuration(duration float64)
-	ObserveHGetDuration(duration float64)
 	ObserveExpireDuration(duration float64)
 	IncrementSetFailures()
 	IncrementGetFailures()
@@ -24,7 +23,6 @@ type MetricsRecorder interface {
 	IncrementMGetFailures()
 	IncrementHSetFailures()
 	IncrementHMGetFailures()
-	IncrementHGetFailures()
 	IncrementExpireFailures()
 }
 
@@ -210,13 +208,4 @@ func (o *Operations) GetHashData(ctx context.Context, key string, fields []strin
 }
 
 // GetHashField fetches a single field from a hash key using HGET.
-func (o *Operations) GetHashField(ctx context.Context, key string, field string) error {
-	start := time.Now()
-	_, err := o.client.HGet(ctx, key, field)
-	o.metrics.ObserveHGetDuration(time.Since(start).Seconds())
-	if err != nil {
-		o.metrics.IncrementHGetFailures()
-		return fmt.Errorf("failed to hget field from Redis: %w", err)
-	}
-	return nil
-}
+// (removed) HGET single-field helper – no longer used

@@ -45,10 +45,7 @@ func (m *MockClient) HMGet(ctx context.Context, key string, fields []string) err
 	return args.Error(0)
 }
 
-func (m *MockClient) HGet(ctx context.Context, key string, field string) (string, error) {
-	args := m.Called(ctx, key, field)
-	return args.String(0), args.Error(1)
-}
+// (removed) HGet from mock client
 
 func (m *MockClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	args := m.Called(ctx, keys, expiration)
@@ -92,9 +89,7 @@ func (m *MockMetrics) ObserveHSetDuration(duration float64) {
 func (m *MockMetrics) ObserveHMGetDuration(duration float64) {
 	m.Called(duration)
 }
-func (m *MockMetrics) ObserveHGetDuration(duration float64) {
-	m.Called(duration)
-}
+// (removed) ObserveHGetDuration
 
 func (m *MockMetrics) ObserveExpireDuration(duration float64) {
 	m.Called(duration)
@@ -122,9 +117,7 @@ func (m *MockMetrics) IncrementHSetFailures() {
 func (m *MockMetrics) IncrementHMGetFailures() {
 	m.Called()
 }
-func (m *MockMetrics) IncrementHGetFailures() {
-	m.Called()
-}
+// (removed) IncrementHGetFailures
 
 func (m *MockMetrics) IncrementExpireFailures() {
 	m.Called()

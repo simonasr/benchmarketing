@@ -69,9 +69,7 @@ func (t *testRedisClient) HMGet(ctx context.Context, key string, fields []string
 	return err
 }
 
-func (t *testRedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
-	return t.client.HGet(ctx, key, field).Result()
-}
+// (removed) HGet from integration test client
 
 func (t *testRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	if len(keys) == 0 || expiration <= 0 {

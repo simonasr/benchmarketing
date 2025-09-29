@@ -19,7 +19,6 @@ type Client interface {
 	MGet(ctx context.Context, keys []string) error
 	HSet(ctx context.Context, key string, fieldValues map[string]string) error
 	HMGet(ctx context.Context, key string, fields []string) error
-	HGet(ctx context.Context, key string, field string) (string, error)
 	ExpireMany(ctx context.Context, keys []string, expiration int32) error
 	PoolStats() *redis.PoolStats
 	Close() error
@@ -175,9 +174,7 @@ func (r *RedisClient) HMGet(ctx context.Context, key string, fields []string) er
 }
 
 // HGet fetches a single field from a hash key.
-func (r *RedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
-	return r.client.HGet(ctx, key, field).Result()
-}
+// (removed) HGet – single-field helper is not used by workloads
 
 // ExpireMany applies expiration to a set of keys using a pipeline for efficiency.
 func (r *RedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {

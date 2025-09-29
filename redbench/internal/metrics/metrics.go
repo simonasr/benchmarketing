@@ -253,15 +253,12 @@ func (m *Metrics) ObserveHSetDuration(duration float64) {
 	m.durationHSet.Observe(duration)
 }
 
-// ObserveHGetDuration records the duration of an HGET operation.
+// ObserveHMGetDuration records the duration of an HMGET operation.
 func (m *Metrics) ObserveHMGetDuration(duration float64) {
 	m.durationHMGet.Observe(duration)
 }
 
-// ObserveHGetDuration records the duration of an HGET operation.
-func (m *Metrics) ObserveHGetDuration(duration float64) {
-	m.durationHGet.Observe(duration)
-}
+// (removed) ObserveHGetDuration
 
 // ObserveExpireDuration records the duration of an EXPIRE operation (batched via pipeline).
 func (m *Metrics) ObserveExpireDuration(duration float64) {
@@ -293,15 +290,12 @@ func (m *Metrics) IncrementHSetFailures() {
 	m.requestFailedHSet.Inc()
 }
 
-// IncrementHGetFailures increments the counter for failed HGET operations.
+// IncrementHMGetFailures increments the counter for failed HMGET operations.
 func (m *Metrics) IncrementHMGetFailures() {
 	m.requestFailedHMGet.Inc()
 }
 
-// IncrementHGetFailures increments the counter for failed HGET operations.
-func (m *Metrics) IncrementHGetFailures() {
-	m.requestFailedHGet.Inc()
-}
+// (removed) IncrementHGetFailures
 
 // IncrementExpireFailures increments the counter for failed EXPIRE operations.
 func (m *Metrics) IncrementExpireFailures() {
