@@ -23,7 +23,6 @@ type Metrics struct {
 	durationMSet        prometheus.Observer
 	durationMGet        prometheus.Observer
 	durationHSet        prometheus.Observer
-	durationHGet        prometheus.Observer
 	durationHMGet       prometheus.Observer
 	durationExpire      prometheus.Observer
 	requestFailedSet    prometheus.Counter
@@ -31,7 +30,6 @@ type Metrics struct {
 	requestFailedMSet   prometheus.Counter
 	requestFailedMGet   prometheus.Counter
 	requestFailedHSet   prometheus.Counter
-	requestFailedHGet   prometheus.Counter
 	requestFailedHMGet  prometheus.Counter
 	requestFailedExpire prometheus.Counter
 
@@ -198,7 +196,6 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.durationMSet = m.duration.WithLabelValues("mset", "redis", target)
 	m.durationMGet = m.duration.WithLabelValues("mget", "redis", target)
 	m.durationHSet = m.duration.WithLabelValues("hset", "redis", target)
-	m.durationHGet = m.duration.WithLabelValues("hget", "redis", target)
 	m.durationHMGet = m.duration.WithLabelValues("hmget", "redis", target)
 	m.durationExpire = m.duration.WithLabelValues("expire", "redis", target)
 	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
@@ -206,7 +203,6 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
 	m.requestFailedMGet = m.requestFailed.WithLabelValues("mget", "redis", target)
 	m.requestFailedHSet = m.requestFailed.WithLabelValues("hset", "redis", target)
-	m.requestFailedHGet = m.requestFailed.WithLabelValues("hget", "redis", target)
 	m.requestFailedHMGet = m.requestFailed.WithLabelValues("hmget", "redis", target)
 	m.requestFailedExpire = m.requestFailed.WithLabelValues("expire", "redis", target)
 

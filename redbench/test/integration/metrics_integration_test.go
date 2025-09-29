@@ -259,10 +259,10 @@ func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
 
 	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
 	sumHSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hset")
-	sumHGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hmget")
+	sumHMGet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hmget")
 
-	if !(sumHSet > 0 && sumHGet > 0) {
-		t.Fatalf("expected positive sums for hset/hget, got hset=%f hget=%f", sumHSet, sumHGet)
+	if !(sumHSet > 0 && sumHMGet > 0) {
+		t.Fatalf("expected positive sums for hset/hmget, got hset=%f hmget=%f", sumHSet, sumHMGet)
 	}
 
 	// Ensure mset/mget remain zero for hash workloads

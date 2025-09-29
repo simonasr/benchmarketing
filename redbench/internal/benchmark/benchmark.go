@@ -138,7 +138,7 @@ func (r *Runner) Run(ctx context.Context) error {
 							slog.Error("GetBatchData failed", "err", err)
 						}
 					}
-                case config.WorkloadHSetHMGet:
+				case config.WorkloadHSetHMGet:
 					tag := ""
 					if r.config.Test.SameSlotPerClient {
 						tag = utils.NewHashSlotTag()
