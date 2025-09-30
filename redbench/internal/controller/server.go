@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
+	"github.com/simonasr/benchmarketing/redbench/internal/httpx"
 )
 
 // Server represents the HTTP server for controller mode.
@@ -78,13 +79,7 @@ func NewServer(port int, cfg *config.Config, metricsRegistry *prometheus.Registr
 		slog.Warn("UI assets not available", "error", err)
 	}
 
-	httpServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	httpServer := httpx.NewServer(fmt.Sprintf(":%d", port), mux, 0, 0, 0)
 
 	return &Server{
 		controller: controller,

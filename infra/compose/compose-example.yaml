@@ -21,6 +21,8 @@ services:
   worker_redis8_1:
     <<: *bench_base
     command: ["--mode=worker", "--port=8080", "--controller=http://controller:8081", "--bind-address=worker_redis8_1"]
+    ports:
+      - "8080:8080"
     depends_on:
       - prometheus
       - redis8

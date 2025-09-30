@@ -2,7 +2,6 @@ package workerapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,38 +14,12 @@ import (
 
 	"github.com/simonasr/benchmarketing/redbench/internal/benchmark"
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
+	"github.com/simonasr/benchmarketing/redbench/internal/httpx"
 	"github.com/simonasr/benchmarketing/redbench/internal/metrics"
 	"github.com/simonasr/benchmarketing/redbench/internal/redis"
 )
 
-// Helper functions for common HTTP response patterns
-
-// writeJSONResponse writes a JSON response with the given status code.
-func writeJSONResponse(w http.ResponseWriter, data interface{}, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	if statusCode != http.StatusOK {
-		w.WriteHeader(statusCode)
-	}
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		slog.Error("Failed to encode JSON response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
-}
-
-// logAndRespond logs an error and sends a 400 Bad Request HTTP error response.
-func logAndRespond(w http.ResponseWriter, logMsg string, err error, httpMsg string) {
-	slog.Error(logMsg, "error", err)
-	http.Error(w, httpMsg, http.StatusBadRequest)
-}
-
-// checkMethod validates the HTTP method and returns false if invalid.
-func checkMethod(w http.ResponseWriter, r *http.Request, expectedMethod string) bool {
-	if r.Method != expectedMethod {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return false
-	}
-	return true
-}
+// HTTP helpers moved to internal/httpx
 
 // Service holds dependencies for the HTTP service.
 type Service struct {
@@ -108,7 +81,7 @@ func (s *Service) getCancelFunc() context.CancelFunc {
 
 // StatusHandler handles GET requests for benchmark status.
 func (s *Service) StatusHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodGet) {
+	if !httpx.CheckMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -121,19 +94,19 @@ func (s *Service) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		state.RedisTarget = nil
 	}
 
-	writeJSONResponse(w, state, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, state)
 }
 
 // StartHandler handles POST requests to start a benchmark.
 func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodPost) {
+	if !httpx.CheckMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		logAndRespond(w, "Failed to read request body", err, "Failed to read request body")
+		httpx.LogAndRespond(w, "Failed to read request body", err, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -141,14 +114,14 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse once for reuse (jobId extraction and config/redis overrides)
 	req, err := ParseBenchmarkRequest(body)
 	if err != nil {
-		logAndRespond(w, "Failed to parse request body", err, fmt.Sprintf("Invalid request body: %v", err))
+		httpx.LogAndRespond(w, "Failed to parse request body", err, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	// Merge configuration with request overrides (use parsed request)
 	mergedConfig, err := MergeConfigurationFromRequest(s.baseConfig, req)
 	if err != nil {
-		logAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err))
+		httpx.LogAndRespond(w, "Failed to merge configuration", err, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -162,7 +135,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 	// Create Redis connection from request overrides or use base connection
 	redisConn, err := CreateRedisConnectionFromRequest(s.baseRedisConn, req)
 	if err != nil {
-		logAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err))
+		httpx.LogAndRespond(w, "Failed to create Redis connection", err, fmt.Sprintf("Invalid Redis configuration: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -173,7 +146,7 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate that we have a valid Redis target
 	if redisConn == nil || (redisConn.URL == "" && redisConn.ClusterURL == "") {
-		logAndRespond(w, "Redis target validation failed", nil, "Redis connection requires either URL or ClusterURL to be specified")
+		httpx.LogAndRespond(w, "Redis target validation failed", nil, "Redis connection requires either URL or ClusterURL to be specified", http.StatusBadRequest)
 		return
 	}
 
@@ -200,12 +173,12 @@ func (s *Service) StartHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Return the new state
 	state := s.globalState.GetState()
-	writeJSONResponse(w, state, http.StatusCreated)
+	httpx.WriteJSON(w, http.StatusCreated, state)
 }
 
 // StopHandler handles DELETE requests to stop a running benchmark.
 func (s *Service) StopHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodDelete) {
+	if !httpx.CheckMethod(w, r, http.MethodDelete) {
 		return
 	}
 
@@ -222,12 +195,12 @@ func (s *Service) StopHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Return the updated state
 	state := s.globalState.GetState()
-	writeJSONResponse(w, state, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, state)
 }
 
 // ExitHandler handles POST requests to gracefully exit the worker service process.
 func (s *Service) ExitHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodPost) {
+	if !httpx.CheckMethod(w, r, http.MethodPost) {
 		return
 	}
 
@@ -239,7 +212,7 @@ func (s *Service) ExitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Respond before terminating to let the client get an acknowledgment
-	writeJSONResponse(w, map[string]interface{}{"status": "exiting"}, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, map[string]interface{}{"status": "exiting"})
 
 	// Shutdown the process after a short delay to allow response to flush
 	go func() {

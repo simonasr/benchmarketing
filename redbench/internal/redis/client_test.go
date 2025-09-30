@@ -68,6 +68,23 @@ func TestNewRedisClient(t *testing.T) {
 	// and is typically done with integration tests
 }
 
+func TestResolveConnectTimeoutSeconds(t *testing.T) {
+	t.Run("nil conn uses default", func(t *testing.T) {
+		got := resolveConnectTimeoutSeconds(nil)
+		assert.Equal(t, config.DefaultConnectTimeoutSeconds, got)
+	})
+	t.Run("zero or negative uses default", func(t *testing.T) {
+		c0 := &config.RedisConnection{ConnectTimeoutSeconds: 0}
+		cNeg := &config.RedisConnection{ConnectTimeoutSeconds: -5}
+		assert.Equal(t, config.DefaultConnectTimeoutSeconds, resolveConnectTimeoutSeconds(c0))
+		assert.Equal(t, config.DefaultConnectTimeoutSeconds, resolveConnectTimeoutSeconds(cNeg))
+	})
+	t.Run("positive returned as-is", func(t *testing.T) {
+		c := &config.RedisConnection{ConnectTimeoutSeconds: 7}
+		assert.Equal(t, 7, resolveConnectTimeoutSeconds(c))
+	})
+}
+
 func TestRedisClientSet(t *testing.T) {
 	mr, conn := setupMiniredis(t)
 

@@ -86,10 +86,7 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 	}
 
 	// Ping to verify connection
-	timeoutSeconds := conn.ConnectTimeoutSeconds
-	if timeoutSeconds <= 0 {
-		timeoutSeconds = 10 // Default timeout
-	}
+	timeoutSeconds := resolveConnectTimeoutSeconds(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -99,6 +96,18 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 
 	slog.Info("Successfully connected to Redis")
 	return &RedisClient{client: client}, nil
+}
+
+// resolveConnectTimeoutSeconds returns the effective connect timeout in seconds,
+// falling back to the configuration default when unset or invalid.
+func resolveConnectTimeoutSeconds(conn *config.RedisConnection) int {
+	if conn == nil {
+		return config.DefaultConnectTimeoutSeconds
+	}
+	if conn.ConnectTimeoutSeconds <= 0 {
+		return config.DefaultConnectTimeoutSeconds
+	}
+	return conn.ConnectTimeoutSeconds
 }
 
 // NewRedisClientLegacy creates a new Redis client using the legacy parameters.

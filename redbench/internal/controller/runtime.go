@@ -3,6 +3,8 @@ package controller
 import (
 	"net/http"
 	"time"
+
+	"github.com/simonasr/benchmarketing/redbench/internal/httpx"
 )
 
 // runtimeConfigDTO is the wire shape for the UI to import configuration.
@@ -92,7 +94,7 @@ func (c *Controller) RuntimeConfigHandler(w http.ResponseWriter, r *http.Request
 		}
 		// Disable HTTP caching to ensure preview reflects current job/config
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSONResponse(w, dto, http.StatusOK)
+		httpx.WriteJSON(w, http.StatusOK, dto)
 		return
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

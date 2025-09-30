@@ -8,47 +8,22 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/simonasr/benchmarketing/redbench/internal/httpx"
 )
 
-// Helper functions for common HTTP response patterns (reused from service package)
-
-// writeJSONResponse writes a JSON response with the given status code.
-func writeJSONResponse(w http.ResponseWriter, data interface{}, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	if statusCode != http.StatusOK {
-		w.WriteHeader(statusCode)
-	}
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		slog.Error("Failed to encode JSON response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
-}
-
-// logAndRespond logs an error and sends a 400 Bad Request HTTP error response.
-func logAndRespond(w http.ResponseWriter, logMsg string, err error, httpMsg string) {
-	slog.Error(logMsg, "error", err)
-	http.Error(w, httpMsg, http.StatusBadRequest)
-}
-
-// checkMethod validates the HTTP method and returns false if invalid.
-func checkMethod(w http.ResponseWriter, r *http.Request, expectedMethod string) bool {
-	if r.Method != expectedMethod {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return false
-	}
-	return true
-}
+// Shared HTTP helpers provided by internal/httpx
 
 // RegisterWorkerHandler handles POST requests to register a worker.
 func (c *Controller) RegisterWorkerHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodPost) {
+	if !httpx.CheckMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		logAndRespond(w, "Failed to read request body", err, "Failed to read request body")
+		httpx.LogAndRespond(w, "Failed to read request body", err, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -56,13 +31,13 @@ func (c *Controller) RegisterWorkerHandler(w http.ResponseWriter, r *http.Reques
 	// Parse registration request
 	var req RegistrationRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		logAndRespond(w, "Failed to parse registration request", err, "Invalid JSON in request body")
+		httpx.LogAndRespond(w, "Failed to parse registration request", err, "Invalid JSON in request body", http.StatusBadRequest)
 		return
 	}
 
 	// Register the worker
 	if err := c.registry.RegisterWorker(req); err != nil {
-		logAndRespond(w, "Failed to register worker", err, fmt.Sprintf("Registration failed: %v", err))
+		httpx.LogAndRespond(w, "Failed to register worker", err, fmt.Sprintf("Registration failed: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -74,7 +49,7 @@ func (c *Controller) RegisterWorkerHandler(w http.ResponseWriter, r *http.Reques
 		"workerId": req.WorkerID,
 		"message":  "Worker registered successfully",
 	}
-	writeJSONResponse(w, response, http.StatusCreated)
+	httpx.WriteJSON(w, http.StatusCreated, response)
 }
 
 // WorkerHandler handles worker-related requests.
@@ -102,27 +77,27 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		defer r.Body.Close()
 		if err != nil {
-			logAndRespond(w, "Failed to read completion request", err, "Failed to read request body")
+			httpx.LogAndRespond(w, "Failed to read completion request", err, "Failed to read request body", http.StatusBadRequest)
 			return
 		}
 
 		var req WorkerCompletionRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			logAndRespond(w, "Failed to parse completion request", err, "Invalid JSON in request body")
+			httpx.LogAndRespond(w, "Failed to parse completion request", err, "Invalid JSON in request body", http.StatusBadRequest)
 			return
 		}
 		if err := req.Validate(); err != nil {
-			logAndRespond(w, "Invalid completion payload", err, "Invalid completion payload")
+			httpx.LogAndRespond(w, "Invalid completion payload", err, "Invalid completion payload", http.StatusBadRequest)
 			return
 		}
 
 		if err := c.jobManager.HandleWorkerCompletion(workerID, req); err != nil {
-			logAndRespond(w, "Failed to handle worker completion", err, "Failed to handle worker completion")
+			httpx.LogAndRespond(w, "Failed to handle worker completion", err, "Failed to handle worker completion", http.StatusBadRequest)
 			return
 		}
 
 		slog.Info("Worker reported completion", "worker_id", workerID, "job_id", req.JobID, "status", req.Status)
-		writeJSONResponse(w, map[string]any{"status": "ok"}, http.StatusOK)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 		return
 	}
 
@@ -136,12 +111,12 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := c.jobManager.ExitWorker(workerID); err != nil {
-			logAndRespond(w, "Failed to exit worker", err, "Failed to exit worker")
+			httpx.LogAndRespond(w, "Failed to exit worker", err, "Failed to exit worker", http.StatusBadRequest)
 			return
 		}
 
 		_ = c.registry.UnregisterWorker(workerID)
-		writeJSONResponse(w, map[string]any{"status": "exiting", "workerId": workerID}, http.StatusOK)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "exiting", "workerId": workerID})
 		return
 	}
 
@@ -167,12 +142,12 @@ func (c *Controller) WorkerHandler(w http.ResponseWriter, r *http.Request) {
 		"workerId": workerID,
 		"message":  "Worker unregistered successfully",
 	}
-	writeJSONResponse(w, response, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, response)
 }
 
 // ListWorkersHandler handles GET requests to list all workers.
 func (c *Controller) ListWorkersHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodGet) {
+	if !httpx.CheckMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -183,19 +158,19 @@ func (c *Controller) ListWorkersHandler(w http.ResponseWriter, r *http.Request) 
 		"total":     len(workers),
 		"available": c.registry.CountAvailable(),
 	}
-	writeJSONResponse(w, response, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, response)
 }
 
 // StartJobHandler handles POST requests to start a coordinated benchmark job.
 func (c *Controller) StartJobHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodPost) {
+	if !httpx.CheckMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		logAndRespond(w, "Failed to read request body", err, "Failed to read request body")
+		httpx.LogAndRespond(w, "Failed to read request body", err, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -203,7 +178,7 @@ func (c *Controller) StartJobHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse job request
 	var req JobRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		logAndRespond(w, "Failed to parse job request", err, "Invalid JSON in request body")
+		httpx.LogAndRespond(w, "Failed to parse job request", err, "Invalid JSON in request body", http.StatusBadRequest)
 		return
 	}
 
@@ -221,7 +196,7 @@ func (c *Controller) StartJobHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Another job is already running", http.StatusConflict)
 			return
 		}
-		logAndRespond(w, "Failed to create job", err, fmt.Sprintf("Job creation failed: %v", err))
+		httpx.LogAndRespond(w, "Failed to create job", err, fmt.Sprintf("Job creation failed: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -232,19 +207,19 @@ func (c *Controller) StartJobHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Another job is already running", http.StatusConflict)
 			return
 		}
-		logAndRespond(w, "Failed to start job", err, fmt.Sprintf("Job start failed: %v", err))
+		httpx.LogAndRespond(w, "Failed to start job", err, fmt.Sprintf("Job start failed: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	slog.Info("Job started", "job_id", job.ID, "targets", len(req.Targets), "total_workers", len(job.Assignments))
 
 	// Return the job details
-	writeJSONResponse(w, job, http.StatusCreated)
+	httpx.WriteJSON(w, http.StatusCreated, job)
 }
 
 // StopJobHandler handles DELETE requests to stop a running job.
 func (c *Controller) StopJobHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodDelete) {
+	if !httpx.CheckMethod(w, r, http.MethodDelete) {
 		return
 	}
 
@@ -267,7 +242,7 @@ func (c *Controller) StopJobHandler(w http.ResponseWriter, r *http.Request) {
 			if latest.Status == JobStatusCompleted || latest.Status == JobStatusFailed {
 				_ = c.jobManager.MarkJobStopped(latest.ID)
 				updated, _ := c.jobManager.GetJob(latest.ID)
-				writeJSONResponse(w, updated, http.StatusOK)
+				httpx.WriteJSON(w, http.StatusOK, updated)
 				return
 			}
 		}
@@ -277,7 +252,7 @@ func (c *Controller) StopJobHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Stop the job
 	if err := c.jobManager.StopJob(activeJob.ID); err != nil {
-		logAndRespond(w, "Failed to stop job", err, fmt.Sprintf("Job stop failed: %v", err))
+		httpx.LogAndRespond(w, "Failed to stop job", err, fmt.Sprintf("Job stop failed: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -285,12 +260,12 @@ func (c *Controller) StopJobHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated job status
 	updatedJob, _ := c.jobManager.GetJob(activeJob.ID)
-	writeJSONResponse(w, updatedJob, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, updatedJob)
 }
 
 // JobStatusHandler handles GET requests to get job status.
 func (c *Controller) JobStatusHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodGet) {
+	if !httpx.CheckMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -301,16 +276,16 @@ func (c *Controller) JobStatusHandler(w http.ResponseWriter, r *http.Request) {
 			"status":  "no_jobs",
 			"message": "No jobs found",
 		}
-		writeJSONResponse(w, response, http.StatusOK)
+		httpx.WriteJSON(w, http.StatusOK, response)
 		return
 	}
 
-	writeJSONResponse(w, currentJob, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, currentJob)
 }
 
 // HealthHandler handles GET requests for controller health check.
 func (c *Controller) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod(w, r, http.MethodGet) {
+	if !httpx.CheckMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -319,5 +294,5 @@ func (c *Controller) HealthHandler(w http.ResponseWriter, r *http.Request) {
 		"totalWorkers":     c.registry.Count(),
 		"availableWorkers": c.registry.CountAvailable(),
 	}
-	writeJSONResponse(w, health, http.StatusOK)
+	httpx.WriteJSON(w, http.StatusOK, health)
 }
