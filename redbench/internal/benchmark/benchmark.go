@@ -202,7 +202,9 @@ func (r *Runner) Run(ctx context.Context) error {
 					if perTag > 1 {
 						lbIdx = int(time.Now().UnixNano() % int64(perTag))
 					}
-					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, 1)
+					// Use dynamic width so index formatting scales with number of leaderboards
+					zIdxWidth := utils.Base36WidthForMax(perTag - 1)
+					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, zIdxWidth)
 
 					// ZADD a batch of members
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
@@ -282,12 +284,14 @@ func (r *Runner) Run(ctx context.Context) error {
 								fanIn = perTag
 							}
 							sources := make([]string, 0, fanIn)
+							// Match dynamic width used for zkey above
+							unionWidth := utils.Base36WidthForMax(perTag - 1)
 							for i := 0; i < fanIn; i++ {
-								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, 1))
+								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, unionWidth))
 							}
 							opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
 							dest := "z:lb:" + tag + ":union"
-							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
+							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK, r.config.Redis.Expiration); err != nil {
 								if ctx.Err() == nil {
 									slog.Error("ZUnionWithinTag failed", "err", err)
 								}

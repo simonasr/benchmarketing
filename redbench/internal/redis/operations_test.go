@@ -290,3 +290,40 @@ func TestGetBatchData(t *testing.T) {
 	mockClient.AssertExpectations(t)
 	mockMetrics.AssertExpectations(t)
 }
+
+func TestSaveRandomHashData_DynamicWidth_NoCollisions(t *testing.T) {
+	mockClient := new(MockClient)
+	mockMetrics := &MockMetrics{}
+
+	ops := NewOperations(mockClient, mockMetrics, false)
+
+	ctx := context.Background()
+	expiration := int32(0)
+	keySize := 8
+	fieldValueSize := 4
+	batchSize := 44 // greater than 36 to validate width>1
+
+	// Capture the map passed to HSet and assert it has batchSize unique fields
+	mockClient.On("HSet", ctx, mock.AnythingOfType("string"), mock.MatchedBy(func(fv map[string]string) bool {
+		if len(fv) != batchSize {
+			return false
+		}
+		// Ensure keys are unique
+		seen := make(map[string]struct{}, len(fv))
+		for k := range fv {
+			if _, ok := seen[k]; ok {
+				return false
+			}
+			seen[k] = struct{}{}
+		}
+		return true
+	})).Return(nil)
+	mockMetrics.On("ObserveHSetDuration", mock.AnythingOfType("float64")).Return()
+
+	key, fields, err := ops.SaveRandomHashData(ctx, expiration, keySize, fieldValueSize, batchSize, "")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, key)
+	assert.Equal(t, batchSize, len(fields))
+
+	mockClient.AssertExpectations(t)
+}

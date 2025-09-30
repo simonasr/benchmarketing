@@ -113,8 +113,9 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 	for i := 0; i < batchSize; i++ {
 		var key string
 		if sameSlotTag != "" {
-			// Use deterministic base36 counter suffix to guarantee uniqueness
-			key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, defaultTaggedSuffixLen, i)
+			// Use deterministic base36 counter suffix sized to batchSize to guarantee uniqueness
+			suffixLen := utils.Base36WidthForMax(batchSize - 1)
+			key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, suffixLen, i)
 		} else {
 			key = utils.RandomString(keySize)
 			// Guarantee uniqueness for non-tagged case by appending a base36 counter if collision
@@ -183,8 +184,10 @@ func (o *Operations) SaveRandomHashData(ctx context.Context, expiration int32, k
 
 	fields := make([]string, 0, batchSize)
 	fv := make(map[string]string, batchSize)
+	// Determine the minimum base36 width required to represent batchSize-1 without collisions
+	width := utils.Base36WidthForMax(batchSize - 1)
 	for i := 0; i < batchSize; i++ {
-		field := "f" + utils.Base36Padded(i, counterPadLen)
+		field := "f" + utils.Base36Padded(i, width)
 		fields = append(fields, field)
 		fv[field] = utils.RandomString(fieldValueSize)
 	}
@@ -281,7 +284,7 @@ func (o *Operations) ZTrimToTopK(ctx context.Context, key string, topK int64) er
 }
 
 // ZUnionWithinTag unions multiple keys into a destination key within same slot tag and trims.
-func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources []string, trimTopK int64) error {
+func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources []string, trimTopK int64, expiration int32) error {
 	if len(sources) == 0 || dest == "" {
 		return nil
 	}
@@ -294,6 +297,12 @@ func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources [
 	if trimTopK > 0 {
 		if err := o.ZTrimToTopK(ctx, dest, trimTopK); err != nil {
 			return err
+		}
+	}
+	if expiration > 0 {
+		if err := o.client.ExpireMany(ctx, []string{dest}, expiration); err != nil {
+			o.metrics.IncrementExpireFailures()
+			return fmt.Errorf("failed to expire zset union dest: %w", err)
 		}
 	}
 	return nil
