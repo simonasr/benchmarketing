@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/simonasr/benchmarketing/redbench/pkg/utils"
@@ -183,8 +184,16 @@ func (o *Operations) SaveRandomHashData(ctx context.Context, expiration int32, k
 
 	fields := make([]string, 0, batchSize)
 	fv := make(map[string]string, batchSize)
+	// Determine the minimum base36 width required to represent batchSize-1 without collisions
+	width := 1
+	if batchSize > 1 {
+		w := len(strconv.FormatInt(int64(batchSize-1), 36))
+		if w > width {
+			width = w
+		}
+	}
 	for i := 0; i < batchSize; i++ {
-		field := "f" + utils.Base36Padded(i, counterPadLen)
+		field := "f" + utils.Base36Padded(i, width)
 		fields = append(fields, field)
 		fv[field] = utils.RandomString(fieldValueSize)
 	}
