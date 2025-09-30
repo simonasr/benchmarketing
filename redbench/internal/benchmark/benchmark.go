@@ -207,8 +207,11 @@ func (r *Runner) Run(ctx context.Context) error {
 					// ZADD a batch of members
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
 					members := make(map[string]float64, batchSize)
+					// Batch nonce to ensure member IDs are unique across batches
+					batchNonce := time.Now().UnixNano() % int64(defaultScoreMax)
 					for i := 0; i < batchSize; i++ {
-						member := "m:" + utils.Base36Padded(i, 4)
+						// Compose unique member id: m:<nonce>:<counter>
+						member := "m:" + utils.Base36Padded(int(batchNonce), 6) + ":" + utils.Base36Padded(i, 4)
 						// Generate score according to configured mode
 						var score float64
 						switch r.config.Test.ZSetScoreMode {
