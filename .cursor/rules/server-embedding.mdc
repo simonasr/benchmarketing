@@ -14,6 +14,13 @@ description: Guidance for embedding and serving UI assets from the controller se
 - Add redirect from `/ui` → `/ui/` (301/308) for a clean base path.
 - Keep existing API routes unchanged and colocated with `/metrics` and `/health`.
 
+## HTTP Helpers and Server Defaults
+- Use shared helpers from `internal/httpx` in all handlers:
+  - `httpx.WriteJSON(w, status, data)` for JSON responses
+  - `httpx.LogAndRespond(w, logMsg, err, httpMsg, status)` for errors
+  - `httpx.CheckMethod(w, r, expected)` for method validation
+- Construct servers via `httpx.NewServer(addr, mux, 0, 0, 0)` to apply default timeouts (Read 15s, Write 15s, Idle 60s) unless overrides are needed.
+
 ## Testability
 - Add a minimal route test that ensures `/ui/` serves an asset successfully.
 - Avoid coupling tests to specific content beyond status and content-type.

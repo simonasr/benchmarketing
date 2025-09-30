@@ -76,3 +76,10 @@ Located in [test/integration/](mdc:test/integration/):
 - Create configuration objects directly in tests
 - Mock external dependencies (file system, network)
 - Use dependency injection to make code testable
+
+## HTTP Utilities Testing
+- For `internal/httpx`, use `httptest` to validate:
+  - `WriteJSON` sets `Content-Type: application/json` and proper status
+  - `CheckMethod` returns 405 and halts handler for wrong methods
+  - `LogAndRespond` writes the desired status code
+- For server defaults, assert `NewServer` applies default timeouts when zero values are passed and honors custom durations otherwise.

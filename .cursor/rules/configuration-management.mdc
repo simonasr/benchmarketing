@@ -45,6 +45,11 @@ if u.Scheme != "redis" {
 - Validate required fields during initialization
 - Provide clear error messages for missing configuration
 
+## Redis Connect Timeout
+- Default fallback is `config.DefaultConnectTimeoutSeconds` (currently 5s).
+- Use `RedisConnection.ConnectTimeoutSeconds` to override; values `<=0` fall back to default.
+- The client computes effective timeout internally; avoid hardcoding literals at call sites.
+
 ## Docker Compose Patterns
 - Use environment variables for all dynamic configuration
 - Provide clear comments for configuration options
