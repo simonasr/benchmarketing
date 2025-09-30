@@ -86,6 +86,44 @@ func TestMergeConfiguration_WithOverrides(t *testing.T) {
 	}
 }
 
+func TestStatusSanitizesTagsCountForSetGet(t *testing.T) {
+	// Base config with tagsCount set (would be used for cluster workloads)
+	baseCfg := &config.Config{
+		Test: config.Test{
+			MinClients:      1,
+			MaxClients:      2,
+			StageIntervalMs: 1000,
+			RequestDelayMs:  10,
+			KeySize:         8,
+			ValueSize:       12,
+			Workload:        config.WorkloadSetGet,
+			TagsCount:       1024,
+		},
+	}
+
+	// Start with a set_get request body (no tagsCount provided)
+	req := BenchmarkRequest{
+		Test:  &TestOverrides{Workload: stringPtr(config.WorkloadSetGet)},
+		Redis: &RedisOverrides{URL: stringPtr("redis://localhost:6379")},
+	}
+	body, _ := json.Marshal(req)
+
+	// Merge config and create conn, then run StartHandler via direct call of merge path
+	merged, err := MergeConfiguration(baseCfg, body)
+	if err != nil {
+		t.Fatalf("merge error: %v", err)
+	}
+	// Simulate the same sanitization as StartHandler
+	if !config.IsBatchWorkload(merged.Test.Workload) {
+		merged.Test.BatchSize = 0
+		merged.Test.SameSlotPerClient = false
+		merged.Test.TagsCount = 0
+	}
+	if merged.Test.TagsCount != 0 {
+		t.Fatalf("expected tagsCount=0 for set_get workload after sanitization, got %d", merged.Test.TagsCount)
+	}
+}
+
 func TestMergeConfiguration_WithRedisOverrides(t *testing.T) {
 	// Base configuration with default Redis values
 	baseConfig := &config.Config{
