@@ -50,7 +50,7 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 	// Determine appropriate address for worker registration
 	address := resolveWorkerAddress(bindAddress, hostname, controllerURL)
 
-	// Create the service server (reusing existing service logic)
+	// Create the service server (reusing existing service logic). Base redisConn may be nil; API requires target in /start.
 	server := service.NewServer(port, cfg, redisConn, reg)
 
 	// Reuse a single HTTP client for completion notifications (config-driven)

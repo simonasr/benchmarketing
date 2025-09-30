@@ -13,31 +13,16 @@ Use the established pattern in [internal/redis/client_test.go](mdc:internal/redi
 func setupMiniredis(t *testing.T) (*miniredis.Miniredis, *config.RedisConnection) {
     mr, err := miniredis.Run()
     require.NoError(t, err)
-    
-    conn := &config.RedisConnection{
-        Host: mr.Host(),
-        Port: mr.Port(),
-        TLS:  config.TLSConfig{Enabled: false},
-    }
+
+    conn := &config.RedisConnection{URL: fmt.Sprintf("redis://localhost:%s", mr.Port())}
     return mr, conn
 }
 
 // For cluster testing
 func setupClusterConnection(t *testing.T) *config.RedisConnection {
-    return &config.RedisConnection{
-        ClusterURL: "redis://cluster.test:6379",
-        TLS:        config.TLSConfig{Enabled: false},
-    }
+    return &config.RedisConnection{ClusterURL: "redis://cluster.test:6379"}
 }
 ```
-
-### TLS Configuration Testing
-Always test these TLS scenarios:
-- **Disabled TLS**: `TLS.Enabled = false` should return `nil` config
-- **Invalid CA file**: Should return appropriate error
-- **Missing CA with verification enabled**: Should fail
-- **InsecureSkipVerify mode**: Should work without CA file
-- **Valid TLS config**: Should create proper `tls.Config`
 
 ## Configuration Testing
 Test configuration loading in [internal/config/config_test.go](mdc:internal/config/config_test.go):
@@ -52,7 +37,7 @@ func TestParseRedisURL(t *testing.T) {
         expected config.RedisConnection
         wantErr  bool
     }{
-        // Test cases for redis:// and rediss:// URLs
+        // Test cases for redis:// URLs
     }
 }
 
@@ -63,7 +48,7 @@ func TestParseRedisClusterURL(t *testing.T) {
         expected config.RedisConnection
         wantErr  bool
     }{
-        // Test cases for cluster URLs: redis://, rediss://, and plain host:port
+        // Test cases for cluster URLs: redis:// and plain host:port
     }
 }
 ```
@@ -84,7 +69,6 @@ func TestParseRedisClusterURL(t *testing.T) {
 Located in [test/integration/](mdc:test/integration/):
 - Test actual Redis connections when possible
 - Use Docker containers for realistic testing
-- Test TLS connections with real certificates
 - Verify cluster mode functionality
 
 ## Mock and Stub Patterns

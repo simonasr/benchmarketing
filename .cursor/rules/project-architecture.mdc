@@ -19,12 +19,12 @@ The project follows Clean Architecture principles with clear separation of conce
 Configuration is loaded through a hierarchical approach:
 1. YAML file ([config.yaml](mdc:config.yaml)) for defaults
 2. Environment variables for runtime overrides
-3. Unified URL-based configuration for Redis connections (supports `redis://` and `rediss://` schemes)
+3. Unified URL-based configuration for Redis connections (redis:// only)
 
 ## Redis Client Architecture
 The Redis client supports multiple connection modes with unified URL configuration:
-- **Single Instance**: `REDIS_URL=rediss://redis.example.com:6380`
-- **Cluster Mode**: `REDIS_CLUSTER_URL=rediss://cluster.example.com:6380` with automatic slot management
+- **Single Instance**: `REDIS_URL=redis://redis.example.com:6379`
+- **Cluster Mode**: `REDIS_CLUSTER_URL=redis://cluster.example.com:6379` with automatic slot management
 
 ## Key Design Patterns
 - **Interface-driven development**: Use `Client` interface for Redis operations
@@ -35,5 +35,5 @@ The Redis client supports multiple connection modes with unified URL configurati
 
 ## Database and Authentication Scope
 - **Database**: Always use database `0` (hardcoded) - Redis clusters don't support multiple databases
-- **Authentication**: TLS-focused, no Redis password support currently (future ACL support planned)
-- **Focus**: Minimal scope - TLS implementation only, avoid feature creep
+- **Authentication**: No TLS support; focus on simple, plaintext connections (future ACL support planned)
+- **Focus**: Minimal scope - avoid feature creep

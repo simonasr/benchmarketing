@@ -68,30 +68,6 @@ func TestNewRedisClient(t *testing.T) {
 	// and is typically done with integration tests
 }
 
-func TestRedisClientWithTLS(t *testing.T) {
-	t.Run("TLS config without CA file should work when verification disabled", func(t *testing.T) {
-		tlsConfig := config.TLSConfig{
-			Enabled:            true,
-			InsecureSkipVerify: true, // Verification disabled
-			ServerName:         "test-server",
-		}
-
-		tls, err := tlsConfig.CreateTLSConfig()
-		require.NoError(t, err)
-		require.NotNil(t, tls)
-		assert.True(t, tls.InsecureSkipVerify)
-		assert.Equal(t, "test-server", tls.ServerName)
-	})
-
-	t.Run("disabled TLS config", func(t *testing.T) {
-		tlsConfig := config.TLSConfig{Enabled: false}
-
-		tls, err := tlsConfig.CreateTLSConfig()
-		require.NoError(t, err)
-		assert.Nil(t, tls)
-	})
-}
-
 func TestRedisClientSet(t *testing.T) {
 	mr, conn := setupMiniredis(t)
 

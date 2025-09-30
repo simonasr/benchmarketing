@@ -214,11 +214,6 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-// Helper function to create bool pointers
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func TestCreateRedisConnection_EmptyBody(t *testing.T) {
 	baseConn := &config.RedisConnection{
 		URL:                   "redis://base-host:6379",
@@ -309,7 +304,7 @@ func TestCreateRedisConnection_WithURLOverride(t *testing.T) {
 
 	requestBody := BenchmarkRequest{
 		Redis: &RedisOverrides{
-			URL: stringPtr("rediss://secure-redis.example.com:6380"),
+			URL: stringPtr("redis://secure-redis.example.com:6379"),
 		},
 	}
 
@@ -327,15 +322,9 @@ func TestCreateRedisConnection_WithURLOverride(t *testing.T) {
 		t.Fatal("Expected connection to be created")
 	}
 
-	expectedURL := "rediss://secure-redis.example.com:6380"
+	expectedURL := "redis://secure-redis.example.com:6379"
 	if conn.URL != expectedURL {
 		t.Errorf("Expected URL '%s', got '%s'", expectedURL, conn.URL)
-	}
-	if !conn.TLS.Enabled {
-		t.Error("Expected TLS to be enabled for rediss:// URL")
-	}
-	if conn.TLS.ServerName != "secure-redis.example.com" {
-		t.Errorf("Expected TLS server name 'secure-redis.example.com', got '%s'", conn.TLS.ServerName)
 	}
 }
 
@@ -371,53 +360,6 @@ func TestCreateRedisConnection_WithClusterURLOverride(t *testing.T) {
 	}
 	if conn.TargetLabel != "cluster.example.com:6379" {
 		t.Errorf("Expected target label 'cluster.example.com:6379', got '%s'", conn.TargetLabel)
-	}
-}
-
-func TestCreateRedisConnection_WithTLSOverrides(t *testing.T) {
-	baseConn := &config.RedisConnection{
-		URL:                   "redis://base-host:6379",
-		ConnectTimeoutSeconds: 10,
-		TargetLabel:           "redis://base-host:6379",
-	}
-
-	requestBody := BenchmarkRequest{
-		Redis: &RedisOverrides{
-			URL: stringPtr("rediss://secure-host:6379"), // TLS URL (enables TLS automatically)
-			TLS: &TLSOverrides{
-				CAFile:             stringPtr("/path/to/ca.pem"),
-				InsecureSkipVerify: boolPtr(false),
-				ServerName:         stringPtr("secure-host.example.com"),
-			},
-		},
-	}
-
-	bodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("Failed to marshal request body: %v", err)
-	}
-
-	conn, err := CreateRedisConnection(baseConn, bodyBytes)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	if conn == nil {
-		t.Fatal("Expected connection to be created")
-	}
-
-	// TLS should be enabled by rediss:// URL scheme
-	if !conn.TLS.Enabled {
-		t.Error("Expected TLS to be enabled by rediss:// URL scheme")
-	}
-	if conn.TLS.CAFile != "/path/to/ca.pem" {
-		t.Errorf("Expected CA file '/path/to/ca.pem', got '%s'", conn.TLS.CAFile)
-	}
-	if conn.TLS.InsecureSkipVerify {
-		t.Error("Expected InsecureSkipVerify to be false")
-	}
-	if conn.TLS.ServerName != "secure-host.example.com" {
-		t.Errorf("Expected server name 'secure-host.example.com', got '%s'", conn.TLS.ServerName)
 	}
 }
 

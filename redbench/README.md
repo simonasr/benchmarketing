@@ -8,7 +8,7 @@ Redis benchmarking tool that measures performance and provides Prometheus metric
 - **Service Mode**: HTTP API for remote control and multiple benchmarks
 - **Controller/Worker Mode**: Centralized orchestration across workers with optional UI
 - **Prometheus Metrics**: Real-time performance monitoring
-- **TLS Support**: Secure connections with certificate validation
+
 - **Cluster Support**: Redis cluster and single-instance modes
 - **Flexible Configuration**: YAML files, environment variables, and API overrides
 
@@ -22,9 +22,6 @@ REDIS_URL=redis://localhost:6379 ./redbench
 
 # Redis cluster
 REDIS_CLUSTER_URL=redis://cluster.example.com:6379 ./redbench
-
-# TLS connection
-REDIS_URL=rediss://secure-redis.example.com:6379 ./redbench
 ```
 
 ### Service Mode (HTTP API)
@@ -100,28 +97,16 @@ The project follows Clean Architecture principles:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `REDIS_URL` | Single Redis instance URL (`redis://` or `rediss://`) | Yes (if `REDIS_CLUSTER_URL` not set) |
-| `REDIS_CLUSTER_URL` | Redis cluster URL (`redis://` or `rediss://`) | Yes (if `REDIS_URL` not set) |
+| `REDIS_URL` | Single Redis instance URL (`redis://`) | Yes (if `REDIS_CLUSTER_URL` not set) |
+| `REDIS_CLUSTER_URL` | Redis cluster URL (`redis://`) | Yes (if `REDIS_URL` not set) |
 | `API_PORT` | HTTP API port for service mode | No (default: 8080) |
 | `TEST_*` | Override test parameters (e.g., `TEST_MAX_CLIENTS=100`) | No |
-| `REDIS_TLS_*` | TLS configuration (see TLS section) | No |
 
 ### Configuration Priority
 
 1. **API Request Body** (highest) - JSON parameters in service mode
 2. **Environment Variables** (medium) - Runtime overrides
 3. **config.yaml** (lowest) - Default configuration file
-
-### TLS Configuration
-
-```bash
-# TLS Environment Variables
-export REDIS_TLS_CA_FILE="/path/to/ca.pem"
-export REDIS_TLS_CERT_FILE="/path/to/client.pem"      # mTLS only
-export REDIS_TLS_KEY_FILE="/path/to/client-key.pem"   # mTLS only
-export REDIS_TLS_SERVER_NAME="redis.example.com"
-export REDIS_TLS_INSECURE_SKIP_VERIFY="false"
-```
 
 ## Service Mode API
 
@@ -166,21 +151,6 @@ curl -X POST http://localhost:8080/start \
   }'
 ```
 
-#### TLS Connection
-```bash
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "url": "rediss://secure-redis.example.com:6379",
-      "tls": {
-        "caFile": "/path/to/ca.pem",
-        "serverName": "secure-redis.example.com"
-      }
-    }
-  }'
-```
-
 #### Redis Cluster
 ```bash
 curl -X POST http://localhost:8080/start \
@@ -188,23 +158,6 @@ curl -X POST http://localhost:8080/start \
   -d '{
     "redis": {
       "clusterUrl": "redis://cluster.example.com:6379"
-    }
-  }'
-```
-
-#### mTLS with Client Certificates
-```bash
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "url": "rediss://secure-redis.example.com:6379",
-      "tls": {
-        "caFile": "/path/to/ca.pem",
-        "certFile": "/path/to/client.pem",
-        "keyFile": "/path/to/client-key.pem",
-        "serverName": "secure-redis.example.com"
-      }
     }
   }'
 ```
@@ -347,12 +300,7 @@ GitHub Actions automatically runs:
    - Ensure you provide Redis configuration in CLI mode via environment variables
    - In service mode, include `redis` configuration in your POST request
 
-2. **TLS connection failures**
-   - Verify CA file path and certificate validity
-   - Check server name matches certificate
-   - Use `insecureSkipVerify: true` only for testing
-
-3. **Port conflicts**
+2. **Port conflicts**
    - Change API/metrics port: `API_PORT=9090 ./redbench -service`
    - Both API and metrics now use the same unified port (8080 by default)
 

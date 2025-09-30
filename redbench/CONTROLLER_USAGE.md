@@ -74,11 +74,11 @@ curl -X POST http://localhost:8081/job/start \
   -d '{
     "targets": [
       {
-        "redisUrl": "rediss://redis1.example.com:6380",
+        "redisUrl": "redis://redis1.example.com:6379",
         "workerCount": 2
       },
       {
-        "clusterUrl": "rediss://redis-cluster.example.com:6380",
+        "clusterUrl": "redis://redis-cluster.example.com:6379",
         "workerCount": 2
       }
     ],
@@ -100,7 +100,7 @@ curl -X POST http://localhost:8081/job/start \
 ```
 
 - Use `redisUrl` for a single Redis instance.
-- Use `clusterUrl` for Redis Cluster; both `redis://` and `rediss://` schemes are accepted. When a full URL is provided, the controller extracts the host:port for cluster clients while preserving TLS intent.
+- Use `clusterUrl` for Redis Cluster; `redis://` scheme is accepted. When a full URL is provided, the controller extracts the host:port for cluster clients.
 - Redis behavior overrides can be provided under `config.redis`:
   - `operationTimeoutMs`: per-operation timeout in milliseconds
   - `expiration`: TTL for generated keys in seconds
@@ -146,15 +146,15 @@ curl http://localhost:8081/job/status
 {
   "targets": [
     {
-      "redisUrl": "rediss://redis-cluster-1.example.com:6380",
+      "redisUrl": "redis://redis-cluster-1.example.com:6379",
       "workerCount": 3
     },
     {
-      "clusterUrl": "rediss://redis-cluster-2.example.com:6380",
+      "clusterUrl": "redis://redis-cluster-2.example.com:6379",
       "workerCount": 2
     }
     {
-      "clusterUrl": "rediss://redis-cluster-2.example.com:6380",
+      "clusterUrl": "redis://redis-cluster-2.example.com:6379",
       "workerCount": 2
     }
   ],

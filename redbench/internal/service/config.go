@@ -17,24 +17,12 @@ type BenchmarkRequest struct {
 
 // RedisOverrides allows specifying Redis target and configuration for the benchmark.
 type RedisOverrides struct {
-	// URL supports both redis:// and rediss:// schemes
+	// URL supports redis:// scheme
 	URL        *string `json:"url,omitempty"`
 	ClusterURL *string `json:"clusterUrl,omitempty"`
 	// Redis configuration overrides
 	OperationTimeoutMs *int `json:"operationTimeoutMs,omitempty"`
 	Expiration         *int `json:"expiration,omitempty"`
-	// TLS configuration
-	TLS *TLSOverrides `json:"tls,omitempty"`
-}
-
-// TLSOverrides allows overriding TLS configuration for Redis connections.
-// TLS is enabled/disabled based on the URL scheme (redis:// vs rediss://).
-type TLSOverrides struct {
-	CAFile             *string `json:"caFile,omitempty"`
-	CertFile           *string `json:"certFile,omitempty"`
-	KeyFile            *string `json:"keyFile,omitempty"`
-	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
-	ServerName         *string `json:"serverName,omitempty"`
 }
 
 // TestOverrides allows overriding specific test configuration values.
@@ -166,36 +154,12 @@ func applyRedisOverrides(conn *config.RedisConnection, overrides *RedisOverrides
 		}
 	}
 
-	// Apply TLS overrides
-	if overrides.TLS != nil {
-		applyTLSOverrides(&conn.TLS, overrides.TLS)
-	}
-
 	// Validate that we have enough information to connect
 	if conn.URL == "" && conn.ClusterURL == "" {
 		return fmt.Errorf("redis connection requires either url or clusterUrl to be specified")
 	}
 
 	return nil
-}
-
-// applyTLSOverrides applies TLS configuration overrides.
-func applyTLSOverrides(tlsConfig *config.TLSConfig, overrides *TLSOverrides) {
-	if overrides.CAFile != nil {
-		tlsConfig.CAFile = *overrides.CAFile
-	}
-	if overrides.CertFile != nil {
-		tlsConfig.CertFile = *overrides.CertFile
-	}
-	if overrides.KeyFile != nil {
-		tlsConfig.KeyFile = *overrides.KeyFile
-	}
-	if overrides.InsecureSkipVerify != nil {
-		tlsConfig.InsecureSkipVerify = *overrides.InsecureSkipVerify
-	}
-	if overrides.ServerName != nil {
-		tlsConfig.ServerName = *overrides.ServerName
-	}
 }
 
 // applyTestOverrides applies non-nil override values to the test configuration.

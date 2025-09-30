@@ -3,8 +3,6 @@ package controller
 import (
 	"net/http"
 	"time"
-
-	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
 // runtimeConfigDTO is the wire shape for the UI to import configuration.
@@ -24,7 +22,6 @@ type runtimePayload struct {
 type redisConfigDTO struct {
 	OperationTimeoutMs int   `json:"operationTimeoutMs"`
 	Expiration         int32 `json:"expiration"`
-	// TLS and connection details are intentionally omitted from import surface
 }
 
 type testConfigDTO struct {
@@ -41,8 +38,6 @@ type targetDTO struct {
 	ClusterURL  string `json:"clusterUrl,omitempty"`
 	WorkerCount int    `json:"workerCount,omitempty"`
 }
-
-const defaultWorkerCount = 1
 
 // RuntimeConfigHandler serves HEAD/GET for UI runtime config import.
 // HEAD: 204 if available, 404 if not.
@@ -94,15 +89,6 @@ func (c *Controller) RuntimeConfigHandler(w http.ResponseWriter, r *http.Request
 		// Prefer deriving targets from the current running job (or any existing job) with worker counts
 		if ts := c.deriveTargetsFromJobs(); len(ts) > 0 {
 			dto.Targets = ts
-		} else if baseConn, err := config.LoadRedisConnectionForService(); err == nil && (baseConn.URL != "" || baseConn.ClusterURL != "") {
-			// Fallback to base connection from environment
-			t := targetDTO{WorkerCount: defaultWorkerCount}
-			if baseConn.ClusterURL != "" {
-				t.ClusterURL = baseConn.ClusterURL
-			} else {
-				t.RedisURL = baseConn.URL
-			}
-			dto.Targets = []targetDTO{t}
 		}
 		// Disable HTTP caching to ensure preview reflects current job/config
 		w.Header().Set("Cache-Control", "no-store")

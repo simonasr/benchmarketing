@@ -398,10 +398,10 @@ func TestParseRedisTarget(t *testing.T) {
 			expectCURL: "",
 		},
 		{
-			name:       "valid rediss URL",
-			target:     JobTarget{RedisURL: "rediss://localhost:6380"},
+			name:       "valid redis URL alternative port",
+			target:     JobTarget{RedisURL: "redis://localhost:6380"},
 			wantErr:    false,
-			expectURL:  "rediss://localhost:6380",
+			expectURL:  "redis://localhost:6380",
 			expectCURL: "",
 		},
 		{

@@ -42,28 +42,19 @@ type RedisOptsLog struct {
 	Addr     string `json:"addr"`
 	DB       int    `json:"db"`
 	Protocol int    `json:"protocol"`
-	TLS      bool   `json:"tls"`
 }
 
 // NewRedisClient creates a new Redis client based on the provided connection configuration.
 func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 	var client redis.UniversalClient
 
-	// Create TLS configuration if enabled
-	tlsConfig, err := conn.TLS.CreateTLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("creating TLS config: %w", err)
-	}
-
 	if conn.ClusterURL != "" {
 		client = redis.NewClusterClient(&redis.ClusterOptions{
 			Addrs:           []string{conn.ClusterURL},
-			TLSConfig:       tlsConfig,
 			DisableIdentity: true,
 		})
 		slog.Info("Redis cluster options", "event", "redis_options", "data", map[string]any{
 			"addr": conn.ClusterURL,
-			"tls":  tlsConfig != nil,
 		})
 	} else if conn.URL != "" {
 		// Extract host:port from URL
@@ -82,14 +73,12 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 			Addr:            addr,
 			DB:              0, // Always use database 0
 			Protocol:        2,
-			TLSConfig:       tlsConfig,
 			DisableIdentity: true,
 		}
 		slog.Info("Redis options", "event", "redis_options", "data", RedisOptsLog{
 			Addr:     opts.Addr,
 			DB:       0, // Always use database 0
 			Protocol: opts.Protocol,
-			TLS:      tlsConfig != nil,
 		})
 		client = redis.NewClient(opts)
 	} else {
@@ -108,7 +97,7 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	slog.Info("Successfully connected to Redis", "tls_enabled", tlsConfig != nil)
+	slog.Info("Successfully connected to Redis")
 	return &RedisClient{client: client}, nil
 }
 

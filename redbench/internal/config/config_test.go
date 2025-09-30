@@ -139,23 +139,11 @@ func TestParseRedisURL(t *testing.T) {
 	tests := []struct {
 		name        string
 		url         string
-		expectedTLS TLSConfig
 		expectError bool
 	}{
 		{
-			name:        "redis URL",
-			url:         "redis://localhost:6379",
-			expectedTLS: TLSConfig{Enabled: false},
-		},
-		{
-			name:        "rediss URL (TLS)",
-			url:         "rediss://redis.example.com:6380",
-			expectedTLS: TLSConfig{Enabled: true, ServerName: "redis.example.com"},
-		},
-		{
-			name:        "rediss URL with port",
-			url:         "rediss://redis.example.com:6380",
-			expectedTLS: TLSConfig{Enabled: true, ServerName: "redis.example.com"},
+			name: "redis URL",
+			url:  "redis://localhost:6379",
 		},
 		{
 			name:        "invalid scheme",
@@ -163,9 +151,8 @@ func TestParseRedisURL(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "default port",
-			url:         "redis://localhost",
-			expectedTLS: TLSConfig{Enabled: false},
+			name: "default port",
+			url:  "redis://localhost",
 		},
 	}
 
@@ -180,8 +167,6 @@ func TestParseRedisURL(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedTLS.Enabled, conn.TLS.Enabled)
-			assert.Equal(t, tt.expectedTLS.ServerName, conn.TLS.ServerName)
 		})
 	}
 }
@@ -194,28 +179,9 @@ func TestParseRedisClusterURL(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "redis cluster URL",
-			url:  "redis://cluster.localhost:6379",
-			expected: RedisConnection{
-				ClusterURL: "cluster.localhost:6379",
-				TLS:        TLSConfig{Enabled: false},
-			},
-		},
-		{
-			name: "rediss cluster URL (TLS)",
-			url:  "rediss://cluster.example.com:6380",
-			expected: RedisConnection{
-				ClusterURL: "cluster.example.com:6380",
-				TLS:        TLSConfig{Enabled: true, ServerName: "cluster.example.com"},
-			},
-		},
-		{
-			name: "rediss cluster URL with default port",
-			url:  "rediss://cluster.example.com",
-			expected: RedisConnection{
-				ClusterURL: "cluster.example.com:6379",
-				TLS:        TLSConfig{Enabled: true, ServerName: "cluster.example.com"},
-			},
+			name:     "redis cluster URL",
+			url:      "redis://cluster.localhost:6379",
+			expected: RedisConnection{ClusterURL: "cluster.localhost:6379"},
 		},
 		{
 			name:        "invalid cluster scheme",
@@ -223,20 +189,14 @@ func TestParseRedisClusterURL(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "plain host:port without scheme",
-			url:  "cluster.example.com:6379",
-			expected: RedisConnection{
-				ClusterURL: "cluster.example.com:6379",
-				TLS:        TLSConfig{Enabled: false},
-			},
+			name:     "plain host:port without scheme",
+			url:      "cluster.example.com:6379",
+			expected: RedisConnection{ClusterURL: "cluster.example.com:6379"},
 		},
 		{
-			name: "plain hostname without scheme",
-			url:  "cluster.example.com",
-			expected: RedisConnection{
-				ClusterURL: "cluster.example.com:6379",
-				TLS:        TLSConfig{Enabled: false},
-			},
+			name:     "plain hostname without scheme",
+			url:      "cluster.example.com",
+			expected: RedisConnection{ClusterURL: "cluster.example.com:6379"},
 		},
 	}
 
@@ -252,54 +212,8 @@ func TestParseRedisClusterURL(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.ClusterURL, conn.ClusterURL)
-			assert.Equal(t, tt.expected.TLS.Enabled, conn.TLS.Enabled)
-			assert.Equal(t, tt.expected.TLS.ServerName, conn.TLS.ServerName)
 		})
 	}
-}
-
-func TestTLSConfigCreateTLSConfig(t *testing.T) {
-	t.Run("disabled TLS", func(t *testing.T) {
-		tlsConfig := TLSConfig{Enabled: false}
-		tls, err := tlsConfig.CreateTLSConfig()
-		require.NoError(t, err)
-		assert.Nil(t, tls)
-	})
-
-	t.Run("enabled TLS without CA file should fail when verification enabled", func(t *testing.T) {
-		tlsConfig := TLSConfig{
-			Enabled:            true,
-			InsecureSkipVerify: false, // Verification enabled
-			ServerName:         "test.example.com",
-		}
-		_, err := tlsConfig.CreateTLSConfig()
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "CA file is required for TLS connections when certificate verification is enabled")
-	})
-
-	t.Run("enabled TLS without CA file should work when verification disabled", func(t *testing.T) {
-		tlsConfig := TLSConfig{
-			Enabled:            true,
-			InsecureSkipVerify: true, // Verification disabled
-			ServerName:         "test.example.com",
-		}
-		tls, err := tlsConfig.CreateTLSConfig()
-		require.NoError(t, err)
-		require.NotNil(t, tls)
-		assert.True(t, tls.InsecureSkipVerify)
-		assert.Equal(t, "test.example.com", tls.ServerName)
-		assert.Nil(t, tls.RootCAs) // No CA pool when verification is disabled
-	})
-
-	t.Run("invalid CA file", func(t *testing.T) {
-		tlsConfig := TLSConfig{
-			Enabled: true,
-			CAFile:  "/nonexistent/ca.pem",
-		}
-		_, err := tlsConfig.CreateTLSConfig()
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "reading CA file")
-	})
 }
 
 func TestGetBoolEnv(t *testing.T) {
