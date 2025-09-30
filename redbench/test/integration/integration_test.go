@@ -69,6 +69,44 @@ func (t *testRedisClient) HMGet(ctx context.Context, key string, fields []string
 	return err
 }
 
+// ZSET methods
+func (t *testRedisClient) ZAdd(ctx context.Context, key string, members map[string]float64) error {
+	if len(members) == 0 {
+		return nil
+	}
+	zs := make([]redis.Z, 0, len(members))
+	for m, s := range members {
+		zs = append(zs, redis.Z{Member: m, Score: s})
+	}
+	return t.client.ZAdd(ctx, key, zs...).Err()
+}
+
+func (t *testRedisClient) ZIncrBy(ctx context.Context, key string, increment float64, member string) error {
+	return t.client.ZIncrBy(ctx, key, increment, member).Err()
+}
+
+func (t *testRedisClient) ZRange(ctx context.Context, key string, start, stop int64) error {
+	_, err := t.client.ZRange(ctx, key, start, stop).Result()
+	return err
+}
+
+func (t *testRedisClient) ZRevRange(ctx context.Context, key string, start, stop int64) error {
+	_, err := t.client.ZRevRange(ctx, key, start, stop).Result()
+	return err
+}
+
+func (t *testRedisClient) ZUnionStore(ctx context.Context, dest string, keys []string) error {
+	if len(keys) == 0 || dest == "" {
+		return nil
+	}
+	zs := &redis.ZStore{Keys: keys}
+	return t.client.ZUnionStore(ctx, dest, zs).Err()
+}
+
+func (t *testRedisClient) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) error {
+	return t.client.ZRemRangeByRank(ctx, key, start, stop).Err()
+}
+
 func (t *testRedisClient) ExpireMany(ctx context.Context, keys []string, expiration int32) error {
 	if len(keys) == 0 || expiration <= 0 {
 		return nil

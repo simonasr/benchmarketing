@@ -18,20 +18,34 @@ type Metrics struct {
 	requestFailed *prometheus.CounterVec
 
 	// Precomputed label handles to avoid per-call map allocations
-	durationSet         prometheus.Observer
-	durationGet         prometheus.Observer
-	durationMSet        prometheus.Observer
-	durationMGet        prometheus.Observer
-	durationHSet        prometheus.Observer
-	durationHMGet       prometheus.Observer
-	durationExpire      prometheus.Observer
-	requestFailedSet    prometheus.Counter
-	requestFailedGet    prometheus.Counter
-	requestFailedMSet   prometheus.Counter
-	requestFailedMGet   prometheus.Counter
-	requestFailedHSet   prometheus.Counter
-	requestFailedHMGet  prometheus.Counter
-	requestFailedExpire prometheus.Counter
+	durationSet    prometheus.Observer
+	durationGet    prometheus.Observer
+	durationMSet   prometheus.Observer
+	durationMGet   prometheus.Observer
+	durationHSet   prometheus.Observer
+	durationHMGet  prometheus.Observer
+	durationExpire prometheus.Observer
+	// ZSET durations
+	durationZAdd            prometheus.Observer
+	durationZIncrBy         prometheus.Observer
+	durationZRange          prometheus.Observer
+	durationZRevRange       prometheus.Observer
+	durationZUnionStore     prometheus.Observer
+	durationZRemRangeByRank prometheus.Observer
+	requestFailedSet        prometheus.Counter
+	requestFailedGet        prometheus.Counter
+	requestFailedMSet       prometheus.Counter
+	requestFailedMGet       prometheus.Counter
+	requestFailedHSet       prometheus.Counter
+	requestFailedHMGet      prometheus.Counter
+	requestFailedExpire     prometheus.Counter
+	// ZSET failures
+	requestFailedZAdd            prometheus.Counter
+	requestFailedZIncrBy         prometheus.Counter
+	requestFailedZRange          prometheus.Counter
+	requestFailedZRevRange       prometheus.Counter
+	requestFailedZUnionStore     prometheus.Counter
+	requestFailedZRemRangeByRank prometheus.Counter
 
 	redisPoolTotalConns prometheus.Gauge
 	redisPoolIdleConns  prometheus.Gauge
@@ -198,6 +212,12 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.durationHSet = m.duration.WithLabelValues("hset", "redis", target)
 	m.durationHMGet = m.duration.WithLabelValues("hmget", "redis", target)
 	m.durationExpire = m.duration.WithLabelValues("expire", "redis", target)
+	m.durationZAdd = m.duration.WithLabelValues("zadd", "redis", target)
+	m.durationZIncrBy = m.duration.WithLabelValues("zincrby", "redis", target)
+	m.durationZRange = m.duration.WithLabelValues("zrange", "redis", target)
+	m.durationZRevRange = m.duration.WithLabelValues("zrevrange", "redis", target)
+	m.durationZUnionStore = m.duration.WithLabelValues("zunionstore", "redis", target)
+	m.durationZRemRangeByRank = m.duration.WithLabelValues("zremrangebyrank", "redis", target)
 	m.requestFailedSet = m.requestFailed.WithLabelValues("set", "redis", target)
 	m.requestFailedGet = m.requestFailed.WithLabelValues("get", "redis", target)
 	m.requestFailedMSet = m.requestFailed.WithLabelValues("mset", "redis", target)
@@ -205,6 +225,12 @@ func New(reg prometheus.Registerer, target string) *Metrics {
 	m.requestFailedHSet = m.requestFailed.WithLabelValues("hset", "redis", target)
 	m.requestFailedHMGet = m.requestFailed.WithLabelValues("hmget", "redis", target)
 	m.requestFailedExpire = m.requestFailed.WithLabelValues("expire", "redis", target)
+	m.requestFailedZAdd = m.requestFailed.WithLabelValues("zadd", "redis", target)
+	m.requestFailedZIncrBy = m.requestFailed.WithLabelValues("zincrby", "redis", target)
+	m.requestFailedZRange = m.requestFailed.WithLabelValues("zrange", "redis", target)
+	m.requestFailedZRevRange = m.requestFailed.WithLabelValues("zrevrange", "redis", target)
+	m.requestFailedZUnionStore = m.requestFailed.WithLabelValues("zunionstore", "redis", target)
+	m.requestFailedZRemRangeByRank = m.requestFailed.WithLabelValues("zremrangebyrank", "redis", target)
 
 	return m
 }
@@ -259,6 +285,18 @@ func (m *Metrics) ObserveExpireDuration(duration float64) {
 	m.durationExpire.Observe(duration)
 }
 
+// ZSET durations
+func (m *Metrics) ObserveZAddDuration(duration float64)      { m.durationZAdd.Observe(duration) }
+func (m *Metrics) ObserveZIncrByDuration(duration float64)   { m.durationZIncrBy.Observe(duration) }
+func (m *Metrics) ObserveZRangeDuration(duration float64)    { m.durationZRange.Observe(duration) }
+func (m *Metrics) ObserveZRevRangeDuration(duration float64) { m.durationZRevRange.Observe(duration) }
+func (m *Metrics) ObserveZUnionStoreDuration(duration float64) {
+	m.durationZUnionStore.Observe(duration)
+}
+func (m *Metrics) ObserveZRemRangeByRankDuration(duration float64) {
+	m.durationZRemRangeByRank.Observe(duration)
+}
+
 // IncrementSetFailures increments the counter for failed SET operations.
 func (m *Metrics) IncrementSetFailures() {
 	m.requestFailedSet.Inc()
@@ -293,6 +331,14 @@ func (m *Metrics) IncrementHMGetFailures() {
 func (m *Metrics) IncrementExpireFailures() {
 	m.requestFailedExpire.Inc()
 }
+
+// ZSET failures
+func (m *Metrics) IncrementZAddFailures()            { m.requestFailedZAdd.Inc() }
+func (m *Metrics) IncrementZIncrByFailures()         { m.requestFailedZIncrBy.Inc() }
+func (m *Metrics) IncrementZRangeFailures()          { m.requestFailedZRange.Inc() }
+func (m *Metrics) IncrementZRevRangeFailures()       { m.requestFailedZRevRange.Inc() }
+func (m *Metrics) IncrementZUnionStoreFailures()     { m.requestFailedZUnionStore.Inc() }
+func (m *Metrics) IncrementZRemRangeByRankFailures() { m.requestFailedZRemRangeByRank.Inc() }
 
 // StartPrometheusServer starts an HTTP server to expose Prometheus metrics.
 func StartPrometheusServer(port int, reg *prometheus.Registry) {

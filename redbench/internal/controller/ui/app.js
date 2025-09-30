@@ -206,6 +206,15 @@ function serializeJobForm() {
       valueSize: parseInt(document.getElementById('valueSize').value, 10),
       batchSize: parseInt(document.getElementById('batchSize')?.value, 10) || 10,
       sameSlotPerClient: !!document.getElementById('sameSlotPerClient')?.checked,
+      tagsCount: parseInt(document.getElementById('tagsCount')?.value, 10) || 1024,
+      zsetTopK: parseInt(document.getElementById('zsetTopK')?.value, 10) || 50,
+      zsetPerTagLeaderboards: parseInt(document.getElementById('zsetPerTagLeaderboards')?.value, 10) || 4,
+      zsetUnionFanIn: parseInt(document.getElementById('zsetUnionFanIn')?.value, 10) || 3,
+      // Allow overriding batch size specifically for zset; fallback to generic batch size
+      zsetBatchSize: parseInt(document.getElementById('zsetBatchSize')?.value, 10) || (parseInt(document.getElementById('batchSize')?.value, 10) || 10),
+      zsetUnionEveryNOps: parseInt(document.getElementById('zsetUnionEveryNOps')?.value, 10) || 8,
+      zsetUpdateRatio: parseInt(document.getElementById('zsetUpdateRatio')?.value, 10) || 0,
+      zsetScoreMode: (document.getElementById('zsetScoreMode')?.value) || 'time',
     },
     redis: {
       operationTimeoutMs: parseInt(document.getElementById('operationTimeoutMs').value, 10),
@@ -423,6 +432,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   updateWorkloadVisibility();
   updatePredictions();
+  // More/Less toggles for ZSET advanced
+  const moreBtn = document.getElementById('zsetMoreBtn');
+  const lessBtn = document.getElementById('zsetLessBtn');
+  const adv = document.getElementById('zsetAdvanced');
+  if (moreBtn && adv) {
+    moreBtn.addEventListener('click', () => {
+      adv.classList.remove('hidden');
+      moreBtn.classList.add('hidden');
+    });
+  }
+  if (lessBtn && adv && moreBtn) {
+    lessBtn.addEventListener('click', () => {
+      adv.classList.add('hidden');
+      moreBtn.classList.remove('hidden');
+    });
+  }
 });
 
 // --- Auto-refresh every 1s with visibility pause and simple backoff ---
@@ -544,6 +569,7 @@ function snapshotForm() {
       valueSize: document.getElementById('valueSize').value,
       batchSize: document.getElementById('batchSize')?.value,
       sameSlotPerClient: document.getElementById('sameSlotPerClient')?.checked ? '1' : '0',
+      tagsCount: document.getElementById('tagsCount')?.value,
     },
     redis: {
       operationTimeoutMs: document.getElementById('operationTimeoutMs').value,
@@ -585,9 +611,17 @@ function restoreForm(data) {
   set('valueSize', data.test?.valueSize);
   set('batchSize', data.test?.batchSize);
   setChecked('sameSlotPerClient', data.test?.sameSlotPerClient === '1' || data.test?.sameSlotPerClient === true);
+  set('tagsCount', data.test?.tagsCount);
   set('operationTimeoutMs', data.redis?.operationTimeoutMs);
   set('expiration', data.redis?.expiration);
   set('assumedLatencyMs', data.assumptions?.latencyMs);
+  set('zsetBatchSize', data.test?.zsetBatchSize);
+  set('zsetTopK', data.test?.zsetTopK);
+  set('zsetPerTagLeaderboards', data.test?.zsetPerTagLeaderboards);
+  set('zsetUnionFanIn', data.test?.zsetUnionFanIn);
+  set('zsetUnionEveryNOps', data.test?.zsetUnionEveryNOps);
+  set('zsetUpdateRatio', data.test?.zsetUpdateRatio);
+  const scoreEl = document.getElementById('zsetScoreMode'); if (scoreEl && data.test?.zsetScoreMode) scoreEl.value = data.test.zsetScoreMode;
   updatePredictions();
 }
 
@@ -855,6 +889,30 @@ function updateWorkloadVisibility() {
     // Labels are flex in this UI; ensure consistent layout when showing
     el.style.display = isBatch ? 'flex' : 'none';
   });
+  // ZSET specific controls
+  const showZset = (wl === 'zset_leaderboards');
+  const adv = document.getElementById('zsetAdvanced');
+  const moreBtn = document.getElementById('zsetMoreBtn');
+  document.querySelectorAll('.workload-zset').forEach(el => {
+    if (!showZset) {
+      el.classList.add('hidden');
+      return;
+    }
+    if (el.id === 'zsetAdvanced') {
+      // Respect current visibility (collapsed by default below)
+    } else {
+      el.classList.remove('hidden');
+    }
+  });
+  if (moreBtn && adv) {
+    if (showZset) {
+      adv.classList.add('hidden');
+      moreBtn.classList.remove('hidden');
+    } else {
+      moreBtn.classList.add('hidden');
+      adv.classList.add('hidden');
+    }
+  }
 }
 
 function initRuntimeConfigImport() {
@@ -1037,6 +1095,14 @@ function buildCurrentDtoFromForm() {
       valueSize: parseInt(s.test.valueSize, 10),
       batchSize: parseInt(s.test.batchSize, 10),
       sameSlotPerClient: s.test.sameSlotPerClient === '1',
+      tagsCount: parseInt(s.test.tagsCount, 10),
+      zsetBatchSize: parseInt(s.test.zsetBatchSize, 10),
+      zsetTopK: parseInt(s.test.zsetTopK, 10),
+      zsetPerTagLeaderboards: parseInt(s.test.zsetPerTagLeaderboards, 10),
+      zsetUnionFanIn: parseInt(s.test.zsetUnionFanIn, 10),
+      zsetUnionEveryNOps: parseInt(s.test.zsetUnionEveryNOps, 10),
+      zsetUpdateRatio: parseInt(s.test.zsetUpdateRatio, 10),
+      zsetScoreMode: s.test.zsetScoreMode || 'time',
     },
     redis: {
       operationTimeoutMs: parseInt(s.redis.operationTimeoutMs, 10),

@@ -16,6 +16,10 @@ const (
 	poolStatsUpdateInterval = 2 * time.Second
 	// defaultBatchSize is used when no batch size is configured
 	defaultBatchSize = 10
+	// defaultTagsCount is the default number of distinct hash-slot tags used by cluster-aware workloads
+	defaultTagsCount = 1024
+	// defaultScoreMax bounds generated scores to a stable range for comparability
+	defaultScoreMax = 1_000_000
 )
 
 // Runner handles the benchmark execution.
@@ -167,6 +171,128 @@ func (r *Runner) Run(ctx context.Context) error {
 					if err != nil {
 						if ctx.Err() == nil {
 							slog.Error("GetHashData failed", "err", err)
+						}
+					}
+				case config.WorkloadZSet:
+					// Always use a hashtag to co-locate per-tag leaderboards and enable unions safely
+					// Use a static tag space controlled by TagsCount to spread load across slots
+					tagsCount := r.config.Test.TagsCount
+					if tagsCount <= 0 {
+						tagsCount = defaultTagsCount
+					}
+					idx := int(time.Now().UnixNano() % int64(tagsCount))
+					tagBody := utils.Base36Padded(idx, 4)
+					tag := "{" + tagBody + "}"
+
+					// Within a tag, pick a leaderboard key and perform operations
+					// Use zset-specific batch size when set, otherwise fall back to generic BatchSize
+					batchSize := r.config.Test.ZSetBatchSize
+					if batchSize <= 0 {
+						batchSize = r.config.Test.BatchSize
+					}
+					if batchSize <= 0 {
+						batchSize = defaultBatchSize
+					}
+					// Choose per-tag leaderboard index based on configured per-tag leaderboards
+					perTag := r.config.Test.ZSetPerTagLeaderboards
+					if perTag <= 0 {
+						perTag = 4
+					}
+					lbIdx := 0
+					if perTag > 1 {
+						lbIdx = int(time.Now().UnixNano() % int64(perTag))
+					}
+					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, 1)
+
+					// ZADD a batch of members
+					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
+					members := make(map[string]float64, batchSize)
+					// Batch nonce to ensure member IDs are unique across batches
+					batchNonce := time.Now().UnixNano() % int64(defaultScoreMax)
+					for i := 0; i < batchSize; i++ {
+						// Compose unique member id: m:<nonce>:<counter>
+						member := "m:" + utils.Base36Padded(int(batchNonce), 6) + ":" + utils.Base36Padded(i, 4)
+						// Generate score according to configured mode
+						var score float64
+						switch r.config.Test.ZSetScoreMode {
+						case "random":
+							// Pseudo-random mix of time and index; bounded by defaultScoreMax
+							mixed := (time.Now().UnixNano() ^ int64(i*2654435761)) % int64(defaultScoreMax)
+							if mixed < 0 {
+								mixed = -mixed
+							}
+							score = float64(mixed)
+						case "increment":
+							// Simple increasing scores within the batch
+							score = float64(i % defaultScoreMax)
+						case "time":
+							fallthrough
+						default:
+							// Time-based to ensure natural movement
+							score = float64(time.Now().UnixNano() % int64(defaultScoreMax))
+						}
+						members[member] = score
+					}
+					if err := r.redisOps.ZAddMembers(opCtx, zkey, members, r.config.Redis.Expiration); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZAddMembers failed", "err", err)
+						}
+					}
+					cancel()
+
+					if ctx.Err() != nil {
+						<-clients
+						return
+					}
+
+					// Read top-K
+					opCtx2, cancel2 := context.WithTimeout(ctx, opTimeout)
+					topK := int64(r.config.Test.ZSetTopK)
+					if topK <= 0 {
+						topK = 50
+					}
+					if err := r.redisOps.ZReadTopK(opCtx2, zkey, topK); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZReadTopK failed", "err", err)
+						}
+					}
+					cancel2()
+
+					// Trim to top-K
+					opCtx3, cancel3 := context.WithTimeout(ctx, opTimeout)
+					if err := r.redisOps.ZTrimToTopK(opCtx3, zkey, topK); err != nil {
+						if ctx.Err() == nil {
+							slog.Error("ZTrimToTopK failed", "err", err)
+						}
+					}
+					cancel3()
+
+					// Occasionally union across few per-tag leaderboards using configured fan-in
+					if (time.Now().UnixNano() & 0x7) == 0 { // ~1/8 ops
+						fanIn := r.config.Test.ZSetUnionFanIn
+						if fanIn < 0 {
+							fanIn = 0
+						}
+						if fanIn > 0 {
+							perTag := r.config.Test.ZSetPerTagLeaderboards
+							if perTag <= 0 {
+								perTag = 4
+							}
+							if fanIn > perTag {
+								fanIn = perTag
+							}
+							sources := make([]string, 0, fanIn)
+							for i := 0; i < fanIn; i++ {
+								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, 1))
+							}
+							opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
+							dest := "z:lb:" + tag + ":union"
+							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
+								if ctx.Err() == nil {
+									slog.Error("ZUnionWithinTag failed", "err", err)
+								}
+							}
+							cancel4()
 						}
 					}
 				default:
