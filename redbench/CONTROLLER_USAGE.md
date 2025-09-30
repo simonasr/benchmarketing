@@ -234,15 +234,9 @@ docker compose -f compose-example.yaml --profile autostart up --build
 
 Without the profile, the stack starts idle and you can configure and launch jobs from the UI.
 
-## Legacy Modes (unchanged)
+## Legacy Modes
 
-```bash
-# Traditional CLI mode
-./redbench
-
-# Single service mode (uses port 8080 by default)
-./redbench --service
-```
+Traditional standalone modes have been removed. Use controller/worker mode.
 
 ## Notes
 

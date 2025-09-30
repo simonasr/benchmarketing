@@ -104,7 +104,6 @@ func (conn *RedisConnection) SetTargetLabel() {
 	} else if conn.URL != "" {
 		conn.TargetLabel = conn.URL
 	} else {
-		// No connection info available (service mode without config)
 		conn.TargetLabel = "unspecified"
 	}
 }

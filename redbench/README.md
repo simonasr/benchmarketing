@@ -4,8 +4,6 @@ Redis benchmarking tool that measures performance and provides Prometheus metric
 
 ## Features
 
-- **CLI Mode**: Traditional one-shot benchmarking
-- **Service Mode**: HTTP API for remote control and multiple benchmarks
 - **Controller/Worker Mode**: Centralized orchestration across workers with optional UI
 - **Prometheus Metrics**: Real-time performance monitoring
 
@@ -14,36 +12,14 @@ Redis benchmarking tool that measures performance and provides Prometheus metric
 
 ## Quick Start
 
-### CLI Mode (One-shot benchmark)
+### Quick CLI examples
 
 ```bash
-# Single Redis instance
-REDIS_URL=redis://localhost:6379 ./redbench
+# Controller
+./redbench --mode=controller --port=8081
 
-# Redis cluster
-REDIS_CLUSTER_URL=redis://cluster.example.com:6379 ./redbench
-```
-
-### Service Mode (HTTP API)
-
-```bash
-# Start the service (Redis config optional in service mode)
-API_PORT=8080 ./redbench -service
-
-# Start a benchmark via API
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "url": "redis://localhost:6379"
-    }
-  }' | jq
-
-# Check status
-curl http://localhost:8080/status | jq
-
-# Stop benchmark
-curl -X DELETE http://localhost:8080/stop | jq
+# Worker
+./redbench --mode=worker --port=8080 --controller=http://localhost:8081
 ```
 
 ### Controller/Worker Mode (Docker Compose)
@@ -99,68 +75,23 @@ The project follows Clean Architecture principles:
 |----------|-------------|----------|
 | `REDIS_URL` | Single Redis instance URL (`redis://`) | Yes (if `REDIS_CLUSTER_URL` not set) |
 | `REDIS_CLUSTER_URL` | Redis cluster URL (`redis://`) | Yes (if `REDIS_URL` not set) |
-| `API_PORT` | HTTP API port for service mode | No (default: 8080) |
+| `API_PORT` | (unused) legacy env, ignored | No |
 | `TEST_*` | Override test parameters (e.g., `TEST_MAX_CLIENTS=100`) | No |
 
 ### Configuration Priority
 
-1. **API Request Body** (highest) - JSON parameters in service mode
-2. **Environment Variables** (medium) - Runtime overrides
-3. **config.yaml** (lowest) - Default configuration file
+1. **Environment Variables** (highest) - Runtime overrides
+2. **config.yaml** (defaults) - Default configuration file
 
-## Service Mode API
+## Worker API
 
-### Endpoints
+Workers expose a minimal HTTP API used by the controller:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/status` | Get current benchmark status |
 | `POST` | `/start` | Start a new benchmark |
 | `DELETE` | `/stop` | Stop running benchmark |
-
-### Starting Benchmarks
-
-All `/start` requests **must** include Redis configuration. Here are examples:
-
-#### Basic Redis Connection
-```bash
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "url": "redis://localhost:6379"
-    }
-  }'
-```
-
-#### Custom Test Parameters
-```bash
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "url": "redis://localhost:6379"
-    },
-    "test": {
-      "minClients": 5,
-      "maxClients": 50,
-      "stageIntervalMs": 2000,
-      "keySize": 15,
-      "valueSize": 20
-    }
-  }'
-```
-
-#### Redis Cluster
-```bash
-curl -X POST http://localhost:8080/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redis": {
-      "clusterUrl": "redis://cluster.example.com:6379"
-    }
-  }'
-```
 
 ### Response Examples
 
@@ -206,13 +137,9 @@ Redis connection requires either URL or ClusterURL to be specified
 
 Metrics are exposed on each running server under `/metrics`:
 
-- In CLI and service modes, the default port is 8080 (configurable via `API_PORT`).
 - In controller/worker mode (Compose), the controller exposes `http://localhost:8081/metrics`; workers are scraped inside the Compose network by Prometheus.
 
 ```bash
-# Example (service/CLI mode):
-curl http://localhost:8080/metrics | grep redbench
-
 # Example (controller mode):
 curl http://localhost:8081/metrics | grep redbench
 ```

@@ -13,7 +13,7 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
 )
 
-// Server represents the HTTP server for service mode.
+// Server represents the HTTP server used by workers.
 type Server struct {
 	service    *Service
 	httpServer *http.Server
@@ -25,7 +25,7 @@ func (s *Server) Service() *Service {
 	return s.service
 }
 
-// NewServer creates a new HTTP server for service mode.
+// NewServer creates a new HTTP server for the worker API.
 func NewServer(port int, baseConfig *config.Config, redisConn *config.RedisConnection, metricsRegistry *prometheus.Registry) *Server {
 	service := NewService(baseConfig, redisConn, metricsRegistry)
 
@@ -56,7 +56,7 @@ func NewServer(port int, baseConfig *config.Config, redisConn *config.RedisConne
 
 // Start starts the HTTP server and blocks until shutdown.
 func (s *Server) Start(ctx context.Context) error {
-	slog.Info("Starting service mode HTTP server", "port", s.port)
+	slog.Info("Starting worker HTTP server", "port", s.port)
 
 	// Start server in a goroutine
 	go func() {
