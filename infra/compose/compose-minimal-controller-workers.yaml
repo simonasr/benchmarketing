@@ -1,9 +1,9 @@
 x-redbench_base: &redbench_base
   build:
-    context: ./redbench
+    context: ../../redbench
     dockerfile: Dockerfile
   volumes:
-    - ./redbench/config.yaml:/config.yaml
+    - ../../redbench/config.yaml:/config.yaml
   restart: no
 
 services:
@@ -46,7 +46,7 @@ services:
       - 9090:9090
     restart: unless-stopped
     volumes:
-      - ./prometheus/prometheus-minimal.yml:/etc/prometheus/prometheus.yml
+      - ../prometheus/prometheus-minimal.yml:/etc/prometheus/prometheus.yml
       - prom_data_min:/prometheus
 
   grafana:
@@ -62,9 +62,9 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-      - ./grafana:/etc/grafana/provisioning/datasources
-      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+      - ../grafana:/etc/grafana/provisioning/datasources
+      - ../grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
 
 volumes:
   prom_data_min:

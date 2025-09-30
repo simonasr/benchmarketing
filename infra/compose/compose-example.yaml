@@ -1,9 +1,9 @@
 x-bench_base: &bench_base
   build:
-    context: ./redbench
+    context: ../../redbench
     dockerfile: Dockerfile
   volumes:
-    - ./redbench/config.yaml:/config.yaml
+    - ../../redbench/config.yaml:/config.yaml
   restart: no
   depends_on:
     - prometheus
@@ -111,7 +111,7 @@ services:
       - 9090:9090
     restart: unless-stopped
     volumes:
-      - ./prometheus:/etc/prometheus
+      - ../prometheus:/etc/prometheus
       - prom_data:/prometheus
   grafana:
     image: grafana/grafana
@@ -126,9 +126,9 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-      - ./grafana:/etc/grafana/provisioning/datasources
-      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+      - ../grafana:/etc/grafana/provisioning/datasources
+      - ../grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
   job_init:
     image: alpine:3.20
     container_name: job_init
@@ -139,7 +139,7 @@ services:
       - worker_redis7_1
       - worker_valkey_1
     volumes:
-      - ./redbench/scripts/compose-start-job.sh:/compose-start-job.sh:ro
+      - ../../redbench/scripts/compose-start-job.sh:/compose-start-job.sh:ro
     environment:
       - CONTROLLER_URL=http://controller:8081
       - EXPECTED_WORKERS=3

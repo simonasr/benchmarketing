@@ -16,13 +16,19 @@ cd benchmarketing
 
 ```bash
 # Start all services in detached mode
-docker compose -f compose-example.yaml up -d
+docker compose -f infra/compose/compose-example.yaml up -d
 
 # To view logs
-docker compose -f compose-example.yaml logs -f
+docker compose -f infra/compose/compose-example.yaml logs -f
 
 # To stop all services
-docker compose -f compose-example.yaml down
+docker compose -f infra/compose/compose-example.yaml down
+```
+
+Minimal stack (controller + workers only):
+
+```bash
+docker compose -f infra/compose/compose-minimal-controller-workers.yaml up -d
 ```
 
 ### Accessing Monitoring Tools
@@ -44,13 +50,13 @@ docker compose -f compose-example.yaml down
 
 ```bash
 # Check service status
-docker compose -f compose-example.yaml ps
+docker compose -f infra/compose/compose-example.yaml ps
 
 # Restart specific service
-docker compose -f compose-example.yaml restart [service-name]
+docker compose -f infra/compose/compose-example.yaml restart [service-name]
 
 # View service logs
-docker compose -f compose-example.yaml logs [service-name]
+docker compose -f infra/compose/compose-example.yaml logs [service-name]
 ```
 
 ## Redis TLS Configuration
@@ -84,7 +90,7 @@ export REDIS_TLS_CA_FILE="/path/to/ca.pem"
 
 ```bash
 # Generate test certificates
-./scripts/generate-tls-certs.sh
+./infra/scripts/generate-tls-certs.sh
 
 # Test TLS connection (insecure for testing)
 export REDIS_URL="rediss://localhost:6380"
