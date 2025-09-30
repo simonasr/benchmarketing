@@ -158,3 +158,12 @@ func ComposeTaggedKeyWithCounter(tag string, keySize int, suffixLen int, counter
 	}
 	return "{" + tagInner + "}" + suffix
 }
+
+// Base36WidthForMax returns the minimal width required to represent n in base36.
+// Always returns at least 1.
+func Base36WidthForMax(n int) int {
+	if n <= 0 {
+		return 1
+	}
+	return len(strconv.FormatInt(int64(n), 36))
+}
