@@ -82,7 +82,7 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 		})
 		client = redis.NewClient(opts)
 	} else {
-		return nil, fmt.Errorf("either REDIS_URL or REDIS_CLUSTER_URL must be configured")
+		return nil, fmt.Errorf("redis URL or cluster URL must be provided")
 	}
 
 	// Ping to verify connection

@@ -73,9 +73,7 @@ The project follows Clean Architecture principles:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `REDIS_URL` | Single Redis instance URL (`redis://`) | Yes (if `REDIS_CLUSTER_URL` not set) |
-| `REDIS_CLUSTER_URL` | Redis cluster URL (`redis://`) | Yes (if `REDIS_URL` not set) |
-| `API_PORT` | (unused) legacy env, ignored | No |
+| Controller API | Provide targets via job request (`redisUrl`/`clusterUrl`) | Yes |
 | `TEST_*` | Override test parameters (e.g., `TEST_MAX_CLIENTS=100`) | No |
 
 ### Configuration Priority

@@ -15,21 +15,24 @@ globs: "compose*.yaml,Dockerfile,*.conf"
 ### Volume Mounting Pattern
 Use volumes for persistent data (e.g., Prometheus storage). Certificate mounts are no longer required.
 
-### Environment Variable Patterns
-Use redis:// URLs for single instance and cluster connections:
-```yaml
-environment:
-  - REDIS_URL=redis://redis.example.com:6379
-  - REDIS_CLUSTER_URL=redis://cluster.example.com:6379
+### Target Configuration
+Provide targets to the controller via job API payloads (not env vars):
+```json
+{
+  "targets": [
+    { "redisUrl": "redis://redis.example.com:6379", "workerCount": 2 },
+    { "clusterUrl": "redis://cluster.example.com:6379", "workerCount": 2 }
+  ]
+}
 ```
 
 ## Certificate Management
 Not applicable.
 
 ## Configuration Flexibility
-Support deployment scenarios:
-- **Single Instance**: `REDIS_URL=redis://host:port`
-- **Cluster Mode**: `REDIS_CLUSTER_URL=redis://host:port`
+Support deployment scenarios via controller job targets:
+- **Single Instance**: `redisUrl=redis://host:port`
+- **Cluster Mode**: `clusterUrl=redis://host:port`
 
 ## Documentation Standards
 Include usage comments in Docker Compose files as needed.

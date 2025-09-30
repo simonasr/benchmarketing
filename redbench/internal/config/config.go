@@ -214,41 +214,6 @@ func LoadConfig(path string) (*Config, error) {
 
 // LoadRedisConnection loads Redis connection configuration from environment variables.
 // It supports both traditional host/port configuration and redis:// URLs.
-func LoadRedisConnection() (*RedisConnection, error) {
-	conn := &RedisConnection{
-		ClusterURL:            os.Getenv("REDIS_CLUSTER_URL"),
-		URL:                   os.Getenv("REDIS_URL"),
-		ConnectTimeoutSeconds: getIntEnv("REDIS_CONNECT_TIMEOUT_SECONDS", 10),
-	}
-
-	// Parse Redis URL if provided
-	if conn.URL != "" {
-		if err := conn.ParseURL(); err != nil {
-			return nil, fmt.Errorf("parsing Redis URL: %w", err)
-		}
-	} else if conn.ClusterURL != "" {
-		// Parse cluster URL
-		if err := conn.ParseClusterURL(); err != nil {
-			return nil, fmt.Errorf("parsing Redis cluster URL: %w", err)
-		}
-	}
-
-	// Check if we're in a test environment
-	if os.Getenv("GO_TEST") == "1" && conn.ClusterURL == "" && conn.URL == "" {
-		// For tests, use a default value
-		conn.URL = "redis://test-host:6379"
-		if err := conn.ParseURL(); err != nil {
-			return nil, fmt.Errorf("parsing test Redis URL: %w", err)
-		}
-	} else if conn.ClusterURL == "" && conn.URL == "" {
-		return nil, fmt.Errorf("REDIS_CLUSTER_URL or REDIS_URL environment variable must be set")
-	}
-
-	// Set target label for metrics
-	conn.SetTargetLabel()
-
-	return conn, nil
-}
 
 // NewRedisConnection creates a new RedisConnection with the given timeout.
 func NewRedisConnection(timeoutSeconds int) *RedisConnection {

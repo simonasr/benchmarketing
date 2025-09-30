@@ -44,14 +44,6 @@ redis:
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
 
-	// Set environment variables for Redis connection
-	os.Setenv("REDIS_URL", "redis://localhost:6379")
-	os.Setenv("REDIS_TARGET_LABEL", "test-redis")
-	defer func() {
-		os.Unsetenv("REDIS_URL")
-		os.Unsetenv("REDIS_TARGET_LABEL")
-	}()
-
 	// We can't actually run main() because it would start the benchmark
 	// But we can verify that the config file exists and is valid
 	_, err = os.Stat(configPath)
@@ -77,25 +69,4 @@ func TestConfigFileExists(t *testing.T) {
 	}
 
 	assert.True(t, found, "config.yaml should exist somewhere in the project")
-}
-
-// TestEnvironmentVariables verifies that environment variables are properly handled
-func TestEnvironmentVariables(t *testing.T) {
-	// Set test environment variables
-	os.Setenv("REDIS_URL", "redis://test-host:1234")
-	os.Setenv("REDIS_TARGET_LABEL", "test-label")
-	os.Setenv("REDIS_CLUSTER_URL", "redis://cluster:6379")
-
-	defer func() {
-		os.Unsetenv("REDIS_URL")
-		os.Unsetenv("REDIS_TARGET_LABEL")
-		os.Unsetenv("REDIS_CLUSTER_URL")
-	}()
-
-	// We can't directly test the LoadRedisConnection function here
-	// since it's in a different package, but we can verify that
-	// environment variables are set correctly
-	assert.Equal(t, "redis://test-host:1234", os.Getenv("REDIS_URL"))
-	assert.Equal(t, "test-label", os.Getenv("REDIS_TARGET_LABEL"))
-	assert.Equal(t, "redis://cluster:6379", os.Getenv("REDIS_CLUSTER_URL"))
 }

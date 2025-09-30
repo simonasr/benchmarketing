@@ -61,15 +61,7 @@ docker compose -f infra/compose/compose-example.yaml logs [service-name]
 
 ## Redis Configuration
 
-Use plain Redis URLs.
-
-```bash
-# Single instance
-export REDIS_URL="redis://redis.example.com:6379"
-
-# Cluster
-export REDIS_CLUSTER_URL="redis://cluster.example.com:6379"
-```
+Provide targets via the controller job API (`redisUrl` or `clusterUrl`).
 
 ## Acknowledgments
 

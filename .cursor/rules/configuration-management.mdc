@@ -7,11 +7,10 @@ globs: "internal/config/*.go,internal/redis/*.go,*.yaml,compose*.yaml"
 
 ## Configuration Loading Priority
 1. **YAML Configuration** ([config.yaml](mdc:config.yaml)) - Base configuration
-2. **Environment Variables** - Runtime overrides (highest priority)
-3. **URL Configuration** - Simplified Redis connection setup
+2. **Environment Variables** - Runtime overrides for test parameters (highest priority)
+3. **Controller API** - Provide Redis targets via job request
 
 ## Environment Variable Conventions
-- Use `REDIS_` prefix for Redis-related configuration
 - Use `TEST_` prefix for test configuration
 - Boolean values: `true`/`false` (case-insensitive)
 - Integer values: Plain numbers (e.g., `10`)
@@ -24,14 +23,11 @@ func getBoolEnv(key string, defaultValue bool) bool
 func getIntEnv(key string, defaultValue int) int
 ```
 
-## URL Configuration Support
-Support both traditional and URL-based configuration (redis only):
+## Target Configuration
+Provide Redis targets via the controller job API fields:
 
-### Single Instance
-- `REDIS_URL=redis://redis.example.com:6379`
-
-### Cluster Mode
-- `REDIS_CLUSTER_URL=redis://cluster.example.com:6379`
+- Single instance: `redisUrl="redis://host:port"`
+- Cluster mode: `clusterUrl="redis://host:port"`
 
 ### URL Parsing Best Practice
 Parse Redis URLs with scheme validation (redis only):
@@ -48,7 +44,6 @@ if u.Scheme != "redis" {
 ## Configuration Validation
 - Validate required fields during initialization
 - Provide clear error messages for missing configuration
-- Use early validation in `LoadRedisConnection()`
 
 ## Docker Compose Patterns
 - Use environment variables for all dynamic configuration

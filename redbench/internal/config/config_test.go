@@ -89,32 +89,6 @@ test:
 	assert.Equal(t, 20, cfg.Test.MaxClients)
 }
 
-func TestLoadRedisConnection(t *testing.T) {
-	// Clear all Redis environment variables first
-	defer func() {
-		os.Unsetenv("REDIS_URL")
-		os.Unsetenv("REDIS_CLUSTER_URL")
-	}()
-
-	// Test with Redis URL
-	os.Setenv("REDIS_URL", "redis://localhost:6380")
-	os.Unsetenv("REDIS_CLUSTER_URL") // Ensure cluster URL is not set
-
-	conn, err := LoadRedisConnection()
-	require.NoError(t, err)
-	assert.Equal(t, "redis://localhost:6380", conn.URL)
-	assert.Equal(t, "redis://localhost:6380", conn.TargetLabel)
-
-	// Test with cluster URL (clear Redis URL first)
-	os.Unsetenv("REDIS_URL")
-	os.Setenv("REDIS_CLUSTER_URL", "redis://cluster.example.com:6379")
-
-	conn, err = LoadRedisConnection()
-	require.NoError(t, err)
-	assert.Equal(t, "cluster.example.com:6379", conn.ClusterURL)
-	assert.Equal(t, "cluster.example.com:6379", conn.TargetLabel)
-}
-
 func TestToEnvName(t *testing.T) {
 	tests := []struct {
 		input    string
