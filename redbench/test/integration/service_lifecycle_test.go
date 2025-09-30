@@ -13,7 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
-	"github.com/simonasr/benchmarketing/redbench/internal/service"
+	"github.com/simonasr/benchmarketing/redbench/internal/workerapi"
 )
 
 // TestServiceRepeatedStartStop tests the service API for repeated start/stop cycles
@@ -40,7 +40,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 	reg := prometheus.NewRegistry()
 
 	// Start service
-	server := service.NewServer(ServiceLifecyclePort, cfg, redisConn, reg)
+	server := workerapi.NewServer(ServiceLifecyclePort, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -16,12 +16,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
-	"github.com/simonasr/benchmarketing/redbench/internal/service"
+	"github.com/simonasr/benchmarketing/redbench/internal/workerapi"
 )
 
 // Worker represents a worker instance with controller registration.
 type Worker struct {
-	server    *service.Server
+	server    *workerapi.Server
 	regClient *RegistrationClient
 	workerID  string
 	port      int
@@ -50,8 +50,8 @@ func NewWorker(cfg *config.Config, redisConn *config.RedisConnection, port int, 
 	// Determine appropriate address for worker registration
 	address := resolveWorkerAddress(bindAddress, hostname, controllerURL)
 
-	// Create the service server (reusing existing service logic). Base redisConn may be nil; API requires target in /start.
-	server := service.NewServer(port, cfg, redisConn, reg)
+	// Create the worker HTTP server. Base redisConn may be nil; API requires target in /start.
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	// Reuse a single HTTP client for completion notifications (config-driven)
 	client := &http.Client{Timeout: cfg.Controller.HTTPTimeout()}
@@ -144,7 +144,7 @@ func (w *Worker) Start(ctx context.Context) error {
 		}
 	}(ctx)
 
-	// Start the service server (this will block until shutdown)
+	// Start the worker HTTP server (this will block until shutdown)
 	if err := w.server.Start(ctx); err != nil {
 		return fmt.Errorf("worker server failed: %w", err)
 	}

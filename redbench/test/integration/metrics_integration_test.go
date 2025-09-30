@@ -17,7 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/simonasr/benchmarketing/redbench/internal/config"
-	"github.com/simonasr/benchmarketing/redbench/internal/service"
+	"github.com/simonasr/benchmarketing/redbench/internal/workerapi"
 )
 
 // TestServiceMetricsPersistAndUpdateAcrossRestarts validates that Redis request metrics
@@ -38,7 +38,7 @@ func TestServiceMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServiceLifecyclePort + 1 // avoid collision with other tests
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	go func() { _ = server.Start(ctx) }()
@@ -153,7 +153,7 @@ func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServicePortBase + 2
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
@@ -218,7 +218,7 @@ func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServicePortBase + 4
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
@@ -292,7 +292,7 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServicePortBase + 3
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
@@ -382,7 +382,7 @@ func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServicePortBase + 5
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
@@ -459,7 +459,7 @@ func TestKeysContainHashTagWithSameSlot(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 	port := ServicePortBase + 4
-	server := service.NewServer(port, cfg, redisConn, reg)
+	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()

@@ -63,7 +63,7 @@ The project follows Clean Architecture principles:
 - `internal/config`: Configuration handling
 - `internal/metrics`: Prometheus metrics
 - `internal/redis`: Redis client and operations
-- `internal/service`: HTTP API service
+- `internal/workerapi`: Worker HTTP API
 - `pkg/utils`: Shared utilities
 - `test/integration`: Integration tests
 
@@ -225,10 +225,10 @@ GitHub Actions automatically runs:
 
 1. **"Redis connection requires either URL or ClusterURL"**
    - Ensure you provide Redis configuration in CLI mode via environment variables
-   - In service mode, include `redis` configuration in your POST request
+   - Provide Redis configuration via controller job targets
 
 2. **Port conflicts**
-   - Change API/metrics port: `API_PORT=9090 ./redbench -service`
+   - Change controller port with `--port` flag; workers use their own `--port`
    - Both API and metrics now use the same unified port (8080 by default)
 
 ### Debug Mode
