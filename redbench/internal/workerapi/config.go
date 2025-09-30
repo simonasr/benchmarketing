@@ -126,7 +126,11 @@ func CreateRedisConnectionFromRequest(baseRedisConn *config.RedisConnection, req
 	}
 
 	// Create a new Redis connection based on the request
-	conn := config.NewRedisConnection(baseRedisConn.ConnectTimeoutSeconds)
+	timeout := config.DefaultConnectTimeoutSeconds
+	if baseRedisConn != nil && baseRedisConn.ConnectTimeoutSeconds > 0 {
+		timeout = baseRedisConn.ConnectTimeoutSeconds
+	}
+	conn := config.NewRedisConnection(timeout)
 
 	// Apply Redis overrides
 	if err := applyRedisOverrides(conn, req.Redis); err != nil {

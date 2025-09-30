@@ -18,6 +18,9 @@ const (
 	WorkloadMSetMGet  = "mset_mget"
 	WorkloadHSetHMGet = "hset_hmget"
 	WorkloadZSet      = "zset_leaderboards"
+	// DefaultConnectTimeoutSeconds is the fallback Redis connection timeout used
+	// when none is explicitly provided by the caller.
+	DefaultConnectTimeoutSeconds = 5
 )
 
 // IsBatchWorkload reports whether the given workload uses batch operations.

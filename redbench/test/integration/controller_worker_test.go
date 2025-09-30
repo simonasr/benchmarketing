@@ -24,12 +24,6 @@ func TestControllerWorkerIntegration(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Create test Redis connection (optional for this test)
-	redisConn := &config.RedisConnection{
-		URL:         "redis://localhost:6379",
-		TargetLabel: TestRedisLabel,
-	}
-
 	// Create metrics registry
 	reg := prometheus.NewRegistry()
 
@@ -62,9 +56,9 @@ func TestControllerWorkerIntegration(t *testing.T) {
 		t.Fatalf("Controller health check failed: %d", resp.StatusCode)
 	}
 
-	// Create worker
+	// Create worker with nil base Redis connection (matches compose behavior)
 	workerPort := 18080
-	workerInstance, err := worker.NewWorker(cfg, redisConn, workerPort, controllerURL, "", reg)
+	workerInstance, err := worker.NewWorker(cfg, nil, workerPort, controllerURL, "", reg)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -108,7 +102,7 @@ func TestControllerWorkerIntegration(t *testing.T) {
 
 	t.Logf("Successfully registered %v workers, %v available", total, available)
 
-	// Test job creation (single-instance)
+	// Test job creation (single-instance) and assert worker transitions to non-idle
 	jobReq := map[string]interface{}{
 		"targets": []map[string]interface{}{
 			{
@@ -129,8 +123,26 @@ func TestControllerWorkerIntegration(t *testing.T) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		t.Logf("Job creation returned status %d (expected due to Redis connection)", resp.StatusCode)
-		// This is expected in test environment without Redis
+		t.Logf("Job creation returned status %d (expected in some environments)", resp.StatusCode)
+	}
+
+	// Give controller time to dispatch the job
+	time.Sleep(StartupDelay)
+
+	// Query worker status directly; expect not idle while job is running/being started
+	workerURL := fmt.Sprintf("http://localhost:%d/status", workerPort)
+	wresp, err := http.Get(workerURL)
+	if err != nil {
+		t.Fatalf("Failed to query worker status: %v", err)
+	}
+	defer wresp.Body.Close()
+	if wresp.StatusCode == http.StatusOK {
+		var wst map[string]any
+		if err := json.NewDecoder(wresp.Body).Decode(&wst); err == nil {
+			if st, _ := wst["status"].(string); st == "idle" {
+				t.Errorf("worker status should not be idle right after job start")
+			}
+		}
 	}
 
 	// Test job creation (cluster target)

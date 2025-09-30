@@ -296,11 +296,7 @@ func TestCreateRedisConnection_WithURLOverride_Alternative(t *testing.T) {
 }
 
 func TestCreateRedisConnection_WithURLOverride(t *testing.T) {
-	baseConn := &config.RedisConnection{
-		URL:                   "redis://base-host:6379",
-		ConnectTimeoutSeconds: 10,
-		TargetLabel:           "redis://base-host:6379",
-	}
+	var baseConn *config.RedisConnection // nil base should be supported
 
 	requestBody := BenchmarkRequest{
 		Redis: &RedisOverrides{
