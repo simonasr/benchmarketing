@@ -297,7 +297,7 @@ func (o *Operations) ZTrimToTopK(ctx context.Context, key string, topK int64) er
 }
 
 // ZUnionWithinTag unions multiple keys into a destination key within same slot tag and trims.
-func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources []string, trimTopK int64) error {
+func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources []string, trimTopK int64, expiration int32) error {
 	if len(sources) == 0 || dest == "" {
 		return nil
 	}
@@ -310,6 +310,12 @@ func (o *Operations) ZUnionWithinTag(ctx context.Context, dest string, sources [
 	if trimTopK > 0 {
 		if err := o.ZTrimToTopK(ctx, dest, trimTopK); err != nil {
 			return err
+		}
+	}
+	if expiration > 0 {
+		if err := o.client.ExpireMany(ctx, []string{dest}, expiration); err != nil {
+			o.metrics.IncrementExpireFailures()
+			return fmt.Errorf("failed to expire zset union dest: %w", err)
 		}
 	}
 	return nil

@@ -303,7 +303,7 @@ func (r *Runner) Run(ctx context.Context) error {
 							}
 							opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
 							dest := "z:lb:" + tag + ":union"
-							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK); err != nil {
+							if err := r.redisOps.ZUnionWithinTag(opCtx4, dest, sources, topK, r.config.Redis.Expiration); err != nil {
 								if ctx.Err() == nil {
 									slog.Error("ZUnionWithinTag failed", "err", err)
 								}
