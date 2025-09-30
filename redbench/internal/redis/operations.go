@@ -114,8 +114,15 @@ func (o *Operations) SaveRandomBatchData(ctx context.Context, expiration int32, 
 	for i := 0; i < batchSize; i++ {
 		var key string
 		if sameSlotTag != "" {
-			// Use deterministic base36 counter suffix to guarantee uniqueness
-			key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, defaultTaggedSuffixLen, i)
+			// Use deterministic base36 counter suffix sized to batchSize to guarantee uniqueness
+			suffixLen := 1
+			if batchSize > 1 {
+				w := len(strconv.FormatInt(int64(batchSize-1), 36))
+				if w > suffixLen {
+					suffixLen = w
+				}
+			}
+			key = utils.ComposeTaggedKeyWithCounter(sameSlotTag, keySize, suffixLen, i)
 		} else {
 			key = utils.RandomString(keySize)
 			// Guarantee uniqueness for non-tagged case by appending a base36 counter if collision

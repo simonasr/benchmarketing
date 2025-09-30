@@ -202,7 +202,15 @@ func (r *Runner) Run(ctx context.Context) error {
 					if perTag > 1 {
 						lbIdx = int(time.Now().UnixNano() % int64(perTag))
 					}
-					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, 1)
+					// Use dynamic width so index formatting scales with number of leaderboards
+					zIdxWidth := 1
+					if perTag > 1 {
+						w := len(utils.Base36Padded(perTag-1, 1))
+						if w > zIdxWidth {
+							zIdxWidth = w
+						}
+					}
+					zkey := "z:lb:" + tag + ":" + utils.Base36Padded(lbIdx, zIdxWidth)
 
 					// ZADD a batch of members
 					opCtx, cancel := context.WithTimeout(ctx, opTimeout)
@@ -282,8 +290,16 @@ func (r *Runner) Run(ctx context.Context) error {
 								fanIn = perTag
 							}
 							sources := make([]string, 0, fanIn)
+							// Match dynamic width used for zkey above
+							unionWidth := 1
+							if perTag > 1 {
+								w := len(utils.Base36Padded(perTag-1, 1))
+								if w > unionWidth {
+									unionWidth = w
+								}
+							}
 							for i := 0; i < fanIn; i++ {
-								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, 1))
+								sources = append(sources, "z:lb:"+tag+":"+utils.Base36Padded(i, unionWidth))
 							}
 							opCtx4, cancel4 := context.WithTimeout(ctx, opTimeout)
 							dest := "z:lb:" + tag + ":union"
