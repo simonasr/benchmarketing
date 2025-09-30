@@ -16,9 +16,9 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/workerapi"
 )
 
-// TestServiceRepeatedStartStop tests the service API for repeated start/stop cycles
+// TestWorkerAPIRepeatedStartStop tests the worker API for repeated start/stop cycles
 // to verify state reset, metrics behavior, and overall reliability.
-func TestServiceRepeatedStartStop(t *testing.T) {
+func TestWorkerAPIRepeatedStartStop(t *testing.T) {
 	// Start miniredis server
 	mockRedis := miniredis.RunT(t)
 
@@ -39,8 +39,8 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 	reg := prometheus.NewRegistry()
 
-	// Start service
-	server := workerapi.NewServer(ServiceLifecyclePort, cfg, redisConn, reg)
+	// Start worker API
+	server := workerapi.NewServer(WorkerAPILifecyclePort, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -53,7 +53,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 	time.Sleep(StartupDelay)
 
-	serviceURL := fmt.Sprintf("http://localhost:%d", ServiceLifecyclePort)
+	serviceURL := fmt.Sprintf("http://localhost:%d", WorkerAPILifecyclePort)
 
 	// Test initial status
 	resp, err := http.Get(fmt.Sprintf("%s/status", serviceURL))
@@ -78,7 +78,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 		// Clear Redis before each cycle
 		mockRedis.FlushAll()
-		mockRedis.Set(ServiceCycleKey, fmt.Sprintf("cycle-%d", cycle))
+		mockRedis.Set(WorkerAPICycleKey, fmt.Sprintf("cycle-%d", cycle))
 
 		// Prepare start request
 		startReq := map[string]interface{}{
@@ -123,7 +123,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 		t.Logf("Cycle %d - Benchmark started successfully", cycle)
 
 		// Let benchmark run for a bit
-		time.Sleep(ServiceRunDuration)
+		time.Sleep(WorkerAPIRunDuration)
 
 		// Check if benchmark is actually running and performing operations
 		statusResp, err := http.Get(fmt.Sprintf("%s/status", serviceURL))
@@ -280,7 +280,7 @@ func TestServiceRepeatedStartStop(t *testing.T) {
 
 	t.Log("Final benchmark started successfully - state reset verified")
 
-	time.Sleep(FinalTestDuration)
+	time.Sleep(WorkerAPIFinalDuration)
 
 	// Check final operations
 	finalCommandCount := mockRedis.CommandCount()

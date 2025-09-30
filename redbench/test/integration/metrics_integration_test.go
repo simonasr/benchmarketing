@@ -20,9 +20,9 @@ import (
 	"github.com/simonasr/benchmarketing/redbench/internal/workerapi"
 )
 
-// TestServiceMetricsPersistAndUpdateAcrossRestarts validates that Redis request metrics
+// TestWorkerAPIMetricsPersistAndUpdateAcrossRestarts validates that Redis request metrics
 // continue to be exposed and increase when starting a job a second time.
-func TestServiceMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
+func TestWorkerAPIMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
 	mockRedis := miniredis.RunT(t)
 
 	cfg, err := config.LoadConfig("../../config.yaml")
@@ -37,7 +37,7 @@ func TestServiceMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServiceLifecyclePort + 1 // avoid collision with other tests
+	port := WorkerAPILifecyclePort + 1 // avoid collision with other tests
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -77,7 +77,7 @@ func TestServiceMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
 
 	// First start
 	startOnce()
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
 	c1 := scrapeSetCount(t, baseURL+"/metrics", expectedTarget)
 
@@ -87,7 +87,7 @@ func TestServiceMetricsPersistAndUpdateAcrossRestarts(t *testing.T) {
 
 	// Second start
 	startOnce()
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 	c2 := scrapeSetCount(t, baseURL+"/metrics", expectedTarget)
 
 	if c2 <= c1 {
@@ -152,7 +152,7 @@ func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServicePortBase + 2
+	port := WorkerAPIPortBase + 2
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -190,7 +190,7 @@ func TestMetrics_MSetMGet_SumIncreases(t *testing.T) {
 		t.Fatalf("unexpected start status: %d", resp.StatusCode)
 	}
 
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 
 	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
 	sumMSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "mset")
@@ -217,7 +217,7 @@ func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServicePortBase + 4
+	port := WorkerAPIPortBase + 4
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -255,7 +255,7 @@ func TestMetrics_HSetHMGet_SumIncreases(t *testing.T) {
 		t.Fatalf("unexpected start status: %d", resp.StatusCode)
 	}
 
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 
 	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
 	sumHSet := scrapeDurationSum(t, baseURL+"/metrics", expectedTarget, "hset")
@@ -291,7 +291,7 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServicePortBase + 3
+	port := WorkerAPIPortBase + 3
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -329,7 +329,7 @@ func TestMetrics_MSetMGet_SetGetRemainZero(t *testing.T) {
 		t.Fatalf("unexpected start status: %d", resp.StatusCode)
 	}
 
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 
 	// Verify set/get sums remain zero under mset_mget workload
 	expectedTarget := fmt.Sprintf("redis://%s", mockRedis.Addr())
@@ -365,8 +365,8 @@ func getSumRegex(target string, command string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
-// TestServiceStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get
-func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
+// TestWorkerAPIStatus_SetGet_HidesBatchFields verifies status JSON does not expose batch-only fields for set_get
+func TestWorkerAPIStatus_SetGet_HidesBatchFields(t *testing.T) {
 	mockRedis := miniredis.RunT(t)
 
 	cfg, err := config.LoadConfig("../../config.yaml")
@@ -381,7 +381,7 @@ func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServicePortBase + 5
+	port := WorkerAPIPortBase + 5
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -414,7 +414,7 @@ func TestServiceStatus_SetGet_HidesBatchFields(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 
 	// Query /status and ensure configuration omits batch-only fields
 	resp, err := http.Get(baseURL + "/status")
@@ -458,7 +458,7 @@ func TestKeysContainHashTagWithSameSlot(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	port := ServicePortBase + 4
+	port := WorkerAPIPortBase + 4
 	server := workerapi.NewServer(port, cfg, redisConn, reg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -496,7 +496,7 @@ func TestKeysContainHashTagWithSameSlot(t *testing.T) {
 		t.Fatalf("unexpected start status: %d", resp.StatusCode)
 	}
 
-	time.Sleep(ServiceRunDuration)
+	time.Sleep(WorkerAPIRunDuration)
 
 	// Inspect keys in miniredis
 	keys := mockRedis.Keys()

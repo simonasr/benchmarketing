@@ -15,7 +15,7 @@ const (
 	// Uses high port numbers (18xxx) to avoid system services
 	ControllerPortBase = 18100 // Base range for controllers
 	WorkerPortBase     = 18200 // Base range for workers (future use)
-	ServicePortBase    = 18300 // Base range for services (future use)
+	WorkerAPIPortBase  = 18300 // Base range for worker API HTTP servers
 
 	// Specific test ports - assigned systematically by test category
 	MockRedisControllerPort         = 18102 // Mock Redis lifecycle tests
@@ -24,7 +24,7 @@ const (
 	MockRedisTimeoutWorkerPort      = 18105
 	RepeatedLifecycleControllerPort = 18120 // Repeated lifecycle tests
 	RepeatedLifecycleWorkerPort     = 18121
-	ServiceLifecyclePort            = 18125 // Service mode tests
+	WorkerAPILifecyclePort          = 18125 // Worker API lifecycle tests
 	BasicControllerPort             = 18081 // Basic integration tests
 	BasicWorkerPort                 = 18080
 
@@ -35,8 +35,8 @@ const (
 	ShutdownDelay          = 200 * time.Millisecond  // Graceful shutdown completion
 	CycleDelay             = 100 * time.Millisecond  // Brief pause between test cycles
 	BenchmarkRunDuration   = 800 * time.Millisecond  // Min time for meaningful benchmark ops
-	ServiceRunDuration     = 600 * time.Millisecond  // Service mode benchmark duration
-	FinalTestDuration      = 400 * time.Millisecond  // Final validation runs
+	WorkerAPIRunDuration   = 600 * time.Millisecond  // Worker API benchmark duration
+	WorkerAPIFinalDuration = 400 * time.Millisecond  // Final validation runs
 	LongRunDuration        = 3 * time.Second         // Extended operations (long timeout tests)
 	WorkerRegistrationWait = 500 * time.Millisecond  // Time to wait for workers to register
 	ControllerRestartWait  = 1000 * time.Millisecond // Time to wait for controller restart operations
@@ -56,13 +56,13 @@ const (
 	TestValueSizeNormal     = 16  // Standard values for comprehensive tests
 
 	// Test labels and identifiers
-	MockRedisLabel   = "mock-redis"
-	TestRedisLabel   = "test-redis"
-	CycleMarkerKey   = "cycle-marker"
-	ServiceCycleKey  = "service-cycle"
-	ResetTestKey     = "reset-test"
-	LocalhostAddress = "localhost"
-	UnknownHostname  = "unknown"
+	MockRedisLabel    = "mock-redis"
+	TestRedisLabel    = "test-redis"
+	CycleMarkerKey    = "cycle-marker"
+	WorkerAPICycleKey = "service-cycle"
+	ResetTestKey      = "reset-test"
+	LocalhostAddress  = "localhost"
+	UnknownHostname   = "unknown"
 
 	// Test IP addresses for bind tests
 	TestIP1 = "10.1.2.3"
