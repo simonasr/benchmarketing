@@ -257,6 +257,18 @@ func LoadControllerConfig() ControllerConfig {
 	}
 }
 
+// ResolveConnectTimeoutSeconds returns the effective Redis connect timeout in seconds.
+// If the provided connection is nil or the timeout is <= 0, the default is returned.
+func ResolveConnectTimeoutSeconds(conn *RedisConnection) int {
+	if conn == nil {
+		return DefaultConnectTimeoutSeconds
+	}
+	if conn.ConnectTimeoutSeconds <= 0 {
+		return DefaultConnectTimeoutSeconds
+	}
+	return conn.ConnectTimeoutSeconds
+}
+
 // toEnvName converts CamelCase to upper snake case (e.g., MinClients -> MINCLIENTS)
 func toEnvName(s string) string {
 	res := ""

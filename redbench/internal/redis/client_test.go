@@ -70,18 +70,18 @@ func TestNewRedisClient(t *testing.T) {
 
 func TestResolveConnectTimeoutSeconds(t *testing.T) {
 	t.Run("nil conn uses default", func(t *testing.T) {
-		got := resolveConnectTimeoutSeconds(nil)
+		got := config.ResolveConnectTimeoutSeconds(nil)
 		assert.Equal(t, config.DefaultConnectTimeoutSeconds, got)
 	})
 	t.Run("zero or negative uses default", func(t *testing.T) {
 		c0 := &config.RedisConnection{ConnectTimeoutSeconds: 0}
 		cNeg := &config.RedisConnection{ConnectTimeoutSeconds: -5}
-		assert.Equal(t, config.DefaultConnectTimeoutSeconds, resolveConnectTimeoutSeconds(c0))
-		assert.Equal(t, config.DefaultConnectTimeoutSeconds, resolveConnectTimeoutSeconds(cNeg))
+		assert.Equal(t, config.DefaultConnectTimeoutSeconds, config.ResolveConnectTimeoutSeconds(c0))
+		assert.Equal(t, config.DefaultConnectTimeoutSeconds, config.ResolveConnectTimeoutSeconds(cNeg))
 	})
 	t.Run("positive returned as-is", func(t *testing.T) {
 		c := &config.RedisConnection{ConnectTimeoutSeconds: 7}
-		assert.Equal(t, 7, resolveConnectTimeoutSeconds(c))
+		assert.Equal(t, 7, config.ResolveConnectTimeoutSeconds(c))
 	})
 }
 
