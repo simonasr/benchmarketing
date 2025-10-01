@@ -103,12 +103,8 @@ func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequ
 }
 
 // SanitizeTestForWorkload normalizes the merged test configuration for the
-// selected workload by clearing fields that are not applicable. This prevents
-// leaking stale or misleading values to downstream components and to the UI.
-//
-// Current rules:
-//   - For non-batch workloads (e.g., set_get), the following are cleared:
-//     BatchSize = 0, SameSlotPerClient = false, TagsCount = 0.
+// selected workload by clearing fields not supported by that workload. The
+// sanitization is data-driven via capability flags for easier evolution.
 //
 // Call this on the final merged config right before execution (e.g., in
 // handler StartHandler) or before exposing the config in responses.
@@ -116,10 +112,51 @@ func SanitizeTestForWorkload(testCfg *config.Test) {
 	if testCfg == nil {
 		return
 	}
-	if !config.IsBatchWorkload(testCfg.Workload) {
+
+	// Capability flags describing which Test fields are meaningful for a workload.
+	type testCap uint32
+	const (
+		capBatch    testCap = 1 << iota // BatchSize
+		capSameSlot                     // SameSlotPerClient
+		capTags                         // TagsCount (cluster tag space)
+		capZSet                         // ZSET-specific knobs
+	)
+	has := func(c testCap, f testCap) bool { return c&f != 0 }
+
+	// Workload → capabilities. Extend here when adding new workloads.
+	var workloadCaps = map[string]testCap{
+		config.WorkloadSetGet:    0,
+		config.WorkloadMSetMGet:  capBatch | capSameSlot,
+		config.WorkloadHSetHMGet: capBatch | capSameSlot,
+		config.WorkloadZSet:      capZSet | capTags, // BatchSize still used as fallback when zsetBatchSize==0
+	}
+
+	caps, ok := workloadCaps[testCfg.Workload]
+	if !ok {
+		// Unknown workload: clear everything non-core
+		caps = 0
+	}
+
+	if !has(caps, capBatch) {
 		testCfg.BatchSize = 0
+	}
+	if !has(caps, capSameSlot) {
 		testCfg.SameSlotPerClient = false
+	}
+	if !has(caps, capTags) {
 		testCfg.TagsCount = 0
+	}
+	if !has(caps, capZSet) {
+		testCfg.ZSetBatchSize = 0
+		testCfg.ZSetTopK = 0
+		testCfg.ZSetPerTagLeaderboards = 0
+		testCfg.ZSetUnionFanIn = 0
+		testCfg.ZSetUnionEveryNOps = 0
+		testCfg.ZSetUpdateRatio = 0
+		testCfg.ZSetScoreMode = ""
+	} else {
+		// For zset workloads explicitly clear same-slot flag to avoid confusion
+		testCfg.SameSlotPerClient = false
 	}
 }
 

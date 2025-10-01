@@ -215,9 +215,6 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// LoadRedisConnection loads Redis connection configuration from environment variables.
-// It supports both traditional host/port configuration and redis:// URLs.
-
 // NewRedisConnection creates a new RedisConnection with the given timeout.
 func NewRedisConnection(timeoutSeconds int) *RedisConnection {
 	return &RedisConnection{

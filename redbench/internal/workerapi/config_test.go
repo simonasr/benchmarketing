@@ -120,6 +120,40 @@ func TestStatusSanitizesTagsCountForSetGet(t *testing.T) {
 	}
 }
 
+func TestSanitize_AllWorkloads(t *testing.T) {
+	t.Run("set_get clears batch/zset", func(t *testing.T) {
+		cfg := config.Test{Workload: config.WorkloadSetGet, BatchSize: 10, SameSlotPerClient: true, TagsCount: 1024, ZSetBatchSize: 5, ZSetTopK: 50, ZSetPerTagLeaderboards: 4, ZSetUnionFanIn: 3, ZSetUnionEveryNOps: 8, ZSetUpdateRatio: 20, ZSetScoreMode: "time"}
+		SanitizeTestForWorkload(&cfg)
+		if cfg.BatchSize != 0 || cfg.SameSlotPerClient || cfg.TagsCount != 0 || cfg.ZSetBatchSize != 0 || cfg.ZSetTopK != 0 || cfg.ZSetPerTagLeaderboards != 0 || cfg.ZSetUnionFanIn != 0 || cfg.ZSetUnionEveryNOps != 0 || cfg.ZSetUpdateRatio != 0 || cfg.ZSetScoreMode != "" {
+			t.Fatalf("set_get not sanitized: %+v", cfg)
+		}
+	})
+
+	t.Run("batch workloads clear zset-only and allow batch", func(t *testing.T) {
+		for _, wl := range []string{config.WorkloadMSetMGet, config.WorkloadHSetHMGet} {
+			cfg := config.Test{Workload: wl, BatchSize: 7, SameSlotPerClient: true, TagsCount: 1024, ZSetBatchSize: 9, ZSetTopK: 10, ZSetPerTagLeaderboards: 2, ZSetUnionFanIn: 2, ZSetUnionEveryNOps: 8, ZSetUpdateRatio: 10, ZSetScoreMode: "random"}
+			SanitizeTestForWorkload(&cfg)
+			if cfg.TagsCount != 0 || cfg.ZSetBatchSize != 0 || cfg.ZSetTopK != 0 || cfg.ZSetPerTagLeaderboards != 0 || cfg.ZSetUnionFanIn != 0 || cfg.ZSetUnionEveryNOps != 0 || cfg.ZSetUpdateRatio != 0 || cfg.ZSetScoreMode != "" {
+				t.Fatalf("batch workload not sanitized: %s %+v", wl, cfg)
+			}
+			if cfg.BatchSize == 0 {
+				t.Fatalf("batch workload should retain BatchSize")
+			}
+		}
+	})
+
+	t.Run("zset clears SameSlotPerClient only", func(t *testing.T) {
+		cfg := config.Test{Workload: config.WorkloadZSet, BatchSize: 5, SameSlotPerClient: true, TagsCount: 8, ZSetBatchSize: 4, ZSetTopK: 20, ZSetPerTagLeaderboards: 3, ZSetUnionFanIn: 2, ZSetUnionEveryNOps: 8, ZSetUpdateRatio: 10, ZSetScoreMode: "time"}
+		SanitizeTestForWorkload(&cfg)
+		if cfg.SameSlotPerClient {
+			t.Fatalf("zset should clear SameSlotPerClient")
+		}
+		if cfg.TagsCount == 0 || cfg.ZSetBatchSize == 0 || cfg.ZSetTopK == 0 {
+			t.Fatalf("zset should retain zset-specific fields")
+		}
+	})
+}
+
 func TestMergeConfiguration_WithRedisOverrides(t *testing.T) {
 	// Base configuration with default Redis values
 	baseConfig := &config.Config{
