@@ -21,6 +21,9 @@ type runtimePayload struct {
 	Test  testConfigDTO  `json:"test"`
 }
 
+// redisConfigDTO is the minimal wire representation of Redis configuration
+// exposed to the UI via /api/v1/runtime-config. Connection details (URLs/TLS)
+// are intentionally omitted from this import surface.
 type redisConfigDTO struct {
 	OperationTimeoutMs int   `json:"operationTimeoutMs"`
 	Expiration         int32 `json:"expiration"`

@@ -17,7 +17,8 @@ type BenchmarkRequest struct {
 
 // RedisOverrides allows specifying Redis target and configuration for the benchmark.
 type RedisOverrides struct {
-	// URL supports redis:// scheme
+	// URL supports only the redis:// scheme (plain TCP, no TLS).
+	// rediss:// (TLS) is NOT supported.
 	URL        *string `json:"url,omitempty"`
 	ClusterURL *string `json:"clusterUrl,omitempty"`
 	// Redis configuration overrides
@@ -101,10 +102,16 @@ func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequ
 	return mergedConfig, nil
 }
 
-// SanitizeTestForWorkload clears or normalizes fields that are irrelevant or unsafe
-// for the selected workload so that downstream components do not misinterpret
-// stale configuration values. This should be applied to the final merged config
-// right before execution or exposure.
+// SanitizeTestForWorkload normalizes the merged test configuration for the
+// selected workload by clearing fields that are not applicable. This prevents
+// leaking stale or misleading values to downstream components and to the UI.
+//
+// Current rules:
+//   - For non-batch workloads (e.g., set_get), the following are cleared:
+//     BatchSize = 0, SameSlotPerClient = false, TagsCount = 0.
+//
+// Call this on the final merged config right before execution (e.g., in
+// handler StartHandler) or before exposing the config in responses.
 func SanitizeTestForWorkload(testCfg *config.Test) {
 	if testCfg == nil {
 		return

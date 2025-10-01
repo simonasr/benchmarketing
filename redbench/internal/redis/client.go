@@ -98,8 +98,6 @@ func NewRedisClient(conn *config.RedisConnection) (*RedisClient, error) {
 	return &RedisClient{client: client}, nil
 }
 
-// Timeout resolution is centralized in internal/config.ResolveConnectTimeoutSeconds
-
 // NewRedisClientLegacy creates a new Redis client using the legacy parameters.
 // Deprecated: Use NewRedisClient with config.RedisConnection instead.
 func NewRedisClientLegacy(host, port, clusterAddress string) (*RedisClient, error) {
