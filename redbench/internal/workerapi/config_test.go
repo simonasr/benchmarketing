@@ -113,12 +113,8 @@ func TestStatusSanitizesTagsCountForSetGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("merge error: %v", err)
 	}
-	// Simulate the same sanitization as StartHandler
-	if !config.IsBatchWorkload(merged.Test.Workload) {
-		merged.Test.BatchSize = 0
-		merged.Test.SameSlotPerClient = false
-		merged.Test.TagsCount = 0
-	}
+	// Apply shared sanitization helper
+	SanitizeTestForWorkload(&merged.Test)
 	if merged.Test.TagsCount != 0 {
 		t.Fatalf("expected tagsCount=0 for set_get workload after sanitization, got %d", merged.Test.TagsCount)
 	}

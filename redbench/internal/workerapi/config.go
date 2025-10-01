@@ -101,6 +101,21 @@ func MergeConfigurationFromRequest(baseConfig *config.Config, req *BenchmarkRequ
 	return mergedConfig, nil
 }
 
+// SanitizeTestForWorkload clears or normalizes fields that are irrelevant or unsafe
+// for the selected workload so that downstream components do not misinterpret
+// stale configuration values. This should be applied to the final merged config
+// right before execution or exposure.
+func SanitizeTestForWorkload(testCfg *config.Test) {
+	if testCfg == nil {
+		return
+	}
+	if !config.IsBatchWorkload(testCfg.Workload) {
+		testCfg.BatchSize = 0
+		testCfg.SameSlotPerClient = false
+		testCfg.TagsCount = 0
+	}
+}
+
 // CreateRedisConnection creates a Redis connection configuration from API request overrides.
 // If no Redis configuration is provided in the request, it returns nil (use default connection).
 func CreateRedisConnection(baseRedisConn *config.RedisConnection, requestBody []byte) (*config.RedisConnection, error) {
